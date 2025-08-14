@@ -1,6 +1,6 @@
 import json
 from abc import ABC, abstractmethod
-from .types import FileResult
+from .utils import FileResult, merge_dataframes
 import pandas as pd
 import inspect
 
@@ -55,22 +55,8 @@ class FileReader(ABC):
         """Filter kwargs to only include valid ones for this reader"""
         return {k: v for k, v in kwargs.items() if k in self._VALID_KWARGS}
     
-    def _merge_sheets(self, sheets_dict):
-        """Merge dictionary of DataFrames into single DataFrame"""
-        normalized_sheets = []
-        for sheet_name, df in sheets_dict.items():
-            df['sheet_name'] = sheet_name
-            normalized_sheets.append(df)
-        
-        if not normalized_sheets:
-            return pd.DataFrame()
-        return pd.concat(normalized_sheets, ignore_index=True)
-
 class CsvReader(FileReader):
     """Reader for CSV files"""
-    
-    def get_valid_kwargs(self) -> list:
-        return ['sep', 'encoding', 'header', 'skiprows']
     
     def read(self, file_path, **kwargs) -> FileResult:
         """Read CSV file and return FileResult"""
@@ -97,7 +83,7 @@ class XlsxReader(FileReader):
         
         if sheet_name is None or isinstance(sheet_name, list):
             sheets_dict = pd.read_excel(file_path, sheet_name=sheet_name, **filtered_kwargs)
-            merged_df = self._merge_sheets(sheets_dict)
+            merged_df = merge_dataframes(sheets_dict)
             return FileResult(dataframe=merged_df, normalized=True)
         elif isinstance(sheet_name, int):
             excel_file = pd.ExcelFile(file_path)
@@ -113,12 +99,15 @@ class XlsxReader(FileReader):
     
 class JsonReader(FileReader):
     """Reader for JSON files"""
+
+    def get_valid_kwargs(self) -> set:
+        return set(['encoding'])
     
     def read(self, file_path, **kwargs) -> FileResult:
         """Read JSON file and return FileResult, handling nested structures"""
         filtered_kwargs = self.filter_kwargs(kwargs)
         
-        with open(file_path, 'r') as f:
+        with open(file_path, 'r', **filtered_kwargs) as f:
             data = json.load(f)
         
         if isinstance(data, list):
@@ -139,7 +128,7 @@ class JsonReader(FileReader):
                     sheets_dict[key] = pd.DataFrame(flattened_records)
             
             if sheets_dict:
-                merged_df = self._merge_sheets(sheets_dict)
+                merged_df = merge_dataframes(sheets_dict)
                 return FileResult(dataframe=merged_df, normalized=True)
             else:
                 raise ValueError(f"No array data found in nested JSON: {file_path}")
