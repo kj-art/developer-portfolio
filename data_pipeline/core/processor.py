@@ -13,9 +13,11 @@ class DataProcessor:
       'json': ['orient', 'lines', 'encoding']
   }
   _SCHEMA_MAP = {
-    'name': ['full_name'],
+    'first_name': ['first', 'firstname'],
+    'last_name': ['last', 'lastname'],
+    'name': ['full_name', 'fullname'],
     'age': [],
-    'city': ['location'],
+    'city': ['location', 'loc'],
   }
 
   def __init__(self, **file_options):
@@ -35,7 +37,7 @@ class DataProcessor:
     self._excel_options = self._filter_options('excel', file_options)
     self._json_options = self._filter_options('json', file_options)
 
-  def _filter_options(self, file_options, extension):
+  def _filter_options(self, extension, file_options):
     """
     Filter options dictionary to only include valid options for the given file type
     
@@ -63,19 +65,52 @@ class DataProcessor:
 
     return self.merge_dataframes(dataframes)
   
-  def normalize_columns(self):
-    pass
-    '''schema_map = {
-    "combine": {
-        "name": ["first_name", "last_name"]  # Combine these into 'name'
-    },
-    "rename": {
-        "customer_name": "name",
-        "AGE": "age"
-    }
-}'''
+  def normalize_columns(self, dataframe):
+    df_n = dataframe.copy()
+    df_n.columns = (df_n.columns
+                    .str.lower()
+                    .str.replace(' ', '_'))
+    
+    # Create reverse mapping: {'full_name': 'name', 'location': 'city', 'loc': 'city'}
+    rename_map = {}
+    for standard_name, alternatives in self._SCHEMA_MAP.items():
+        for alt_name in alternatives:
+            rename_map[alt_name.lower().replace(' ', '_')] = standard_name
+    
+    df_n = df_n.rename(columns=rename_map)
 
-  def merge_dataframes(self, dataframes):
+    # Smart name handling with "fill in the gaps" logic
+    has_name = 'name' in df_n.columns
+    has_first = 'first_name' in df_n.columns
+    has_last = 'last_name' in df_n.columns
+    
+    if has_name:
+      # Split the full name
+      name_parts = df_n['name'].str.split(' ', n=1, expand=True)
+      split_first = name_parts[0] if 0 in name_parts.columns else None
+      split_last = name_parts[1] if 1 in name_parts.columns else None
+      
+      # Use existing columns if available, otherwise use split parts
+      if not has_first and split_first is not None:
+        df_n['first_name'] = split_first
+      if not has_last and split_last is not None:
+        df_n['last_name'] = split_last
+          
+      # Drop the original name column
+      df_n = df_n.drop(['name'], axis=1)
+    
+    return df_n
+
+  def merge_dataframes(self, sheets_dict):
+    """
+    Merge dictionary of DataFrames into single DataFrame
+    
+    Args:
+        sheets_dict (dict): Dictionary where keys are sheet names, values are DataFrames
+        
+    Returns:
+        pandas.DataFrame: Combined DataFrame with 'sheet_name' column added
+    """
     pass
 
   def read_file(self, file_path, **override_options):
@@ -86,27 +121,30 @@ class DataProcessor:
 
     extension = Path(file_path).suffix.lower()[1:]
     if extension in self._ALLOWED_EXTENSIONS:
+      # Try to find a custom handler method for this file type (e.g., _read_xlsx)
       method_name = f'_read_{extension}'
       base_options = getattr(self, f'{extension}_options', {})
-      filtered_kwargs = self._filter_options(override_options, extension)
+      filtered_kwargs = self._filter_options(extension, override_options)
       final_options = {**base_options, **filtered_kwargs}
-      if hasattr(self, method_name):
-        try:
-          data = getattr(self, method_name)(file_path, **final_options)
-          print(f"Loaded: {data.dataframe.shape[0]} rows, {data.dataframe.shape[1]} columns")
-          print(f"Columns: {list(data.dataframe.columns)}")
-          return data
-        except Exception as e:
-          self._handle_read_error(e, abs_path)
-      else:
-        pd_name = method_name[1:]
-        if hasattr(pd, pd_name):
-          return FileResult(
-            dataframe=getattr(pd, pd_name)(file_path, **final_options), 
-            normalized=False
-        )
+      try:
+        if hasattr(self, method_name):
+            # Custom handler exists - use it (handles special cases like Excel multi-sheet)
+            data = getattr(self, method_name)(file_path, **final_options)
         else:
-          raise ValueError(f"No method pandas.{pd_name} exists")
+          # No custom handler - try pandas directly (e.g., pd.read_csv)
+          pd_name = method_name[1:] # Remove underscore: '_read_csv' -> 'read_csv'
+          if hasattr(pd, pd_name):
+            data = FileResult(
+              dataframe=getattr(pd, pd_name)(file_path, **final_options), 
+              normalized=False
+          )
+          else:
+            raise ValueError(f"No method pandas.{pd_name} exists")
+        print(f"Loaded: {data.dataframe.shape[0]} rows, {data.dataframe.shape[1]} columns")
+        print(f"Columns: {list(data.dataframe.columns)}")
+        return data
+      except Exception as e:
+          self._handle_read_error(e, abs_path)
     else:
       raise ValueError(f"Unsupported file type: '{extension}'. Only {', '.join(self._ALLOWED_EXTENSIONS)} files are allowed.")
 
