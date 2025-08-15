@@ -21,14 +21,18 @@ class DataProcessor:
         """
         self.file_options = file_options
 
-    def process_folder(self, input_folder, recursive=False, **kwargs):
+    def process_folder(self, input_folder, recursive=False, filetype_filter=None, **kwargs):
         """
         Process all files in a folder and return merged DataFrame
         
         Args:
             input_folder (str): Path to folder containing files to process
             recursive (bool, optional): If True, search subdirectories recursively. 
-                                       Defaults to False.
+                                      Defaults to False.
+            filetype_filter (str|list, optional): File extensions to process. 
+                                                Can be single string or list of strings.
+                                                Defaults to all supported types.
+            **kwargs: Additional options passed to file readers
         
         Returns:
             pandas.DataFrame: Merged DataFrame from all processed files
@@ -45,7 +49,7 @@ class DataProcessor:
         
         for file_path in files:
             if file_path.is_file():  # Skip directories
-                data = self.read_file(str(file_path), **kwargs)
+                data = self.read_file(str(file_path), filetype_filter, **kwargs)
                 if not data:
                     continue
                 df = data.dataframe
@@ -55,40 +59,109 @@ class DataProcessor:
 
         return merge_dataframes(dataframes)
 
-    def read_file(self, file_path, **override_options):
+    def _normalize_filetype_filter(self, filetype_filter=None):
+        """
+        Normalize and validate filetype filter input
+        
+        Args:
+            filetype_filter (str|list|None, optional): File extensions to allow.
+                                                      Can be:
+                                                      - None: defaults to all supported types
+                                                      - str: single extension (e.g., 'csv')
+                                                      - list: multiple extensions (e.g., ['csv', 'xlsx'])
+        
+        Returns:
+            list: Validated list of file extensions
+            
+        Raises:
+            TypeError: If filetype_filter is not str, list, or None
+            ValueError: If any extension in filetype_filter is not supported
+            
+        Examples:
+            >>> self._normalize_filetype_filter(None)
+            ['csv', 'xlsx', 'json']
+
+            >>> self._normalize_filetype_filter(123)  # Wrong type
+            TypeError: filetype_filter must be str, list, or None. Got int: 123
+            
+            >>> self._normalize_filetype_filter('.csv')
+            ['csv']
+            
+            >>> self._normalize_filetype_filter(['csv', '.xlsx'])
+            ['csv', 'xlsx']
+            
+            >>> self._normalize_filetype_filter(['txt'])  # Unsupported
+            ValueError: Unsupported file types in filter: {'txt'}. Supported: ['csv', 'xlsx', 'json']
+        """
+        if filetype_filter is None:
+            filetype_filter = ALLOWED_EXTENSIONS
+        else:
+            if isinstance(filetype_filter, list):
+                # Strip leading dots from extensions in list
+                filetype_filter = [ext.lstrip('.').lower() for ext in filetype_filter]
+            elif isinstance(filetype_filter, str):
+                filetype_filter = [filetype_filter.lstrip('.').lower()]
+            else:
+                raise TypeError(f"filetype_filter must be str, list, or None. Got {type(filetype_filter).__name__}: {filetype_filter}")
+            unsupported_filters = set(filetype_filter) - set(ALLOWED_EXTENSIONS)
+            if unsupported_filters:
+                raise ValueError(f"Unsupported file types in filter: {unsupported_filters}. Supported: {ALLOWED_EXTENSIONS}")
+        return filetype_filter
+
+    def read_file(self, file_path, filetype_filter=None, **override_options):
+        """
+        Read a single file if it matches the filetype filter
+        
+        Args:
+            file_path (str): Path to file to read
+            filetype_filter (str|list, optional): File extensions to allow. 
+                                                Defaults to all supported types.
+            **override_options: Options passed to file readers
+        
+        Returns:
+            FileResult|None: FileResult if file matches filter, None if filtered out
+        """
         abs_path = os.path.abspath(file_path)
         print(f"Processing '{abs_path}'...")
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"The file '{abs_path}' does not exist.")
 
         extension = Path(file_path).suffix.lower()[1:]
-        if extension in ALLOWED_EXTENSIONS:
-            try:
-                # Dynamically instantiate reader class based on extension
-                reader_class_name = f"{extension.capitalize()}Reader"
-                reader_class = getattr(readers, reader_class_name)
-                reader = reader_class()
-                
-                # Merge constructor options with override options
-                final_options = {**self.file_options, **override_options}
-                
-                data = reader.read(file_path, **final_options)
-                data.dataframe['source_file'] = abs_path
-                print(f"Loaded: {data.dataframe.shape[0]} rows, {data.dataframe.shape[1]} columns")
-                print(f"Columns: {list(data.dataframe.columns)}")
-                return data
-            except Exception as e:
-                self._handle_read_error(e, abs_path)
-        else:
-            raise ValueError(f"Unsupported file type: '{extension}'. Only {', '.join(ALLOWED_EXTENSIONS)} files are allowed.")
 
-    def _handle_read_error(self, exception, file_path):
-        """Handle errors from pandas read operations"""
-        error_messages = {
-            pd.errors.EmptyDataError: f"File '{file_path}' is empty",
-            UnicodeDecodeError: f"Encoding issue with '{file_path}'",
-            pd.errors.ParserError: f"File '{file_path}' has malformed data",
-        }
+        if extension not in self._normalize_filetype_filter(filetype_filter):
+            return None
+        
+        #try:
+        # Dynamically instantiate reader class based on extension
+        reader_class_name = f"{extension.capitalize()}Reader"
+        reader_class = getattr(readers, reader_class_name)
+        reader = reader_class()
+        
+        # Merge constructor options with override options
+        final_options = {**self.file_options, **override_options}
+        
+        data = reader.read(file_path, **final_options)
+        data.dataframe['source_file'] = os.path.relpath(abs_path)
+        print(f"Loaded: {data.dataframe.shape[0]} rows, {data.dataframe.shape[1]} columns")
+        print(f"Columns: {list(data.dataframe.columns)}")
+        return data
+        '''except Exception as e:
+            self._handle_read_error(e, abs_path)'''
 
-        message = error_messages.get(type(exception), f"Failed to read {file_path}: {str(exception)}")
-        raise ValueError(message) from exception
+    '''def _handle_read_error(self, exception, file_path):
+      """Handle errors from pandas read operations, preserving exception types"""
+      if isinstance(exception, pd.errors.EmptyDataError):
+          raise pd.errors.EmptyDataError(f"File '{file_path}' is empty") from exception
+      elif isinstance(exception, UnicodeDecodeError):
+          raise UnicodeDecodeError(
+              exception.encoding, 
+              exception.object, 
+              exception.start, 
+              exception.end, 
+              f"Encoding issue with '{file_path}': {exception.reason}"
+          ) from exception
+      elif isinstance(exception, pd.errors.ParserError):
+          raise pd.errors.ParserError(f"File '{file_path}' has malformed data: {str(exception)}") from exception
+      else:
+          # For unexpected errors, wrap in ValueError with clear message
+          raise ValueError(f"Failed to read '{file_path}': {str(exception)}") from exception'''
