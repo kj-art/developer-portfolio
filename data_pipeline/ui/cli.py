@@ -195,20 +195,18 @@ def main():
     # Create processor and run it
     processor = DataProcessor(**read_kwargs)
     
-    # Handle filetype filter
-    filetype_filter = args.filetype if args.filetype else None
-    
-    to_lower = True if args.to_lower is None else args.to_lower == 'true'
-    spaces_to_underscores = True if args.spaces_to_underscores is None else args.spaces_to_underscores == 'true'
+    # Convert args to dict and filter out None values
+    kwargs = {k: v for k, v in vars(args).items() if v is not None}
 
-    result = processor.process_folder(
-        args.input_folder, 
-        recursive=args.recursive,
-        filetype_filter=filetype_filter,
-        schema_map=schema_map,
-        to_lower=to_lower,
-        spaces_to_underscores=spaces_to_underscores
-    )
+    def string_to_boolean(arg_name):
+        if arg_name in kwargs:
+            kwargs[arg_name] = kwargs[arg_name].lower() == 'true'
+
+    string_to_boolean('to_lower')
+    string_to_boolean('spaces_to_underscores')
+
+    result = processor.process_folder(**kwargs)
+
     print(f'output file: {args.output_file}')
     # Output results
     if args.output_file:

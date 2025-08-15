@@ -21,7 +21,7 @@ class DataProcessor:
         """
         self.file_options = file_options
 
-    def process_folder(self, input_folder, recursive=False, filetype_filter=None, schema_map=None, to_lower=True, spaces_to_underscores=True, **kwargs):
+    def process_folder(self, input_folder, recursive=False, filetype=None, schema_map=None, to_lower=True, spaces_to_underscores=True, **kwargs):
         """
         Process all files in a folder and return merged DataFrame
         
@@ -29,7 +29,7 @@ class DataProcessor:
             input_folder (str): Path to folder containing files to process
             recursive (bool, optional): If True, search subdirectories recursively. 
                                       Defaults to False.
-            filetype_filter (str|list, optional): File extensions to process. 
+            filetype (str|list, optional): File extensions to process. 
                                                 Can be single string or list of strings.
                                                 Defaults to all supported types.
             schema_map (dict, optional): Column name mapping for normalization.
@@ -52,7 +52,7 @@ class DataProcessor:
         
         for file_path in files:
             if file_path.is_file():  # Skip directories
-                data = self.read_file(str(file_path), filetype_filter, **kwargs)
+                data = self.read_file(str(file_path), filetype, **kwargs)
                 if not data:
                     continue
                 df = data.dataframe
@@ -62,12 +62,12 @@ class DataProcessor:
 
         return merge_dataframes(dataframes, schema_map, to_lower, spaces_to_underscores)
 
-    def _normalize_filetype_filter(self, filetype_filter=None):
+    def _normalize_filetype(self, filetype=None):
         """
         Normalize and validate filetype filter input
         
         Args:
-            filetype_filter (str|list|None, optional): File extensions to allow.
+            filetype (str|list|None, optional): File extensions to allow.
                                                       Can be:
                                                       - None: defaults to all supported types
                                                       - str: single extension (e.g., 'csv')
@@ -77,39 +77,39 @@ class DataProcessor:
             list: Validated list of file extensions
             
         Raises:
-            TypeError: If filetype_filter is not str, list, or None
-            ValueError: If any extension in filetype_filter is not supported
+            TypeError: If filetype is not str, list, or None
+            ValueError: If any extension in filetype is not supported
             
         Examples:
-            >>> self._normalize_filetype_filter(None)
+            >>> self._normalize_filetype(None)
             ['csv', 'xlsx', 'json']
 
-            >>> self._normalize_filetype_filter(123)  # Wrong type
-            TypeError: filetype_filter must be str, list, or None. Got int: 123
+            >>> self._normalize_filetype(123)  # Wrong type
+            TypeError: filetype must be str, list, or None. Got int: 123
             
-            >>> self._normalize_filetype_filter('.csv')
+            >>> self._normalize_filetype('.csv')
             ['csv']
             
-            >>> self._normalize_filetype_filter(['csv', '.xlsx'])
+            >>> self._normalize_filetype(['csv', '.xlsx'])
             ['csv', 'xlsx']
             
-            >>> self._normalize_filetype_filter(['txt'])  # Unsupported
+            >>> self._normalize_filetype(['txt'])  # Unsupported
             ValueError: Unsupported file types in filter: {'txt'}. Supported: ['csv', 'xlsx', 'json']
         """
-        if filetype_filter is None:
-            filetype_filter = ALLOWED_EXTENSIONS
+        if filetype is None:
+            filetype = ALLOWED_EXTENSIONS
         else:
-            if isinstance(filetype_filter, list):
+            if isinstance(filetype, list):
                 # Strip leading dots from extensions in list
-                filetype_filter = [ext.lstrip('.').lower() for ext in filetype_filter]
-            elif isinstance(filetype_filter, str):
-                filetype_filter = [filetype_filter.lstrip('.').lower()]
+                filetype = [ext.lstrip('.').lower() for ext in filetype]
+            elif isinstance(filetype, str):
+                filetype = [filetype.lstrip('.').lower()]
             else:
-                raise TypeError(f"filetype_filter must be str, list, or None. Got {type(filetype_filter).__name__}: {filetype_filter}")
-            unsupported_filters = set(filetype_filter) - set(ALLOWED_EXTENSIONS)
+                raise TypeError(f"filetype must be str, list, or None. Got {type(filetype).__name__}: {filetype}")
+            unsupported_filters = set(filetype) - set(ALLOWED_EXTENSIONS)
             if unsupported_filters:
                 raise ValueError(f"Unsupported file types in filter: {unsupported_filters}. Supported: {ALLOWED_EXTENSIONS}")
-        return filetype_filter
+        return filetype
     
     def _get_handler_for_extension(self, extension):
         """Get handler class for a given extension"""
@@ -122,13 +122,13 @@ class DataProcessor:
         
         return handler_class()
 
-    def read_file(self, file_path, filetype_filter=None, **override_options):
+    def read_file(self, file_path, filetype=None, **override_options):
         """
         Read a single file if it matches the filetype filter
         
         Args:
             file_path (str): Path to file to read
-            filetype_filter (str|list, optional): File extensions to allow. 
+            filetype (str|list, optional): File extensions to allow. 
                                                 Defaults to all supported types.
             **override_options: Options passed to file handlers
         
@@ -142,7 +142,7 @@ class DataProcessor:
 
         extension = Path(file_path).suffix.lower()[1:]
 
-        if extension not in self._normalize_filetype_filter(filetype_filter):
+        if extension not in self._normalize_filetype(filetype):
             return None
         
         handler = self._get_handler_for_extension(extension)
