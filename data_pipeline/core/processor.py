@@ -131,7 +131,6 @@ class DataProcessor:
         if extension not in self._normalize_filetype_filter(filetype_filter):
             return None
         
-        #try:
         # Dynamically instantiate reader class based on extension
         reader_class_name = f"{extension.capitalize()}Reader"
         reader_class = getattr(readers, reader_class_name)
@@ -145,23 +144,3 @@ class DataProcessor:
         print(f"Loaded: {data.dataframe.shape[0]} rows, {data.dataframe.shape[1]} columns")
         print(f"Columns: {list(data.dataframe.columns)}")
         return data
-        '''except Exception as e:
-            self._handle_read_error(e, abs_path)'''
-
-    '''def _handle_read_error(self, exception, file_path):
-      """Handle errors from pandas read operations, preserving exception types"""
-      if isinstance(exception, pd.errors.EmptyDataError):
-          raise pd.errors.EmptyDataError(f"File '{file_path}' is empty") from exception
-      elif isinstance(exception, UnicodeDecodeError):
-          raise UnicodeDecodeError(
-              exception.encoding, 
-              exception.object, 
-              exception.start, 
-              exception.end, 
-              f"Encoding issue with '{file_path}': {exception.reason}"
-          ) from exception
-      elif isinstance(exception, pd.errors.ParserError):
-          raise pd.errors.ParserError(f"File '{file_path}' has malformed data: {str(exception)}") from exception
-      else:
-          # For unexpected errors, wrap in ValueError with clear message
-          raise ValueError(f"Failed to read '{file_path}': {str(exception)}") from exception'''
