@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 import pandas as pd
-from . import readers
+from . import handlers
 from .utils import merge_dataframes, normalize_columns
 from .config import SCHEMA_MAP, ALLOWED_EXTENSIONS
 
@@ -13,7 +13,7 @@ class DataProcessor:
         Args:
             **file_options: File type specific options (e.g. sep=';', 
                            engine='openpyxl', orient='records')
-                           Options are passed to appropriate readers
+                           Options are passed to appropriate handlers
         
         Example:
             processor = DataProcessor(sep=';', encoding='latin-1', 
@@ -32,12 +32,11 @@ class DataProcessor:
             filetype_filter (str|list, optional): File extensions to process. 
                                                 Can be single string or list of strings.
                                                 Defaults to all supported types.
-            **kwargs: Additional options passed to file readers
+            **kwargs: Additional options passed to file handlers
         
         Returns:
             pandas.DataFrame: Merged DataFrame from all processed files
         """
-        from pathlib import Path
         
         dataframes = []
         path = Path(input_folder)
@@ -107,6 +106,17 @@ class DataProcessor:
             if unsupported_filters:
                 raise ValueError(f"Unsupported file types in filter: {unsupported_filters}. Supported: {ALLOWED_EXTENSIONS}")
         return filetype_filter
+    
+    def _get_handler_for_extension(self, extension):
+        """Get handler class for a given extension"""
+        handler_class_name = f"{extension.capitalize()}Handler"
+        try:
+            handler_class = getattr(handlers, handler_class_name)
+        except AttributeError:
+            from .config import ALLOWED_EXTENSIONS
+            raise ValueError(f"Unsupported file format: .{extension}. Supported: {[f'.{ext}' for ext in ALLOWED_EXTENSIONS]}")
+        
+        return handler_class()
 
     def read_file(self, file_path, filetype_filter=None, **override_options):
         """
@@ -116,7 +126,7 @@ class DataProcessor:
             file_path (str): Path to file to read
             filetype_filter (str|list, optional): File extensions to allow. 
                                                 Defaults to all supported types.
-            **override_options: Options passed to file readers
+            **override_options: Options passed to file handlers
         
         Returns:
             FileResult|None: FileResult if file matches filter, None if filtered out
@@ -131,16 +141,43 @@ class DataProcessor:
         if extension not in self._normalize_filetype_filter(filetype_filter):
             return None
         
-        # Dynamically instantiate reader class based on extension
-        reader_class_name = f"{extension.capitalize()}Reader"
-        reader_class = getattr(readers, reader_class_name)
-        reader = reader_class()
+        handler = self._get_handler_for_extension(extension)
         
         # Merge constructor options with override options
         final_options = {**self.file_options, **override_options}
         
-        data = reader.read(file_path, **final_options)
+        data = handler.read(file_path, **final_options)
         data.dataframe['source_file'] = os.path.relpath(abs_path)
         print(f"Loaded: {data.dataframe.shape[0]} rows, {data.dataframe.shape[1]} columns")
         print(f"Columns: {list(data.dataframe.columns)}")
         return data
+    
+    def write_file(self, dataframe, output_path, **override_options):
+        """
+        Save DataFrame to file, determining format from file extension
+        
+        Args:
+            dataframe (pandas.DataFrame): DataFrame to save
+            output_path (str): Path to output file
+            **override_options: Options passed to file handlers
+        
+        Supported formats:
+            .csv -> CsvHandler.write()
+            .xlsx -> XlsxHandler.write() 
+            .json -> JsonHandler.write()
+        """
+        
+        abs_path = os.path.abspath(output_path)
+        extension = Path(output_path).suffix.lower()[1:]  # Remove the dot
+        
+        if not extension:
+            raise ValueError(f"Output file must have an extension to determine format: {output_path}")
+        
+        handler = self._get_handler_for_extension(extension)
+        
+        # Merge constructor options with override options
+        final_options = {**self.file_options, **override_options}
+        
+        # Write the file
+        handler.write(dataframe, output_path, **final_options)
+        print(f"Data saved to '{abs_path}' ({len(dataframe)} rows, {len(dataframe.columns)} columns)")

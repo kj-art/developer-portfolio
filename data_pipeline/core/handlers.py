@@ -5,74 +5,88 @@ import pandas as pd
 import inspect
 
 """
-File readers for the data processing pipeline.
+File handlers for the data processing pipeline.
 
-This module contains reader classes that handle different file formats. Each reader
+This module contains handler classes that handle different file formats. Each handler
 is responsible for:
 - Filtering kwargs to only those valid for its file type
 - Reading the file using appropriate pandas/custom logic  
 - Returning a consistent FileResult object
 
-Reader classes follow a naming convention where the class name is the file extension
-capitalized + "Reader" (e.g., 'csv' → CsvReader, 'xlsx' → XlsxReader). This allows
-the DataProcessor to dynamically instantiate the correct reader based on file
+Handler classes follow a naming convention where the class name is the file extension
+capitalized + "Handler" (e.g., 'csv' → CsvHandler, 'xlsx' → XlsxHandler). This allows
+the DataProcessor to dynamically instantiate the correct handler based on file
 extension without maintaining an explicit mapping.
 
 Usage:
-    reader = CsvReader()
-    result = reader.read('data.csv', sep=';', encoding='utf-8')
+    handler = CsvHandler()
+    result = handler.read('data.csv', sep=';', encoding='utf-8')
 
 Adding New File Types:
-    To support a new file format, create a new reader class following the naming
-    convention (e.g., ParquetReader for .parquet files) and implement the 
-    FileReader abstract base class methods.
+    To support a new file format, create a new handler class following the naming
+    convention (e.g., ParquetHandler for .parquet files) and implement the 
+    FileHandler abstract base class methods.
 """
 
-class FileReader(ABC):
-    """Abstract base class for file readers"""
+class FileHandler(ABC):
+    """Abstract base class for file handlers"""
 
     def __init__(self):
-        self._VALID_KWARGS = self.get_valid_kwargs()
+        self._READ_KWARGS = self.get_read_kwargs()
+        self._WRITE_KWARGS = self.get_write_kwargs()
     
-    def get_pandas_function_name(self):
+    def get_function_name(self):
         """Override this if pandas function name differs from class name"""
-        # Default: CsvReader → read_csv, JsonReader → read_json
+        # Default: CsvHandler → read_csv, JsonHandler → read_json
         class_name = self.__class__.__name__.lower()
-        return class_name.replace('reader', '')
+        return class_name.replace('handler', '')
     
-    def get_valid_kwargs(self) -> set:
-        func_name = self.get_pandas_function_name()
-        pandas_func = getattr(pd, f'read_{func_name}')
-        sig = inspect.signature(pandas_func)
+    def get_read_function(self):
+        return getattr(pd, f'read_{self.get_function_name()}')
+    
+    def get_write_function(self, dataframe):
+        return getattr(dataframe, f'to_{self.get_function_name()}')
+    
+    def get_read_kwargs(self) -> set:
+        sig = inspect.signature(self.get_read_function())
         return set(sig.parameters.keys())
+    
+    def get_write_kwargs(self) -> set:
+        sig = inspect.signature(self.get_write_function(pd.DataFrame))
+        return set(sig.parameters.keys()) - {'self'}  # Remove 'self' parameter
 
     @abstractmethod
     def read(self, file_path, **kwargs) -> FileResult:
         """Read file and return FileResult"""
         pass
     
-    def filter_kwargs(self, kwargs) -> dict:
-        """Filter kwargs to only include valid ones for this reader"""
-        return {k: v for k, v in kwargs.items() if k in self._VALID_KWARGS}
+    def write(self, dataframe, file_path, **kwargs) -> bool:
+        """Default write implementation - works for most formats"""
+        filtered_kwargs = self.filter_kwargs(kwargs, self._WRITE_KWARGS)
+        self.get_write_function(dataframe)(file_path, **filtered_kwargs)
+
+    def filter_kwargs(self, kwargs, valid_kwargs) -> dict:
+        """Filter kwargs to only include valid ones for this handler"""
+        return {k: v for k, v in kwargs.items() if k in valid_kwargs}
     
-class CsvReader(FileReader):
-    """Reader for CSV files"""
+class CsvHandler(FileHandler):
+    """Handler for CSV files"""
     
     def read(self, file_path, **kwargs) -> FileResult:
         """Read CSV file and return FileResult"""
-        filtered_kwargs = self.filter_kwargs(kwargs)
+        filtered_kwargs = self.filter_kwargs(kwargs, self._READ_KWARGS)
         df = pd.read_csv(file_path, **filtered_kwargs)
         return FileResult(dataframe=df, normalized=False)
 
-class XlsxReader(FileReader):
-    """Reader for Excel files"""
+class XlsxHandler(FileHandler):
+    """Handler for Excel files"""
 
-    def get_pandas_function_name(self):
+    def get_function_name(self):
         return 'excel'  # Override for pd.read_excel
     
     def read(self, file_path, **kwargs) -> FileResult:
         """Read Excel file and return FileResult with sheet_name handling"""
-        filtered_kwargs = self.filter_kwargs(kwargs)
+        filtered_kwargs = self.filter_kwargs(kwargs, self._READ_KWARGS)
         sheet_name = filtered_kwargs.pop('sheet_name', 0)
         
         if not isinstance(sheet_name, (int, str, list, type(None))):
@@ -97,15 +111,15 @@ class XlsxReader(FileReader):
             df['sheet_name'] = sheet_name
             return FileResult(dataframe=df, normalized=False)
     
-class JsonReader(FileReader):
-    """Reader for JSON files"""
+class JsonHandler(FileHandler):
+    """Handler for JSON files"""
 
-    def get_valid_kwargs(self) -> set:
+    def get_read_kwargs(self) -> set:
         return set(['encoding'])
     
     def read(self, file_path, **kwargs) -> FileResult:
         """Read JSON file and return FileResult, handling nested structures"""
-        filtered_kwargs = self.filter_kwargs(kwargs)
+        filtered_kwargs = self.filter_kwargs(kwargs, self._READ_KWARGS)
         
         with open(file_path, 'r', **filtered_kwargs) as f:
             data = json.load(f)
