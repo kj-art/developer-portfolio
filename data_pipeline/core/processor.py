@@ -21,7 +21,7 @@ class DataProcessor:
         """
         self.file_options = file_options
 
-    def process_folder(self, input_folder, recursive=False, filetype_filter=None, **kwargs):
+    def process_folder(self, input_folder, recursive=False, filetype_filter=None, schema_map=None, to_lower=True, spaces_to_underscores=True, **kwargs):
         """
         Process all files in a folder and return merged DataFrame
         
@@ -32,12 +32,16 @@ class DataProcessor:
             filetype_filter (str|list, optional): File extensions to process. 
                                                 Can be single string or list of strings.
                                                 Defaults to all supported types.
+            schema_map (dict, optional): Column name mapping for normalization.
+                                      Maps standard names to list of alternatives.
+                                      If None, uses default SCHEMA_MAP from config.
             **kwargs: Additional options passed to file handlers
         
         Returns:
             pandas.DataFrame: Merged DataFrame from all processed files
         """
         
+        schema_map = schema_map or SCHEMA_MAP
         dataframes = []
         path = Path(input_folder)
         
@@ -53,10 +57,10 @@ class DataProcessor:
                     continue
                 df = data.dataframe
                 if not data.normalized:
-                    df = normalize_columns(df, SCHEMA_MAP)
+                    df = normalize_columns(df, schema_map, to_lower, spaces_to_underscores)
                 dataframes.append(df)
 
-        return merge_dataframes(dataframes)
+        return merge_dataframes(dataframes, schema_map, to_lower, spaces_to_underscores)
 
     def _normalize_filetype_filter(self, filetype_filter=None):
         """
@@ -160,11 +164,6 @@ class DataProcessor:
             dataframe (pandas.DataFrame): DataFrame to save
             output_path (str): Path to output file
             **override_options: Options passed to file handlers
-        
-        Supported formats:
-            .csv -> CsvHandler.write()
-            .xlsx -> XlsxHandler.write() 
-            .json -> JsonHandler.write()
         """
         
         abs_path = os.path.abspath(output_path)
