@@ -10,9 +10,9 @@ This module provides comprehensive logging capabilities including:
 - Log rotation and filtering
 
 Usage:
-    from shared_utils.logging import setup_logging, get_logger, log_performance
+    from shared_utils.logging import set_up_logging, get_logger, log_performance
     
-    setup_logging(level='INFO', log_file='app.log', enable_json=True)
+    set_up_logging(level='INFO', log_file='app.log', enable_json=True)
     logger = get_logger(__name__)
     
     with log_performance("file_processing"):
@@ -206,7 +206,7 @@ class EnterpriseLogger:
             self.logger.log(level, message, **kwargs)
 
 
-def setup_logging(
+def set_up_logging(
     level: str = 'INFO',
     log_file: Optional[str] = None,
     json_file: Optional[str] = None,
@@ -217,7 +217,7 @@ def setup_logging(
     log_format: Optional[str] = None
 ):
     """
-    Setup enterprise logging configuration
+    Set up enterprise logging configuration
     
     Args:
         level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
@@ -362,7 +362,7 @@ def _parse_file_size(size_str: str) -> int:
 # Convenience function for quick setup
 def quick_setup(level='INFO', log_file=None):
     """Quick logging setup for simple use cases"""
-    setup_logging(
+    set_up_logging(
         level=level,
         log_file=log_file,
         json_file=f"{log_file}.json" if log_file else None,
