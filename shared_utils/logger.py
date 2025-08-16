@@ -1,8 +1,9 @@
 """
-Logging system
+Enterprise-grade logging system for portfolio projects
 
 This module provides comprehensive logging capabilities including:
-- Colored console output
+- Dynamic conditional formatting (using shared_utils.dynamic_formatting)
+- Colored console output with graceful missing data handling
 - JSON structured logging
 - Performance monitoring
 - Progress bar integration
@@ -10,13 +11,14 @@ This module provides comprehensive logging capabilities including:
 - Log rotation and filtering
 
 Usage:
-    from shared_utils.logging import set_up_logging, get_logger, log_performance
+    from shared_utils.logger import set_up_logging, get_logger, log_performance
     
     set_up_logging(level='INFO', log_file='app.log', enable_json=True)
     logger = get_logger(__name__)
     
     with log_performance("file_processing"):
-        logger.info("Processing files", extra={"file_count": 100})
+        logger.info("Processing files", file_count=100, duration=2.5)
+        # Output: "Processing files (100files) in 2.5s"
 """
 
 import logging
@@ -28,14 +30,20 @@ import sys
 import traceback
 import threading
 from pathlib import Path
-from typing import Optional, Dict, Any, Union
+from typing import Optional, Dict, Any, Union, Callable
 from contextlib import contextmanager
 from datetime import datetime
-import psutil  # For memory monitoring
+
+try:
+    import psutil  # For memory monitoring
+except ImportError:
+    psutil = None
+
+from .dynamic_formatting import DynamicLoggingFormatter, DynamicFormattingError
 
 
-class ColoredFormatter(logging.Formatter):
-    """Formatter that adds color codes for console output"""
+class ColoredDynamicFormatter(DynamicLoggingFormatter):
+    """Dynamic formatter that adds color codes for console output"""
     
     # ANSI color codes
     COLORS = {
@@ -47,13 +55,24 @@ class ColoredFormatter(logging.Formatter):
     }
     RESET = '\033[0m'
     
-    def format(self, record):
-        if hasattr(record, 'no_color') and record.no_color:
-            return super().format(record)
+    def __init__(self, format_string: str, functions: Optional[Dict[str, Callable]] = None, enable_colors: bool = True):
+        super().__init__(format_string, functions)
+        self.enable_colors = enable_colors
+    
+    def format(self, record: logging.LogRecord) -> str:
+        # Apply coloring to levelname before dynamic formatting
+        if self.enable_colors and not (hasattr(record, 'no_color') and record.no_color):
+            color = self.COLORS.get(record.levelname, '')
+            original_levelname = record.levelname
+            record.levelname = f"{color}{record.levelname}{self.RESET}"
             
-        color = self.COLORS.get(record.levelname, '')
-        record.levelname = f"{color}{record.levelname}{self.RESET}"
-        return super().format(record)
+            result = super().format(record)
+            
+            # Restore original levelname
+            record.levelname = original_levelname
+            return result
+        else:
+            return super().format(record)
 
 
 class JSONFormatter(logging.Formatter):
@@ -155,6 +174,8 @@ class PerformanceTracker:
     
     def _get_memory_usage(self) -> float:
         """Get current memory usage in MB"""
+        if psutil is None:
+            return 0.0
         try:
             process = psutil.Process()
             return process.memory_info().rss / 1024 / 1024
@@ -206,6 +227,63 @@ class EnterpriseLogger:
             self.logger.log(level, message, **kwargs)
 
 
+def create_default_format_functions() -> Dict[str, Callable]:
+    """Create default formatting functions for common log scenarios"""
+    
+    def duration_format(seconds):
+        """Format duration with appropriate units"""
+        if seconds < 0.001:
+            return f"{seconds*1000000:.0f}μs"
+        elif seconds < 1:
+            return f"{seconds*1000:.1f}ms"
+        elif seconds < 60:
+            return f"{seconds:.2f}s"
+        else:
+            minutes = int(seconds // 60)
+            secs = seconds % 60
+            return f"{minutes}m{secs:.1f}s"
+    
+    def file_size_format(size_bytes):
+        """Format file size with appropriate units"""
+        if size_bytes < 1024:
+            return f"{size_bytes}B"
+        elif size_bytes < 1024**2:
+            return f"{size_bytes/1024:.1f}KB"
+        elif size_bytes < 1024**3:
+            return f"{size_bytes/(1024**2):.1f}MB"
+        else:
+            return f"{size_bytes/(1024**3):.2f}GB"
+    
+    def performance_indicator(duration):
+        """Add performance indicators based on duration"""
+        if duration < 0.1:
+            return "⚡"
+        elif duration < 1.0:
+            return "✓"
+        elif duration < 5.0:
+            return "⏳"
+        else:
+            return "🐌"
+    
+    def error_severity(error_code):
+        """Format error severity based on error code"""
+        if isinstance(error_code, str):
+            if error_code.startswith('E0'):
+                return "CRITICAL"
+            elif error_code.startswith('W'):
+                return "WARNING"
+            else:
+                return "ERROR"
+        return "ERROR"
+    
+    return {
+        'duration_format': duration_format,
+        'file_size_format': file_size_format,
+        'performance_indicator': performance_indicator,
+        'error_severity': error_severity,
+    }
+
+
 def set_up_logging(
     level: str = 'INFO',
     log_file: Optional[str] = None,
@@ -214,10 +292,12 @@ def set_up_logging(
     enable_performance: bool = True,
     max_file_size: str = '10MB',
     backup_count: int = 5,
-    log_format: Optional[str] = None
+    console_format: Optional[str] = None,
+    file_format: Optional[str] = None,
+    format_functions: Optional[Dict[str, Callable]] = None
 ):
     """
-    Set up enterprise logging configuration
+    Set up enterprise logging configuration with dynamic formatting
     
     Args:
         level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
@@ -227,7 +307,20 @@ def set_up_logging(
         enable_performance: Whether to enable performance tracking
         max_file_size: Maximum size of log files before rotation
         backup_count: Number of backup files to keep
-        log_format: Custom log format string
+        console_format: Custom console log format string (dynamic formatting syntax)
+        file_format: Custom file log format string (dynamic formatting syntax)
+        format_functions: Custom formatting functions for dynamic formatting
+        
+    Examples:
+        # Basic setup
+        set_up_logging(level='INFO', log_file='app.log')
+        
+        # Advanced setup with custom formatting
+        set_up_logging(
+            level='DEBUG',
+            console_format='{{asctime}} {{levelname}} - {{message}}{{file_count| (|files)}}{{duration| in |$duration_format}}',
+            format_functions={'duration_format': lambda x: f"{x:.2f}s"}
+        )
     """
     root_logger = logging.getLogger()
     root_logger.setLevel(getattr(logging, level.upper()))
@@ -235,35 +328,49 @@ def set_up_logging(
     # Clear existing handlers
     root_logger.handlers.clear()
     
-    # Default format
-    if log_format is None:
-        log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    # Merge default format functions with custom ones
+    default_functions = create_default_format_functions()
+    if format_functions:
+        default_functions.update(format_functions)
     
-    # Console handler with colors
-    if enable_colors:
-        console_handler = ProgressAwareHandler(sys.stdout)
-        console_formatter = ColoredFormatter(log_format)
-    else:
-        console_handler = ProgressAwareHandler(sys.stdout)
-        console_formatter = logging.Formatter(log_format)
+    # Default console format using dynamic formatting syntax
+    if console_format is None:
+        console_format = ('{{asctime}} - {{levelname}} - {{message}}'
+                         '{{file_count| (|files)}}'
+                         '{{duration| in |$duration_format}}'
+                         '{{error_code| [|]}}'
+                         '{{memory_delta_mb| +|MB}}')
     
+    # Console handler with dynamic formatting and colors
+    console_handler = ProgressAwareHandler(sys.stdout)
+    console_formatter = ColoredDynamicFormatter(
+        console_format, 
+        default_functions, 
+        enable_colors=enable_colors
+    )
     console_handler.setFormatter(console_formatter)
     root_logger.addHandler(console_handler)
     
-    # File handler with rotation
+    # File handler with dynamic formatting and detailed info
     if log_file:
+        if file_format is None:
+            file_format = ('{{asctime}} - {{name}} - {{levelname}} - {{funcName}}:{{lineno}} - {{message}}'
+                          '{{file_count| (|files)}}'
+                          '{{duration| [duration: |$duration_format]}}'
+                          '{{file_size| [size: |$file_size_format]}}'
+                          '{{error_code| [error: |]}}'
+                          '{{memory_delta_mb| [memory: |MB]}}')
+        
         file_handler = logging.handlers.RotatingFileHandler(
             log_file,
             maxBytes=_parse_file_size(max_file_size),
             backupCount=backup_count
         )
-        file_formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s'
-        )
+        file_formatter = DynamicLoggingFormatter(file_format, default_functions)
         file_handler.setFormatter(file_formatter)
         root_logger.addHandler(file_handler)
     
-    # JSON handler for structured logging
+    # JSON handler for structured logging (unchanged - still useful for log aggregation)
     if json_file:
         json_handler = logging.handlers.RotatingFileHandler(
             json_file,
@@ -327,14 +434,14 @@ def log_processing_stats(
     errors: int = 0,
     **extra_stats
 ):
-    """Log standardized processing statistics"""
+    """Log standardized processing statistics using dynamic formatting"""
     logger = get_logger('stats')
     
     stats = {
         'operation': operation,
         'files_processed': files_processed,
         'rows_processed': rows_processed,
-        'duration_seconds': round(duration, 3),
+        'duration': duration,
         'files_per_second': round(files_processed / duration, 2) if duration > 0 else 0,
         'rows_per_second': round(rows_processed / duration, 2) if duration > 0 else 0,
         'errors': errors,
@@ -369,3 +476,48 @@ def quick_setup(level='INFO', log_file=None):
         enable_colors=True,
         enable_performance=True
     )
+
+
+# Example usage demonstrating dynamic formatting integration
+if __name__ == "__main__":
+    print("=== Enterprise Logger with Dynamic Formatting Demo ===")
+    
+    # Set up logging with custom format
+    set_up_logging(
+        level='DEBUG',
+        log_file='demo.log',
+        console_format=('{{levelname}} {{$performance_indicator|duration}} {{message}}'
+                       '{{file_count| (|files)}}'
+                       '{{duration| |$duration_format}}'
+                       '{{file_size| [|$file_size_format]}}')
+    )
+    
+    logger = get_logger('demo')
+    
+    # Demonstrate various logging scenarios
+    logger.info("Application started")
+    
+    logger.info("Processing files", file_count=150, duration=2.45)
+    
+    logger.info("Large file detected", file_size=1048576, duration=0.05)
+    
+    logger.warning("Slow operation detected", duration=8.2, operation="file_scan")
+    
+    logger.error("Processing failed", error_code="E001", file_count=5)
+    
+    # Demonstrate performance logging
+    with log_performance("demo_operation"):
+        import time
+        time.sleep(0.1)  # Simulate work
+        logger.info("Work completed", rows_processed=1000)
+    
+    # Demonstrate processing stats
+    log_processing_stats(
+        operation="batch_process",
+        files_processed=100,
+        rows_processed=50000,
+        duration=12.5,
+        errors=2
+    )
+    
+    print("\nCheck demo.log and demo.log.json for formatted output!")

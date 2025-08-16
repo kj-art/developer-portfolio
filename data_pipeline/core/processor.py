@@ -58,10 +58,7 @@ class DataProcessor:
         dataframes = []
         path = Path(input_folder)
         
-        if recursive:
-            files = path.rglob('*')  # Recursive: all files in subdirectories
-        else:
-            files = path.iterdir()   # Non-recursive: direct children only
+        files = path.rglob('*') if recursive else path.iterdir()
         
         for file_path in files:
             if file_path.is_file():  # Skip directories
