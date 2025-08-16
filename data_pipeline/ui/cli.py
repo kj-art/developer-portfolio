@@ -1,4 +1,4 @@
-# ui/cli.py - Option A: parse_known_args() with pandas docs reference
+# ui/cli.py - Updated with BooleanOptionalAction
 
 import argparse
 import sys
@@ -8,6 +8,76 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from core.processor import DataProcessor
+from core.processing_config import ProcessingConfig
+
+def cast_string_to_appropriate_type(value):
+    """
+    Cast string values to appropriate Python types (int, float, or keep as string)
+    
+    Supports optional type prefixes to force specific types:
+    - "str:5" -> "5" (force string)
+    - "int:3.14" -> 3 (force int, truncates float)
+    - "float:42" -> 42.0 (force float)
+    - "5" -> 5 (auto-detect as int)
+    
+    Args:
+        value (str): String value to cast, optionally with type prefix
+        
+    Returns:
+        int|float|str: Appropriately cast value
+        
+    Examples:
+        "42" -> 42
+        "3.14" -> 3.14
+        "1e-5" -> 1e-05
+        "utf-8" -> "utf-8"
+        "str:5" -> "5"
+        "int:3.14" -> 3
+        "float:42" -> 42.0
+        "" -> ""
+    """
+    if not isinstance(value, str):
+        return value
+    
+    # Handle empty strings
+    if value == "":
+        return value
+    
+    # Check for type prefixes
+    if ':' in value:
+        prefix, actual_value = value.split(':', 1)
+        
+        if prefix == 'str':
+            return actual_value
+        elif prefix == 'int':
+            try:
+                return int(float(actual_value))  # Handle "int:3.14" -> 3
+            except ValueError:
+                raise ValueError(f"Cannot convert '{actual_value}' to int with int: prefix")
+        elif prefix == 'float':
+            try:
+                return float(actual_value)
+            except ValueError:
+                raise ValueError(f"Cannot convert '{actual_value}' to float with float: prefix")
+        # If prefix is not recognized, fall through to auto-detection
+    
+    # Auto-detection for values without prefixes
+    # Try integer first
+    try:
+        # Check if it looks like an integer (no decimal point, no scientific notation)
+        if '.' not in value and 'e' not in value.lower():
+            return int(value)
+    except ValueError:
+        pass
+    
+    # Try float (handles scientific notation too)
+    try:
+        return float(value)
+    except ValueError:
+        pass
+    
+    # Keep as string if not numeric
+    return value
 
 def parse_unknown_args(unknown_args):
     """
@@ -18,6 +88,8 @@ def parse_unknown_args(unknown_args):
     - 1 value: same for read and write  
     - 2 values: first=read, second=write
     - 3+ values: error
+    
+    String values are automatically cast to appropriate types (int, float, or string).
     
     Args:
         unknown_args: List from parse_known_args() like ['--encoding', 'utf-8', '--sep', ';', ';']
@@ -36,7 +108,9 @@ def parse_unknown_args(unknown_args):
             # Collect all values for this key (until next -- or end)
             i += 1
             while i < len(unknown_args) and not unknown_args[i].startswith('--'):
-                values.append(unknown_args[i])
+                # Cast string numbers to actual numbers
+                cast_value = cast_string_to_appropriate_type(unknown_args[i])
+                values.append(cast_value)
                 i += 1
             
             kwargs[key] = values
@@ -76,6 +150,13 @@ Pandas options:
     1 value: same value for both read and write  
     2 values: first value for read, second value for write
   
+  Type casting:
+    Values are automatically converted to int/float when possible.
+    To force a specific type, use prefixes:
+      str:VALUE    Force string type (e.g., str:5 -> "5")
+      int:VALUE    Force integer type (e.g., int:3.14 -> 3)
+      float:VALUE  Force float type (e.g., float:42 -> 42.0)
+  
   For available parameters, see pandas documentation:
     Read functions: https://pandas.pydata.org/docs/reference/io.html
     Write functions: DataFrame.to_csv(), .to_excel(), .to_json() methods
@@ -84,6 +165,7 @@ Pandas options:
     --encoding utf-8                    # Same encoding for read and write
     --encoding latin-1 utf-8           # Read latin-1, write utf-8
     --sep ";"                          # Use semicolon separator for CSV
+    --sheet-name str:5                 # Access sheet named "5" (not 6th sheet)
     --sheet-name 0 Summary             # Read sheet 0, write to sheet "Summary"
     --na-values "NULL" "N/A"           # Treat NULL as NaN when reading, N/A when writing
     --schema custom_mappings.json      # Use custom column name mappings
@@ -105,7 +187,7 @@ class CustomHelpAction(argparse.Action):
 def main():
     # Create argument parser - only define the core CLI arguments
     parser = argparse.ArgumentParser(
-        description='Process and merge data files from multiple formats',
+        description='Process and merge data files from multiple formats. CSV outputs automatically use memory-efficient streaming for large datasets.',
         prog='data-pipeline',
         add_help=False  # We'll add custom help
     )
@@ -126,7 +208,7 @@ def main():
     
     parser.add_argument(
         '--output-file',
-        help='Path to output file (if not specified, prints to console)'
+        help='Path to output file. CSV files automatically use memory-efficient streaming processing for large datasets. Other formats use in-memory processing with full feature support.'
     )
     
     parser.add_argument(
@@ -148,16 +230,16 @@ def main():
 
     parser.add_argument(
         '--to-lower',
-        type=str,
-        choices=['true', 'false'],
-        help='Convert column names to lowercase (true/false). Default: true'
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help='Convert column names to lowercase. Use --no-to-lower to disable. Default: enabled'
     )
 
     parser.add_argument(
         '--spaces-to-underscores',
-        type=str, 
-        choices=['true', 'false'],
-        help='Convert spaces to underscores in column names (true/false). Default: true'
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help='Convert spaces to underscores in column names. Use --no-spaces-to-underscores to disable. Default: enabled'
     )
     
     # Parse known args, let everything else go to unknown
@@ -192,27 +274,54 @@ def main():
         print(f"Error: {e}")
         sys.exit(1)
     
-    # Create processor and run it
-    processor = DataProcessor(**read_kwargs)
+    # Create processor with both read and write defaults
+    processor = DataProcessor(read_kwargs=read_kwargs, write_kwargs=write_kwargs)
     
-    # Convert args to dict and filter out None values
-    kwargs = {k: v for k, v in vars(args).items() if v is not None}
-
-    def string_to_boolean(arg_name):
-        if arg_name in kwargs:
-            kwargs[arg_name] = kwargs[arg_name].lower() == 'true'
-
-    string_to_boolean('to_lower')
-    string_to_boolean('spaces_to_underscores')
-
-    result = processor.process_folder(**kwargs)
-
-    print(f'output file: {args.output_file}')
-    # Output results
-    if args.output_file:
-        processor.write_file(result, args.output_file, **write_kwargs)
+    # Create processing configuration from CLI arguments
+    config = ProcessingConfig.from_cli_args(args, read_kwargs, write_kwargs)
+    
+    # Add schema_map if provided
+    if args.schema:
+        config = config.with_schema_map(schema_map)
+    
+    # Smart processing mode selection based on output format
+    if args.output_file and args.output_file.lower().endswith('.csv'):
+        # Automatically use streaming for CSV output (memory efficient)
+        print("📄 CSV output detected - using streaming mode for memory efficiency...")
+        
+        summary = processor.process_folder_streaming(config)
+        
+        if summary:
+            print(f"✅ Processing complete: {summary['files_processed']} files, {summary['total_rows']} rows")
+        else:
+            print("❌ Processing failed or no files processed")
+            sys.exit(1)
+            
     else:
-        print(result)
+        # Use normal in-memory processing for other formats or console output
+        if args.output_file:
+            print(f"📄 {Path(args.output_file).suffix.upper()} output detected - using in-memory processing...")
+        else:
+            print("📄 Console output - using in-memory processing...")
+            
+        # For non-streaming, we still use the individual parameters (for now)
+        result = processor.process_folder(
+            input_folder=config.input_folder,
+            recursive=config.recursive,
+            filetype=config.filetype,
+            schema_map=config.schema_map,
+            to_lower=config.to_lower,
+            spaces_to_underscores=config.spaces_to_underscores
+        )
+
+        # Output results
+        if args.output_file:
+            processor.write_file(result, args.output_file)  # Use constructor defaults
+            print(f"✅ Data saved to '{args.output_file}' ({len(result)} rows, {len(result.columns)} columns)")
+        else:
+            print(result)
 
 if __name__ == '__main__':
     main()
+
+#python data_pipeline/ui/cli.py --input-folder data_pipeline/test_data --output-file c:/users/krjar/downloads/merged.csv --recursive --to-lower --spaces-to-underscores

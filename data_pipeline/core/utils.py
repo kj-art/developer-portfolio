@@ -76,7 +76,7 @@ def normalize_columns(dataframe, schema_map=None, to_lower=True, spaces_to_under
         When both full name and separate name columns exist, separate 
         columns take precedence with full name used to fill any gaps.
     """
-    print(to_lower, spaces_to_underscores, type(to_lower))
+    
     def normalize(string, force=False):
         if force or to_lower:
             string = string.lower()

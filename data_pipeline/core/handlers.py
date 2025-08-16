@@ -55,6 +55,30 @@ class FileHandler(ABC):
         sig = inspect.signature(self.get_write_function(pd.DataFrame))
         return set(sig.parameters.keys()) - {'self'}  # Remove 'self' parameter
 
+    def filter_kwargs(self, kwargs, mode='read'):
+        """
+        Filter kwargs to only include valid parameters for this handler
+        
+        Args:
+            kwargs (dict): Keyword arguments to filter
+            mode (str): Either 'read' or 'write' to specify which valid kwargs to use
+            
+        Returns:
+            dict: Filtered kwargs containing only valid parameters
+            
+        Raises:
+            ValueError: If mode is not 'read' or 'write', or if handler doesn't support the mode
+        """
+        kwarg_attr_name = f"_{mode.upper()}_KWARGS"
+        
+        if hasattr(self, kwarg_attr_name):
+            valid_kwargs = getattr(self, kwarg_attr_name)
+        else:
+            raise ValueError(f"Handler {self.__class__.__name__} does not support mode '{mode}'. "
+                           f"Expected attribute '{kwarg_attr_name}' not found.")
+        
+        return {k: v for k, v in kwargs.items() if k in valid_kwargs}
+
     @abstractmethod
     def read(self, file_path, **kwargs) -> FileResult:
         """Read file and return FileResult"""
@@ -62,19 +86,15 @@ class FileHandler(ABC):
     
     def write(self, dataframe, file_path, **kwargs) -> bool:
         """Default write implementation - works for most formats"""
-        filtered_kwargs = self.filter_kwargs(kwargs, self._WRITE_KWARGS)
+        filtered_kwargs = self.filter_kwargs(kwargs, mode='write')
         self.get_write_function(dataframe)(file_path, **filtered_kwargs)
-
-    def filter_kwargs(self, kwargs, valid_kwargs) -> dict:
-        """Filter kwargs to only include valid ones for this handler"""
-        return {k: v for k, v in kwargs.items() if k in valid_kwargs}
     
 class CsvHandler(FileHandler):
     """Handler for CSV files"""
     
     def read(self, file_path, **kwargs) -> FileResult:
         """Read CSV file and return FileResult"""
-        filtered_kwargs = self.filter_kwargs(kwargs, self._READ_KWARGS)
+        filtered_kwargs = self.filter_kwargs(kwargs, mode='read')
         df = pd.read_csv(file_path, **filtered_kwargs)
         return FileResult(dataframe=df, normalized=False)
 
@@ -86,7 +106,7 @@ class XlsxHandler(FileHandler):
     
     def read(self, file_path, **kwargs) -> FileResult:
         """Read Excel file and return FileResult with sheet_name handling"""
-        filtered_kwargs = self.filter_kwargs(kwargs, self._READ_KWARGS)
+        filtered_kwargs = self.filter_kwargs(kwargs, mode='read')
         sheet_name = filtered_kwargs.pop('sheet_name', 0)
         
         if not isinstance(sheet_name, (int, str, list, type(None))):
@@ -119,7 +139,7 @@ class JsonHandler(FileHandler):
     
     def read(self, file_path, **kwargs) -> FileResult:
         """Read JSON file and return FileResult, handling nested structures"""
-        filtered_kwargs = self.filter_kwargs(kwargs, self._READ_KWARGS)
+        filtered_kwargs = self.filter_kwargs(kwargs, mode='read')
         
         with open(file_path, 'r', **filtered_kwargs) as f:
             data = json.load(f)
