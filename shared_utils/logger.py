@@ -55,8 +55,8 @@ class ColoredDynamicFormatter(DynamicLoggingFormatter):
     }
     RESET = '\033[0m'
     
-    def __init__(self, format_string: str, functions: Optional[Dict[str, Callable]] = None, enable_colors: bool = True):
-        super().__init__(format_string, functions)
+    def __init__(self, format_string: str, delimiter: str = ';', functions: Optional[Dict[str, Callable]] = None, enable_colors: bool = True):
+        super().__init__(format_string, delimiter, functions)
         self.enable_colors = enable_colors
     
     def format(self, record: logging.LogRecord) -> str:
@@ -318,7 +318,7 @@ def set_up_logging(
         # Advanced setup with custom formatting
         set_up_logging(
             level='DEBUG',
-            console_format='{{asctime}} {{levelname}} - {{message}}{{file_count| (|files)}}{{duration| in |$duration_format}}',
+            console_format='{{asctime}} {{levelname}} - {{message}}{{(;file_count;files)}}{{ in ;duration;$duration_format}}',
             format_functions={'duration_format': lambda x: f"{x:.2f}s"}
         )
     """
@@ -336,16 +336,16 @@ def set_up_logging(
     # Default console format using dynamic formatting syntax
     if console_format is None:
         console_format = ('{{asctime}} - {{levelname}} - {{message}}'
-                         '{{file_count| (|files)}}'
-                         '{{duration| in |$duration_format}}'
-                         '{{error_code| [|]}}'
-                         '{{memory_delta_mb| +|MB}}')
+                         '{{(;file_count;files)}}'
+                         '{{ in ;duration;$duration_format}}'
+                         '{{[;error_code;]}}'
+                         '{{+;memory_delta_mb;MB}}')
     
     # Console handler with dynamic formatting and colors
     console_handler = ProgressAwareHandler(sys.stdout)
     console_formatter = ColoredDynamicFormatter(
         console_format, 
-        default_functions, 
+        functions=default_functions, 
         enable_colors=enable_colors
     )
     console_handler.setFormatter(console_formatter)
@@ -355,18 +355,18 @@ def set_up_logging(
     if log_file:
         if file_format is None:
             file_format = ('{{asctime}} - {{name}} - {{levelname}} - {{funcName}}:{{lineno}} - {{message}}'
-                          '{{file_count| (|files)}}'
-                          '{{duration| [duration: |$duration_format]}}'
-                          '{{file_size| [size: |$file_size_format]}}'
-                          '{{error_code| [error: |]}}'
-                          '{{memory_delta_mb| [memory: |MB]}}')
+                          '{{(;file_count;files)}}'
+                          '{{[duration: ;duration;$duration_format]}}'
+                          '{{[size: ;file_size;$file_size_format]}}'
+                          '{{[error: ;error_code;]}}'
+                          '{{[memory: ;memory_delta_mb;MB]}}')
         
         file_handler = logging.handlers.RotatingFileHandler(
             log_file,
             maxBytes=_parse_file_size(max_file_size),
             backupCount=backup_count
         )
-        file_formatter = DynamicLoggingFormatter(file_format, default_functions)
+        file_formatter = DynamicLoggingFormatter(file_format, functions=default_functions)
         file_handler.setFormatter(file_formatter)
         root_logger.addHandler(file_handler)
     
@@ -486,10 +486,10 @@ if __name__ == "__main__":
     set_up_logging(
         level='DEBUG',
         log_file='demo.log',
-        console_format=('{{levelname}} {{$performance_indicator|duration}} {{message}}'
-                       '{{file_count| (|files)}}'
-                       '{{duration| |$duration_format}}'
-                       '{{file_size| [|$file_size_format]}}')
+        console_format=('{{levelname}} {{$performance_indicator;;duration;}} {{message}}'
+                       '{{(;file_count;files)}}'
+                       '{{;duration;$duration_format}}'
+                       '{{[;file_size;$file_size_format]}}')
     )
     
     logger = get_logger('demo')
