@@ -3,12 +3,9 @@
 import argparse
 import sys
 from pathlib import Path
-
-# Add the parent directory to Python path so we can import from core
-sys.path.append(str(Path(__file__).parent.parent))
-
-from core.processor import DataProcessor
-from core.processing_config import ProcessingConfig
+from shared_utils.logger import quick_setup, get_logger
+from data_pipeline.core.processor import DataProcessor
+from data_pipeline.core.processing_config import ProcessingConfig
 
 def cast_string_to_appropriate_type(value):
     """
@@ -244,35 +241,41 @@ def main():
     
     # Parse known args, let everything else go to unknown
     args, unknown_args = parser.parse_known_args()
-    
-    # Basic validation
-    if not Path(args.input_folder).exists():
-        print(f"Error: Input folder '{args.input_folder}' does not exist")
-        sys.exit(1)
-    
-    # Load custom schema if provided
-    schema_map = None
-    if args.schema:
-        if not Path(args.schema).exists():
-            print(f"Error: Schema file '{args.schema}' does not exist")
-            sys.exit(1)
-        try:
-            import json
-            with open(args.schema, 'r') as f:
-                schema_map = json.load(f)
-        except json.JSONDecodeError as e:
-            print(f"Error: Invalid JSON in schema file '{args.schema}': {e}")
-            sys.exit(1)
-        except Exception as e:
-            print(f"Error: Could not read schema file '{args.schema}': {e}")
-            sys.exit(1)
-    
+
     # Parse unknown arguments into read/write kwargs
     try:
         read_kwargs, write_kwargs = parse_unknown_args(unknown_args)
     except ValueError as e:
         print(f"Error: {e}")
         sys.exit(1)
+
+    # Set up logging after argument parsing is complete
+    quick_setup(level='INFO', log_file='data_pipeline.log')
+    logger = get_logger('data_pipeline.cli')
+    
+    logger.info("Data pipeline started", input_folder=args.input_folder)
+    
+    # Basic validation
+    if not Path(args.input_folder).exists():
+        logger.error("Input folder does not exist", folder=args.input_folder)
+        sys.exit(1)
+    
+    # Load custom schema if provided
+    schema_map = None
+    if args.schema:
+        if not Path(args.schema).exists():
+            logger.error("Schema file does not exist", schema_file=args.schema)
+            sys.exit(1)
+        try:
+            import json
+            with open(args.schema, 'r') as f:
+                schema_map = json.load(f)
+        except json.JSONDecodeError as e:
+            logger.error("Invalid JSON in schema file", schema_file=args.schema, error=str(e))
+            sys.exit(1)
+        except Exception as e:
+            logger.error("Could not read schema file", schema_file=args.schema, error=str(e))
+            sys.exit(1)
     
     # Create processor with both read and write defaults
     processor = DataProcessor(read_kwargs=read_kwargs, write_kwargs=write_kwargs)
@@ -281,47 +284,47 @@ def main():
     config = ProcessingConfig.from_cli_args(args, read_kwargs, write_kwargs)
     
     # Add schema_map if provided
-    if args.schema:
+    if schema_map:
         config = config.with_schema_map(schema_map)
     
     # Smart processing mode selection based on output format
     if args.output_file and args.output_file.lower().endswith('.csv'):
         # Automatically use streaming for CSV output (memory efficient)
-        print("📄 CSV output detected - using streaming mode for memory efficiency...")
+        logger.info("Using streaming mode for CSV output", output_file=args.output_file)
         
         summary = processor.process_folder_streaming(config)
         
         if summary:
-            print(f"✅ Processing complete: {summary['files_processed']} files, {summary['total_rows']} rows")
+            logger.info("Streaming processing complete", 
+                       files_processed=summary['files_processed'], 
+                       total_rows=summary['total_rows'])
         else:
-            print("❌ Processing failed or no files processed")
+            logger.error("Processing failed or no files processed")
             sys.exit(1)
             
     else:
         # Use normal in-memory processing for other formats or console output
         if args.output_file:
-            print(f"📄 {Path(args.output_file).suffix.upper()} output detected - using in-memory processing...")
+            logger.info("Using in-memory processing for file output", 
+                        output_format=Path(args.output_file).suffix.upper(),
+                        output_file=args.output_file)
         else:
-            print("📄 Console output - using in-memory processing...")
+            logger.info("Using in-memory processing for console output")
             
-        # For non-streaming, we still use the individual parameters (for now)
-        result = processor.process_folder(
-            input_folder=config.input_folder,
-            recursive=config.recursive,
-            filetype=config.filetype,
-            schema_map=config.schema_map,
-            to_lower=config.to_lower,
-            spaces_to_underscores=config.spaces_to_underscores
-        )
+        # Use the config object for in-memory processing too
+        result = processor.process_folder(config)
 
         # Output results
         if args.output_file:
-            processor.write_file(result, args.output_file)  # Use constructor defaults
-            print(f"✅ Data saved to '{args.output_file}' ({len(result)} rows, {len(result.columns)} columns)")
+            processor.write_file(result, args.output_file)
+            logger.info("Data saved to file", 
+                        output_file=args.output_file,
+                        rows=len(result),
+                        columns=len(result.columns))
         else:
             print(result)
 
 if __name__ == '__main__':
     main()
 
-#python data_pipeline/ui/cli.py --input-folder data_pipeline/test_data --output-file c:/users/krjar/downloads/merged.csv --recursive --to-lower --spaces-to-underscores
+#python -m data_pipeline.ui.cli --input-folder data_pipeline/test_data --output-file c:/users/krjar/downloads/merged.csv --recursive --to-lower --spaces-to-underscores

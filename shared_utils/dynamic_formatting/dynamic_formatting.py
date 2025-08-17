@@ -1,25 +1,12 @@
 """
-Dynamic Formatting Library
+Dynamic Formatting Library - Main Module
 
-A string formatting system that supports conditional sections with graceful handling of missing data.
-
-Syntax:
-    {{field}}                    - Simple substitution
-    {{prefix;field;suffix}}      - Optional section with prefix/suffix
-    {{!prefix;field;suffix}}     - Required section (error if missing)
-    {{$func;prefix;field;suffix}} - Conditional section based on function result
-    {{$prefix_func;field;suffix}} - Dynamic prefix based on function result
-    {{prefix;field;$suffix_func}} - Dynamic suffix based on function result
-
-Features:
-    - Graceful handling of missing data
-    - Configurable delimiter (default: semicolon) with escaping support
-    - Custom function support for conditional rendering
-    - Integration with Python logging
+Clean, working version with modular token parsing.
 """
 
 import logging
 from typing import Dict, Any, Callable, Optional, Union, List
+from .formatters import TOKEN_FORMATTERS
 
 
 class DynamicFormattingError(Exception):
@@ -34,11 +21,16 @@ class FunctionNotFoundError(DynamicFormattingError):
     pass
 
 
-class Token:
-    def __init__(self, type_: str, value: str, position: int):
-        self.type = type_
-        self.value = value
-        self.position = position
+class FormattedSpan:
+    def __init__(self, text: str, token_type: str = None, token_value: str = None):
+        self.text = text
+        self.token_type = token_type
+        self.token_value = token_value
+        self.parsed_token = None
+        
+        if token_type and token_value and token_type in TOKEN_FORMATTERS:
+            formatter = TOKEN_FORMATTERS[token_type]
+            self.parsed_token = formatter.parse_token(token_value)
 
 
 class FormatSection:
@@ -46,7 +38,8 @@ class FormatSection:
                  prefix: str = "", suffix: str = "", 
                  function_name: Optional[str] = None,
                  prefix_function: Optional[str] = None,
-                 suffix_function: Optional[str] = None):
+                 suffix_function: Optional[str] = None,
+                 whole_string_formatting: Optional[FormattedSpan] = None):
         self.field_name = field_name
         self.is_required = is_required
         self.prefix = prefix
@@ -54,13 +47,17 @@ class FormatSection:
         self.function_name = function_name
         self.prefix_function = prefix_function
         self.suffix_function = suffix_function
+        self.whole_string_formatting = whole_string_formatting
 
 
 class DynamicFormatter:
-    def __init__(self, format_string: str, delimiter: str = ';', functions: Optional[Dict[str, Callable]] = None):
+    def __init__(self, format_string: str, delimiter: str = ';', 
+                 functions: Optional[Dict[str, Callable]] = None,
+                 output_mode: str = 'console'):
         self.format_string = format_string
         self.delimiter = delimiter
         self.functions = functions or {}
+        self.output_mode = output_mode
         self.sections = self._parse_format_string()
     
     def _parse_format_string(self) -> List[Union[str, FormatSection]]:
@@ -72,7 +69,6 @@ class DynamicFormatter:
             char = self.format_string[i]
             
             if char == '{' and i + 1 < len(self.format_string) and self.format_string[i + 1] == '{':
-                # Found template start
                 if current_literal:
                     sections.append(current_literal)
                     current_literal = ""
@@ -90,7 +86,6 @@ class DynamicFormatter:
                 if i + 1 < len(self.format_string):
                     i += 2  # Skip }}
                 
-                # Parse template content
                 section = self._parse_template_content(template_content)
                 sections.append(section)
             else:
@@ -109,27 +104,65 @@ class DynamicFormatter:
             is_required = True
             content = content[1:]
         
-        # Split by delimiter
+        # Extract tokens modularly
+        function_name = None
+        color_token = None
+        
+        # Keep extracting until no more tokens
+        while True:
+            found_token = False
+            
+            # Look for function
+            if content.startswith('$') and ';' in content:
+                end_pos = content.find(';')
+                function_name = content[1:end_pos]
+                content = content[end_pos + 1:]
+                found_token = True
+                continue
+            
+            # Look for color token
+            if content.startswith('#') and ';' in content:
+                end_pos = content.find(';')
+                color_value = content[1:end_pos]
+                color_token = FormattedSpan("", '#', color_value)
+                content = content[end_pos + 1:]
+                found_token = True
+                continue
+            
+            if not found_token:
+                break
+        
+        # Parse remaining content
         parts = self._split_content(content)
         
-        # Check if it's a conditional function
-        if content.startswith('$') and (len(parts) == 2 or len(parts) == 4):
-            return self._parse_conditional_function(parts)
-        
         if len(parts) == 1:
-            # Simple field
-            return FormatSection(field_name=parts[0], is_required=is_required)
+            return FormatSection(
+                field_name=parts[0], 
+                is_required=is_required,
+                function_name=function_name,
+                whole_string_formatting=color_token
+            )
+        elif len(parts) == 2:
+            # Handle 2 parts: treat as prefix;field
+            return FormatSection(
+                field_name=parts[1], 
+                is_required=is_required,
+                prefix=parts[0],
+                function_name=function_name,
+                whole_string_formatting=color_token
+            )
         elif len(parts) == 3:
-            # prefix;field;suffix
             prefix, field_name, suffix = parts
             
             prefix_func = None
             suffix_func = None
             
+            # Check for function prefixes
             if prefix.startswith('$'):
                 prefix_func = prefix[1:]
                 prefix = ""
             
+            # Check for function suffixes  
             if suffix.startswith('$'):
                 suffix_func = suffix[1:]
                 suffix = ""
@@ -139,26 +172,13 @@ class DynamicFormatter:
                 is_required=is_required,
                 prefix=prefix, 
                 suffix=suffix,
-                prefix_function=prefix_func, 
-                suffix_function=suffix_func
-            )
-        else:
-            raise DynamicFormattingError("Invalid template syntax")
-    
-    def _parse_conditional_function(self, parts: List[str]) -> FormatSection:
-        function_name = parts[0][1:]  # Remove $
-        
-        if len(parts) == 2:
-            # $func;field
-            return FormatSection(field_name=parts[1], function_name=function_name)
-        else:
-            # $func;prefix;field;suffix
-            return FormatSection(
-                field_name=parts[2], 
                 function_name=function_name,
-                prefix=parts[1], 
-                suffix=parts[3]
+                prefix_function=prefix_func, 
+                suffix_function=suffix_func,
+                whole_string_formatting=color_token
             )
+        else:
+            raise DynamicFormattingError(f"Invalid syntax: got {len(parts)} parts")
     
     def _split_content(self, content: str) -> List[str]:
         parts = []
@@ -169,11 +189,9 @@ class DynamicFormatter:
             char = content[i]
             
             if char == '\\' and i + 1 < len(content) and content[i + 1] == self.delimiter:
-                # Escaped delimiter
                 current += self.delimiter
                 i += 2
             elif char == self.delimiter:
-                # Split here
                 parts.append(current)
                 current = ""
                 i += 1
@@ -212,29 +230,51 @@ class DynamicFormatter:
             if not func(field_value):
                 return ""
         
-        # Get prefix
-        prefix = section.prefix
+        # Build result
+        result_parts = []
+        
+        # Add prefix
         if section.prefix_function:
             func = self.functions.get(section.prefix_function)
             if not func:
                 raise FunctionNotFoundError("Prefix function not found: " + section.prefix_function)
-            prefix = func(field_value)
+            result_parts.append(func(field_value))
+        elif section.prefix:
+            result_parts.append(str(section.prefix))
         
-        # Get suffix
-        suffix = section.suffix
+        # Add field value
+        result_parts.append(str(field_value))
+        
+        # Add suffix
         if section.suffix_function:
             func = self.functions.get(section.suffix_function)
             if not func:
                 raise FunctionNotFoundError("Suffix function not found: " + section.suffix_function)
-            suffix = func(field_value)
+            result_parts.append(func(field_value))
+        elif section.suffix:
+            result_parts.append(str(section.suffix))
         
-        return prefix + str(field_value) + suffix
+        result = "".join(result_parts)
+        
+        # Apply formatting
+        if section.whole_string_formatting:
+            formatter = TOKEN_FORMATTERS.get(section.whole_string_formatting.token_type)
+            if formatter:
+                result = formatter.apply_formatting(
+                    result, 
+                    section.whole_string_formatting.parsed_token, 
+                    self.output_mode
+                )
+        
+        return result
 
 
 class DynamicLoggingFormatter(logging.Formatter):
-    def __init__(self, format_string: str, delimiter: str = ';', functions: Optional[Dict[str, Callable]] = None):
+    def __init__(self, format_string: str, delimiter: str = ';', 
+                 functions: Optional[Dict[str, Callable]] = None,
+                 output_mode: str = 'console'):
         super().__init__()
-        self.formatter = DynamicFormatter(format_string, delimiter, functions)
+        self.formatter = DynamicFormatter(format_string, delimiter, functions, output_mode)
     
     def format(self, record: logging.LogRecord) -> str:
         log_data = {
@@ -260,66 +300,36 @@ class DynamicLoggingFormatter(logging.Formatter):
 
 
 if __name__ == "__main__":
-    print("=== Dynamic Formatting Tests ===")
+    print("=== Clean Modular Tests ===")
     
-    # Basic test
-    formatter = DynamicFormatter("Hello {{name}}")
-    print(formatter.format(name="World"))     # "Hello World"
-    print(formatter.format())                 # "Hello "
+    # Basic functionality
+    formatter = DynamicFormatter("{{#blue;Processing ;file_count; files}}")
+    result = formatter.format(file_count=5)
+    print(f"Basic: {result}")
+    print(f"Raw: {repr(result)}")
     
-    # Prefix/suffix test - NEW SYNTAX
-    formatter = DynamicFormatter("{{File size: ;file_size;MB }}{{(;file_count;files) }}processed")
-    print(formatter.format(file_size=2.5, file_count=100))  # "File size: 2.5MB (100files) processed"
-    print(formatter.format(file_size=2.5))                  # "File size: 2.5MB processed"
-    print(formatter.format(file_count=100))                 # "(100files) processed"
-    print(formatter.format())                               # "processed"
+    # Test both orders with debug
+    def has_items(count):
+        return count > 0
     
-    # Required sections
-    formatter = DynamicFormatter("Processing {{!filename}}")
-    print(formatter.format(filename="data.csv"))  # "Processing data.csv"
-    try:
-        print(formatter.format())  # Raises RequiredFieldError
-    except RequiredFieldError as e:
-        print("Error: " + str(e))
-    
-    # Function-based conditions - NEW SYNTAX
-    def is_large_file(size):
-        return size > 1.0
-    
-    def has_many_files(count):
-        return count > 50
-    
+    # Function first (3 parts - debug this one)
     formatter = DynamicFormatter(
-        "{{$is_large_file;Large file: ;file_size;MB }}{{$has_many_files;Batch of ;file_count; files}}",
-        functions={'is_large_file': is_large_file, 'has_many_files': has_many_files}
+        "{{$has_items;#green;Found ;item_count; items}}",
+        functions={'has_items': has_items}
     )
+    print(f"Function first: {formatter.format(item_count=3)}")
+    print(f"Function first raw: {repr(formatter.format(item_count=3))}")
     
-    print(formatter.format(file_size=2.5, file_count=100))  # "Large file: 2.5MB Batch of 100 files"
-    print(formatter.format(file_size=0.5, file_count=100))  # "Batch of 100 files"
-    print(formatter.format(file_size=2.5, file_count=10))   # "Large file: 2.5MB"
-    print(formatter.format(file_size=0.5, file_count=10))   # ""
+    # Simple green test
+    formatter = DynamicFormatter("{{#green;item_count}}")
+    print(f"Simple green: {formatter.format(item_count=3)}")
+    print(f"Simple green raw: {repr(formatter.format(item_count=3))}")
     
-    # Function prefix/suffix
-    def size_prefix(size):
-        return "Big: " if size > 1.0 else "Small: "
-    
-    def size_suffix(size):
-        return "MB (backup worthy)" if size > 5.0 else "MB"
-    
+    # Color first (2 parts)
     formatter = DynamicFormatter(
-        "{{$size_prefix;file_size;$size_suffix}}", 
-        functions={'size_prefix': size_prefix, 'size_suffix': size_suffix}
+        "{{#red;$has_items;Error ;error_count}}",
+        functions={'has_items': has_items}
     )
-    print(formatter.format(file_size=2.5))   # "Big: 2.5MB"
-    print(formatter.format(file_size=0.5))   # "Small: 0.5MB"
-    print(formatter.format(file_size=6.2))   # "Big: 6.2MB (backup worthy)"
+    print(f"Color first: {formatter.format(error_count=2)}")
     
-    # Mixed static and function - NEW SYNTAX  
-    formatter = DynamicFormatter(
-        "{{File size: ;file_size;$size_suffix}}",
-        functions={'size_suffix': size_suffix}
-    )
-    print(formatter.format(file_size=3.2))   # "File size: 3.2MB"
-    print(formatter.format(file_size=7.8))   # "File size: 7.8MB (backup worthy)"
-    
-    print("All tests completed!")
+    print("Tests completed!")

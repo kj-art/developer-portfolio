@@ -5,13 +5,8 @@ import pandas as pd
 from . import handlers
 from .utils import merge_dataframes, normalize_columns
 from .config import SCHEMA_MAP, ALLOWED_EXTENSIONS
-
-# Import the ProcessingConfig class
-try:
-    from .processing_config import ProcessingConfig
-except ImportError:
-    # Fallback if not using the config class yet
-    ProcessingConfig = None
+from .processing_config import ProcessingConfig
+from shared_utils.logger import get_logger, log_performance
 
 class DataProcessor:
     def __init__(self, read_kwargs=None, write_kwargs=None):
@@ -21,59 +16,59 @@ class DataProcessor:
         Args:
             read_kwargs (dict, optional): Default file reading options (e.g. sep=';', encoding='utf-8')
             write_kwargs (dict, optional): Default file writing options (e.g. sep=';', na_rep='NULL')
-        
-        Example:
-            processor = DataProcessor(
-                read_kwargs={'sep': ';', 'encoding': 'latin-1'}, 
-                write_kwargs={'sep': ';', 'na_rep': 'NULL'}
-            )
         """
         self.read_options = read_kwargs or {}
         self.write_options = write_kwargs or {}
+        self.logger = get_logger('data_pipeline.processor')
 
-    def process_folder(self, input_folder, recursive=False, filetype=None, schema_map=None, to_lower=True, spaces_to_underscores=True, **kwargs):
+    def process_folder(self, config):
         """
-        Process all files in a folder and return merged DataFrame (legacy method)
-        
-        This is the original in-memory processing method. For large datasets,
-        use process_folder_streaming() instead.
+        Process all files in a folder and return merged DataFrame (in-memory processing)
         
         Args:
-            input_folder (str): Path to folder containing files to process
-            recursive (bool, optional): If True, search subdirectories recursively. 
-                                      Defaults to False.
-            filetype (str|list, optional): File extensions to process. 
-                                                Can be single string or list of strings.
-                                                Defaults to all supported types.
-            schema_map (dict, optional): Column name mapping for normalization.
-                                      Maps standard names to list of alternatives.
-                                      If None, uses default SCHEMA_MAP from config.
-            **kwargs: Additional options passed to file handlers
-        
+            config (ProcessingConfig): Processing configuration object
+            
         Returns:
             pandas.DataFrame: Merged DataFrame from all processed files
         """
-        
-        schema_map = schema_map or SCHEMA_MAP
-        dataframes = []
-        path = Path(input_folder)
-        
-        files = path.rglob('*') if recursive else path.iterdir()
-        
-        for file_path in files:
-            if file_path.is_file():  # Skip directories
-                data = self.read_file(str(file_path), filetype, **self.read_options)
-                if not data:
-                    continue
-                df = data.dataframe
-                if not data.normalized:
-                    df = normalize_columns(df, schema_map, to_lower, spaces_to_underscores)
-                dataframes.append(df)
+        with log_performance("in_memory_processing", 
+                           input_folder=config.input_folder, 
+                           recursive=config.recursive):
+            
+            self.logger.info("Starting in-memory processing", 
+                           input_folder=config.input_folder,
+                           recursive=config.recursive,
+                           file_types=config.filetype)
+            
+            schema_map = config.schema_map or SCHEMA_MAP
+            dataframes = []
+            path = Path(config.input_folder)
+            
+            files = path.rglob('*') if config.recursive else path.iterdir()
+            files_processed = 0
+            
+            # Merge constructor options with config options
+            merged_read_kwargs = {**self.read_options, **config.read_options}
+            
+            for file_path in files:
+                if file_path.is_file():
+                    data = self.read_file(str(file_path), config.filetype, **merged_read_kwargs)
+                    if not data:
+                        continue
+                    df = data.dataframe
+                    if not data.normalized:
+                        df = normalize_columns(df, schema_map, config.to_lower, config.spaces_to_underscores)
+                    dataframes.append(df)
+                    files_processed += 1
 
-        return merge_dataframes(dataframes, schema_map, to_lower, spaces_to_underscores)
+            result = merge_dataframes(dataframes, schema_map, config.to_lower, config.spaces_to_underscores)
+            self.logger.info("In-memory processing complete", 
+                           files_processed=files_processed, 
+                           total_rows=len(result), 
+                           columns=len(result.columns))
+            return result
 
-    def process_folder_streaming(self, config_or_input_folder, output_file=None, read_kwargs=None, write_kwargs=None, 
-                               recursive=False, filetype=None, schema_map=None, to_lower=True, spaces_to_underscores=True, **kwargs):
+    def process_folder_streaming(self, config):
         """
         Stream processing implementation for large datasets
         
@@ -81,144 +76,106 @@ class DataProcessor:
         maintaining constant memory usage regardless of dataset size.
         
         Args:
-            config_or_input_folder: Either ProcessingConfig object or input folder string (legacy)
-            output_file (str): Path to output file (legacy, ignored if config provided)
-            read_kwargs (dict): Read-specific kwargs (legacy, ignored if config provided)
-            write_kwargs (dict): Write-specific kwargs (legacy, ignored if config provided)
-            **kwargs: Additional legacy options (ignored if config provided)
+            config (ProcessingConfig): Processing configuration object
             
         Returns:
             dict: Processing summary with files_processed, total_rows, output_file
-            
-        Examples:
-            # New config-based usage (recommended):
-            config = ProcessingConfig(input_folder='data', output_file='output.csv')
-            summary = processor.process_folder_streaming(config)
-            
-            # Legacy usage (still supported):
-            summary = processor.process_folder_streaming('data', 'output.csv')
         """
-        # Handle both config object and legacy parameter usage
-        if ProcessingConfig and isinstance(config_or_input_folder, ProcessingConfig):
-            config = config_or_input_folder
-        else:
-            # Legacy usage - create config from individual parameters
-            if ProcessingConfig:
-                config = ProcessingConfig(
-                    input_folder=config_or_input_folder,
-                    output_file=output_file,
-                    recursive=recursive,
-                    filetype=filetype,
-                    schema_map=schema_map,
-                    to_lower=to_lower,
-                    spaces_to_underscores=spaces_to_underscores,
-                    read_options=read_kwargs or {},
-                    write_options=write_kwargs or {}
-                )
-            else:
-                # Fallback if ProcessingConfig not available
-                return self._process_folder_streaming_legacy(
-                    config_or_input_folder, output_file, read_kwargs, write_kwargs,
-                    recursive, filetype, schema_map, to_lower, spaces_to_underscores, **kwargs
-                )
-        
-        print("🔄 Starting streaming processing...")
-        
-        # Merge constructor defaults with config options
-        merged_read_kwargs = {**self.read_options, **config.read_options}
-        merged_write_kwargs = {**self.write_options, **config.write_options}
-        
-        # Get CSV handler to filter both read and write kwargs
-        csv_handler = self._get_handler_for_extension('csv')
-        filtered_read_kwargs = csv_handler.filter_kwargs(merged_read_kwargs, mode='read')
-        filtered_write_kwargs = csv_handler.filter_kwargs(merged_write_kwargs, mode='write')
-        
-        # Step 1: Detect unified schema across all files (using filtered read options)
-        schema_info = self._determine_schema(
-            config.input_folder, config.recursive, config.filetype, config.schema_map, 
-            config.to_lower, config.spaces_to_underscores, **filtered_read_kwargs
-        )
-        print(f"📋 Target schema: {list(schema_info['dtypes'].keys())}")
-        
-        # Step 2: Get file iterator (memory efficient)
-        file_iterator = self._get_files_iterator(config.input_folder, config.recursive, config.filetype)
-        
-        try:
-            # Step 3: Handle first file (with headers)
-            first_file_path = next(file_iterator)
-            print(f"📄 Processing first file: {first_file_path.name}")
+        with log_performance("streaming_processing", 
+                           input_folder=config.input_folder,
+                           output_file=config.output_file,
+                           file_types=config.filetype):
             
-            first_df = self._process_single_file(
-                first_file_path, schema_info, config.schema_map, 
+            self.logger.info("Starting streaming processing", 
+                           input_folder=config.input_folder,
+                           output_file=config.output_file)
+            
+            # Merge constructor defaults with config options
+            merged_read_kwargs = {**self.read_options, **config.read_options}
+            merged_write_kwargs = {**self.write_options, **config.write_options}
+            
+            # Get CSV handler to filter both read and write kwargs
+            csv_handler = self._get_handler_for_extension('csv')
+            filtered_read_kwargs = csv_handler.filter_kwargs(merged_read_kwargs, mode='read')
+            filtered_write_kwargs = csv_handler.filter_kwargs(merged_write_kwargs, mode='write')
+            
+            # Step 1: Detect unified schema across all files
+            schema_info = self._determine_schema(
+                config.input_folder, config.recursive, config.filetype, config.schema_map, 
                 config.to_lower, config.spaces_to_underscores, **filtered_read_kwargs
             )
             
-            if first_df is not None:
-                # Write first file with headers using filtered write kwargs
-                first_df.to_csv(config.output_file, index=False, mode='w', **filtered_write_kwargs)
-                print(f"    💾 Wrote {len(first_df)} rows with headers")
-                total_rows = len(first_df)
-                del first_df  # Clean up immediately
-            else:
-                print(f"    ❌ Failed to process first file")
-                return None
-                
-            # Step 4: Stream remaining files (append without headers)
-            files_processed = 1
+            self.logger.info("Schema detection complete", 
+                           columns=len(schema_info['dtypes']),
+                           files_sampled=schema_info['files_processed'])
             
-            for file_path in file_iterator:
-                print(f"📄 Processing file {files_processed + 1}: {file_path.name}")
+            # Step 2: Get file iterator (memory efficient)
+            file_iterator = self._get_files_iterator(config.input_folder, config.recursive, config.filetype)
+            
+            try:
+                # Step 3: Handle first file (with headers)
+                first_file_path = next(file_iterator)
+                self.logger.info("Processing first file", file_name=first_file_path.name)
                 
-                df = self._process_single_file(
-                    file_path, schema_info, config.schema_map,
+                first_df = self._process_single_file(
+                    first_file_path, schema_info, config.schema_map, 
                     config.to_lower, config.spaces_to_underscores, **filtered_read_kwargs
                 )
                 
-                if df is not None:
-                    # Append without headers using filtered write kwargs
-                    df.to_csv(config.output_file, index=False, mode='a', header=False, **filtered_write_kwargs)
-                    total_rows += len(df)
-                    print(f"    💾 Appended {len(df)} rows")
-                    del df  # Clean up immediately
+                if first_df is not None:
+                    first_df.to_csv(config.output_file, index=False, mode='w', **filtered_write_kwargs)
+                    total_rows = len(first_df)
+                    self.logger.info("First file written", rows=total_rows)
+                    del first_df
+                else:
+                    self.logger.error("Failed to process first file", file_name=first_file_path.name)
+                    return None
                     
-                files_processed += 1
-            
-            print(f"✅ Streaming processing complete!")
-            print(f"    📊 Processed {files_processed} files")
-            print(f"    📈 Total rows written: {total_rows}")
-            print(f"    💾 Output: {config.output_file}")
-            
-            return {
-                'files_processed': files_processed,
-                'total_rows': total_rows,
-                'output_file': config.output_file,
-                'schema': schema_info
-            }
-            
-        except StopIteration:
-            print("⚠️ No files found to process")
-            return None
+                # Step 4: Stream remaining files
+                files_processed = 1
+                
+                for file_path in file_iterator:
+                    self.logger.info("Processing file", 
+                                   file_name=file_path.name, 
+                                   file_number=files_processed + 1)
+                    
+                    df = self._process_single_file(
+                        file_path, schema_info, config.schema_map,
+                        config.to_lower, config.spaces_to_underscores, **filtered_read_kwargs
+                    )
+                    
+                    if df is not None:
+                        df.to_csv(config.output_file, index=False, mode='a', header=False, **filtered_write_kwargs)
+                        total_rows += len(df)
+                        del df
+                        
+                    files_processed += 1
+                
+                self.logger.info("Streaming processing complete", 
+                               files_processed=files_processed,
+                               total_rows=total_rows,
+                               output_file=config.output_file)
+                
+                return {
+                    'files_processed': files_processed,
+                    'total_rows': total_rows,
+                    'output_file': config.output_file,
+                    'schema': schema_info
+                }
+                
+            except StopIteration:
+                self.logger.warning("No files found to process", input_folder=config.input_folder)
+                return None
 
     def _determine_schema(self, input_folder, recursive=False, filetype=None, 
                          schema_map=None, to_lower=True, spaces_to_underscores=True, 
                          sample_rows=100, **kwargs):
         """
         Determine unified schema across all files by sampling headers and data types
-        
-        This is the first pass of streaming processing - we read just enough of each
-        file to understand the column structure and data types, without loading
-        entire files into memory.
-        
-        Args:
-            sample_rows (int): Number of rows to sample for type inference (default: 100)
-            **kwargs: File reading options passed to handlers
-            
-        Returns:
-            dict: Schema information containing:
-                - 'dtypes': Dict mapping column names to unified data types
-                - 'files_processed': Number of files sampled
         """
-        print("🔍 Detecting schema across files...")
+        self.logger.info("Starting schema detection", 
+                        input_folder=input_folder, 
+                        sample_rows=sample_rows)
         
         schema_map = schema_map or SCHEMA_MAP
         all_columns = set()
@@ -229,39 +186,30 @@ class DataProcessor:
         
         for file_path in file_iterator:
             try:
-                print(f"  📄 Sampling: {file_path.name}")
-                
-                # Read small sample for schema detection
                 sample_df = self._read_file_sample(file_path, sample_rows, **kwargs)
                 if sample_df is None or sample_df.empty:
                     continue
                 
-                # Normalize columns using same logic as full processing
                 normalized_df = normalize_columns(sample_df, schema_map, to_lower, spaces_to_underscores)
                 
-                # Collect column information
                 file_columns = set(normalized_df.columns)
                 all_columns.update(file_columns)
                 
-                # Update dtype information with most permissive types
                 for col in normalized_df.columns:
                     current_dtype = str(normalized_df[col].dtype)
                     existing_dtype = column_dtypes.get(col)
-                    
-                    # Merge dtypes - choose most permissive
                     unified_dtype = self._merge_dtypes(existing_dtype, current_dtype)
                     column_dtypes[col] = unified_dtype
                 
                 files_processed += 1
-                
-                # Explicit memory cleanup
                 del sample_df, normalized_df
                 
             except Exception as e:
-                print(f"  ⚠️ Warning: Could not sample {file_path.name}: {e}")
+                self.logger.warning("Could not sample file", 
+                                  file_name=file_path.name, 
+                                  error=str(e))
                 continue
         
-        # Force garbage collection after processing all samples
         gc.collect()
         
         schema_info = {
@@ -269,25 +217,10 @@ class DataProcessor:
             'files_processed': files_processed
         }
         
-        unified_columns = list(column_dtypes.keys())
-        print(f"  ✅ Schema detection complete:")
-        print(f"     📊 {len(unified_columns)} unique columns across {files_processed} files")
-        print(f"     📋 Columns: {', '.join(unified_columns[:5])}{'...' if len(unified_columns) > 5 else ''}")
-        
         return schema_info
 
     def _get_files_iterator(self, input_folder, recursive=False, filetype=None):
-        """
-        Memory-efficient file iterator that yields valid files one at a time
-        
-        Args:
-            input_folder (str): Path to folder containing files
-            recursive (bool): Search subdirectories recursively
-            filetype (list): File extensions to include
-            
-        Yields:
-            pathlib.Path: Valid file paths that match criteria
-        """
+        """Memory-efficient file iterator that yields valid files one at a time"""
         path = Path(input_folder)
         files = path.rglob('*') if recursive else path.iterdir()
         valid_extensions = self._normalize_filetype(filetype)
@@ -300,26 +233,12 @@ class DataProcessor:
 
     def _process_single_file(self, file_path, schema_info, schema_map=None, 
                            to_lower=True, spaces_to_underscores=True, **kwargs):
-        """
-        Process a single file using the unified schema
-        
-        Args:
-            file_path (Path): Path to file to process
-            schema_info (dict): Schema information from _determine_schema()
-            **kwargs: File processing options
-            
-        Returns:
-            pd.DataFrame|None: Normalized dataframe or None if processing failed
-        """
+        """Process a single file using the unified schema"""
         try:
-            # Read the file
             data = self.read_file(str(file_path), **kwargs)
             if data is None:
                 return None
                 
-            print(f"    📊 Original: {data.dataframe.shape[1]} columns, {data.dataframe.shape[0]} rows")
-            
-            # Normalize to unified schema
             normalized_df = self._normalize_to_schema(
                 data.dataframe, 
                 schema_info,
@@ -328,61 +247,40 @@ class DataProcessor:
                 spaces_to_underscores
             )
             
-            print(f"    ✅ Normalized: {normalized_df.shape[1]} columns, {normalized_df.shape[0]} rows")
-            
             return normalized_df
             
         except Exception as e:
-            print(f"    ❌ Error processing {file_path.name}: {e}")
+            self.logger.error("Error processing file", 
+                            file_name=file_path.name, 
+                            error=str(e))
             return None
 
     def _normalize_to_schema(self, dataframe, schema_info, schema_map=None, 
                            to_lower=True, spaces_to_underscores=True):
-        """
-        Normalize a dataframe to match the unified schema
-        
-        This ensures every file has the same columns in the same order with the same types,
-        so they can be safely concatenated during streaming processing.
-        
-        Args:
-            dataframe (pd.DataFrame): Individual file's dataframe to normalize
-            schema_info (dict): Schema info from _determine_schema()
-            schema_map (dict): Column name mappings
-            to_lower (bool): Convert column names to lowercase
-            spaces_to_underscores (bool): Convert spaces to underscores
-            
-        Returns:
-            pd.DataFrame: Normalized dataframe with unified schema
-        """
-        # Step 1: Apply same column normalization as current logic
+        """Normalize a dataframe to match the unified schema"""
         normalized_df = normalize_columns(dataframe, schema_map, to_lower, spaces_to_underscores)
         
-        # Step 2: Get target schema information
         target_dtypes = schema_info['dtypes']
         target_columns = list(target_dtypes.keys())
         
-        # Step 3: Add missing columns with appropriate default values
+        # Add missing columns
         current_columns = set(normalized_df.columns)
         missing_columns = set(target_columns) - current_columns
         
         for col in missing_columns:
-            # Add missing column with appropriate default based on target type
             default_value = self._get_default_value_for_dtype(target_dtypes[col])
             normalized_df[col] = default_value
-            print(f"    ➕ Added missing column '{col}' with default {default_value}")
         
-        # Step 4: Remove extra columns not in schema (optional - could keep them)
+        # Remove extra columns
         extra_columns = current_columns - set(target_columns)
         if extra_columns:
             normalized_df = normalized_df.drop(columns=list(extra_columns))
-            print(f"    ➖ Removed extra columns: {list(extra_columns)}")
         
-        # Step 5: Reorder columns to match schema order
+        # Reorder columns to match schema order
         normalized_df = normalized_df.reindex(columns=target_columns)
         
-        # Step 6: Cast data types to match schema
+        # Cast data types to match schema
         try:
-            # Only cast columns that exist and aren't already the right type
             for col in target_columns:
                 if col in normalized_df.columns:
                     current_dtype = str(normalized_df[col].dtype)
@@ -392,44 +290,27 @@ class DataProcessor:
                         normalized_df[col] = normalized_df[col].astype(target_dtype, errors='ignore')
                         
         except Exception as e:
-            print(f"    ⚠️ Warning: Type casting failed for some columns: {e}")
-            # Continue processing - type mismatches are often not critical
+            self.logger.warning("Type casting failed for some columns", error=str(e))
         
         return normalized_df
 
     def _read_file_sample(self, file_path, sample_rows, **kwargs):
-        """
-        Read a small sample of a file for schema detection
-        
-        Args:
-            file_path (Path): Path to file to sample
-            sample_rows (int): Number of rows to read
-            **kwargs: File reading options
-            
-        Returns:
-            pandas.DataFrame|None: Sample dataframe or None if error
-        """
+        """Read a small sample of a file for schema detection"""
         extension = file_path.suffix.lower()[1:]
         handler = self._get_handler_for_extension(extension)
         
         try:
-            # Add nrows parameter for sampling (works for CSV and Excel)
             sample_kwargs = {**self.read_options, **kwargs}
-            if extension in ['csv']:
+            if extension in ['csv', 'xlsx']:
                 sample_kwargs['nrows'] = sample_rows
-            elif extension in ['xlsx']:
-                sample_kwargs['nrows'] = sample_rows
-            # JSON files are typically loaded entirely (usually smaller)
             
-            # Use existing handler logic but with sampling
             result = handler.read(str(file_path), **sample_kwargs)
             return result.dataframe
             
-        except Exception as e:
-            # If sampling fails, try reading without nrows (for file types that don't support it)
+        except Exception:
+            # Fallback: try reading without nrows
             try:
                 result = handler.read(str(file_path), **self.read_options)
-                # Manually sample the result
                 if len(result.dataframe) > sample_rows:
                     return result.dataframe.head(sample_rows)
                 return result.dataframe
@@ -437,81 +318,45 @@ class DataProcessor:
                 return None
 
     def _merge_dtypes(self, existing_dtype, new_dtype):
-        """
-        Merge two pandas dtypes, choosing the most permissive one
-        
-        Type hierarchy (most to least permissive):
-        object > float64 > int64 > bool
-        
-        Args:
-            existing_dtype (str|None): Current dtype for column
-            new_dtype (str): New dtype encountered
-            
-        Returns:
-            str: Most permissive dtype
-        """
+        """Merge two pandas dtypes, choosing the most permissive one"""
         if existing_dtype is None:
             return new_dtype
         
-        # Define dtype hierarchy (most permissive first)
         dtype_hierarchy = ['object', 'float64', 'int64', 'bool', 'datetime64[ns]']
         
-        # Find positions in hierarchy
         try:
             existing_pos = dtype_hierarchy.index(existing_dtype)
         except ValueError:
-            existing_pos = 0  # Default to most permissive for unknown types
+            existing_pos = 0
             
         try:
             new_pos = dtype_hierarchy.index(new_dtype)
         except ValueError:
-            new_pos = 0  # Default to most permissive for unknown types
+            new_pos = 0
         
-        # Return the more permissive type (lower index = more permissive)
         return dtype_hierarchy[min(existing_pos, new_pos)]
 
     def _get_default_value_for_dtype(self, dtype_str):
-        """
-        Get appropriate default value for missing columns based on data type
-        
-        Args:
-            dtype_str (str): Pandas dtype string (e.g., 'int64', 'object', 'float64')
-            
-        Returns:
-            Appropriate default value for the data type
-        """
+        """Get appropriate default value for missing columns based on data type"""
         if dtype_str == 'object':
-            return None  # Will become NaN for strings
+            return None
         elif 'int' in dtype_str:
-            return None  # Will become NaN, can be filled later if needed
+            return None
         elif 'float' in dtype_str:
-            return None  # Will become NaN
+            return None
         elif 'bool' in dtype_str:
             return False
         elif 'datetime' in dtype_str:
-            return None  # Will become NaT (Not a Time)
+            return None
         else:
-            return None  # Safe default
+            return None
 
     def _normalize_filetype(self, filetype=None):
-        """
-        Normalize and validate filetype filter input
-        
-        Args:
-            filetype (str|list|None, optional): File extensions to allow.
-                                                      Can be:
-                                                      - None: defaults to all supported types
-                                                      - str: single extension (e.g., 'csv')
-                                                      - list: multiple extensions (e.g., ['csv', 'xlsx'])
-        
-        Returns:
-            list: Validated list of file extensions
-        """
+        """Normalize and validate filetype filter input"""
         if filetype is None:
             filetype = ALLOWED_EXTENSIONS
         else:
             if isinstance(filetype, list):
-                # Strip leading dots from extensions in list
                 filetype = [ext.lstrip('.').lower() for ext in filetype]
             elif isinstance(filetype, str):
                 filetype = [filetype.lstrip('.').lower()]
@@ -528,7 +373,6 @@ class DataProcessor:
         try:
             handler_class = getattr(handlers, handler_class_name)
         except AttributeError:
-            from .config import ALLOWED_EXTENSIONS
             raise ValueError(f"Unsupported file format: .{extension}. Supported: {[f'.{ext}' for ext in ALLOWED_EXTENSIONS]}")
         
         return handler_class()
@@ -539,15 +383,13 @@ class DataProcessor:
         
         Args:
             file_path (str): Path to file to read
-            filetype (str|list, optional): File extensions to allow. 
-                                                Defaults to all supported types.
+            filetype (str|list, optional): File extensions to allow
             **override_options: Options passed to file handlers
         
         Returns:
             FileResult|None: FileResult if file matches filter, None if filtered out
         """
         abs_path = os.path.abspath(file_path)
-        print(f"Processing '{abs_path}'...")
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"The file '{abs_path}' does not exist.")
 
@@ -567,14 +409,10 @@ class DataProcessor:
         rel_path = os.path.relpath(abs_path)
         path_parts = Path(rel_path).parts
         if len(path_parts) > 1:
-            # Remove first directory (input folder) from path
             data.dataframe['source_file'] = str(Path(*path_parts[1:]))
         else:
-            # If only one part, just use the filename
             data.dataframe['source_file'] = path_parts[0]
         
-        print(f"Loaded: {data.dataframe.shape[0]} rows, {data.dataframe.shape[1]} columns")
-        print(f"Columns: {list(data.dataframe.columns)}")
         return data
     
     def write_file(self, dataframe, output_path, **override_options):
@@ -586,9 +424,8 @@ class DataProcessor:
             output_path (str): Path to output file
             **override_options: Options passed to file handlers
         """
-        
         abs_path = os.path.abspath(output_path)
-        extension = Path(output_path).suffix.lower()[1:]  # Remove the dot
+        extension = Path(output_path).suffix.lower()[1:]
         
         if not extension:
             raise ValueError(f"Output file must have an extension to determine format: {output_path}")
@@ -600,4 +437,7 @@ class DataProcessor:
         
         # Write the file
         handler.write(dataframe, output_path, **final_write_options)
-        print(f"Data saved to '{abs_path}' ({len(dataframe)} rows, {len(dataframe.columns)} columns)")
+        self.logger.info("Data saved to file", 
+                        output_file=abs_path, 
+                        rows=len(dataframe), 
+                        columns=len(dataframe.columns))
