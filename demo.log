@@ -1,0 +1,10 @@
+{asctime} - {name} - {levelname} - {funcName}:{lineno} - {message}
+{asctime} - {name} - {levelname} - {funcName}:{lineno} - {message} (150 files) duration: 2.452.45s
+{asctime} - {name} - {levelname} - {funcName}:{lineno} - {message} duration: 8.28.20s
+{asctime} - {name} - {levelname} - {funcName}:{lineno} - {message} (100 files)
+{asctime} - {name} - {levelname} - {funcName}:{lineno} - {message}
+{asctime} - {name} - {levelname} - {funcName}:{lineno} - {message}
+{asctime} - {name} - {levelname} - {funcName}:{lineno} - {message} (1000 files) duration: 12.512.50s
+{asctime} - {name} - {levelname} - {funcName}:{lineno} - {message} memory: 0.0MB
+{asctime} - {name} - {levelname} - {funcName}:{lineno} - {message} memory: 0.0MB
+{asctime} - {name} - {levelname} - {funcName}:{lineno} - {message} duration: 12.512.50s
