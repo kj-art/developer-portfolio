@@ -283,6 +283,19 @@ def run_all_tests():
             import traceback
             traceback.print_exc()
     
+    import random
+
+    def random_color(field):
+        return random.choice(['red', 'green', 'blue', 'yellow', 'cyan', 'magenta'])
+    formatter = DynamicFormatter(
+        "{{A{#random_color}B{#random_color}C ;{#random_color}field; {#random_color}X{#random_color}Y{#random_color}Z}}",
+        functions={'random_color': random_color}
+    )
+    
+    result = formatter.format(field="FIELD_VALUE")
+    print(f"Random character colors: {result}")
+    print(f"Raw: {repr(result)}")
+
     print("\n" + "=" * 50)
     print("All tests completed!")
 
