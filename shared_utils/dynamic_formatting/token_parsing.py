@@ -28,13 +28,19 @@ class TemplateParser:
         self.token_formatters = token_formatters or {}
     
     def parse_format_string(self, format_string: str) -> List[Union[str, FormatSection]]:
-        """Parse a format string into sections"""
+        """Parse a format string into sections, handling escape sequences"""
         sections = []
         i = 0
         current_literal = ""
         
         while i < len(format_string):
             char = format_string[i]
+            
+            # Check for escaped braces
+            if char == '\\' and i + 1 < len(format_string) and format_string[i + 1] in '{}':
+                current_literal += format_string[i + 1]  # Add the literal brace
+                i += 2  # Skip both backslash and brace
+                continue
             
             if char == '{' and i + 1 < len(format_string) and format_string[i + 1] == '{':
                 if current_literal:
@@ -223,7 +229,7 @@ class TemplateParser:
         return field_part, formatting_tokens
     
     def _parse_formatted_text(self, text: str) -> Union[str, List[FormattedSpan]]:
-        """Parse text with inline formatting tokens including conditionals"""
+        """Parse text with inline formatting tokens including conditionals, handling escape sequences"""
         if '{' not in text:
             return text
         
@@ -231,12 +237,24 @@ class TemplateParser:
         i = 0
         
         while i < len(text):
-            if text[i] == '{':
+            char = text[i]
+            
+            # Handle escaped braces
+            if char == '\\' and i + 1 < len(text) and text[i + 1] in '{}':
+                # Add escaped brace to current span or create new unformatted span
+                if not spans or spans[-1].formatting_tokens:
+                    spans.append(FormattedSpan(text[i + 1]))  # Add the literal brace
+                else:
+                    spans[-1].text += text[i + 1]  # Add to existing unformatted span
+                i += 2  # Skip both backslash and brace
+                continue
+            
+            if char == '{':
                 # Look for formatting tokens or conditionals
                 token_end = text.find('}', i)
                 if token_end == -1:
                     # No closing brace, treat as literal
-                    if len(spans) == 0:
+                    if not spans or spans[-1].formatting_tokens:
                         spans.append(FormattedSpan(text[i:]))
                     else:
                         spans[-1].text += text[i:]
@@ -250,18 +268,19 @@ class TemplateParser:
                     function_name = token_content[1:]  # Remove the '?'
                     
                     # Find the text that this conditional controls
-                    # Everything from after the } until the next { or end of string
+                    # Everything from after the } until the next unescaped { or end of string
                     controlled_start = token_end + 1
-                    controlled_end = text.find('{', controlled_start)
-                    if controlled_end == -1:
-                        controlled_end = len(text)
+                    controlled_end = self._find_next_unescaped_brace(text, controlled_start)
                     
                     controlled_text = text[controlled_start:controlled_end]
                     
+                    # Process escape sequences in the controlled text
+                    processed_controlled_text = self._process_escape_sequences(controlled_text)
+                    
                     # Create a span for the controlled text with conditional formatting
-                    if controlled_text:
+                    if processed_controlled_text:
                         conditional_tokens = {'conditional': [function_name]}
-                        spans.append(FormattedSpan(controlled_text, conditional_tokens))
+                        spans.append(FormattedSpan(processed_controlled_text, conditional_tokens))
                     
                     # Move past the controlled text
                     i = controlled_end
@@ -303,14 +322,15 @@ class TemplateParser:
                     
                     # Find the text that this formatting controls
                     section_start = token_end + 1
-                    section_end = text.find('{', section_start)
-                    if section_end == -1:
-                        section_end = len(text)
+                    section_end = self._find_next_unescaped_brace(text, section_start)
                     
                     formatted_text = text[section_start:section_end]
                     
-                    if formatted_text or formatting_tokens:
-                        spans.append(FormattedSpan(formatted_text, formatting_tokens))
+                    # Process escape sequences in the formatted text
+                    processed_formatted_text = self._process_escape_sequences(formatted_text)
+                    
+                    if processed_formatted_text or formatting_tokens:
+                        spans.append(FormattedSpan(processed_formatted_text, formatting_tokens))
                     
                     # Move past the formatted text
                     i = section_end
@@ -330,6 +350,37 @@ class TemplateParser:
             return spans[0].text
         
         return spans
+    
+    def _find_next_unescaped_brace(self, text: str, start_pos: int) -> int:
+        """Find the next unescaped { character starting from start_pos"""
+        i = start_pos
+        while i < len(text):
+            if text[i] == '\\' and i + 1 < len(text) and text[i + 1] in '{}':
+                # Skip escaped brace
+                i += 2
+                continue
+            elif text[i] == '{':
+                return i
+            else:
+                i += 1
+        
+        return len(text)  # No more braces found
+    
+    def _process_escape_sequences(self, text: str) -> str:
+        """Process escape sequences in text, converting \\{ to { and \\} to }"""
+        result = ""
+        i = 0
+        
+        while i < len(text):
+            if text[i] == '\\' and i + 1 < len(text) and text[i + 1] in '{}':
+                # Convert escaped brace to literal brace
+                result += text[i + 1]
+                i += 2
+            else:
+                result += text[i]
+                i += 1
+        
+        return result
     
     def _split_content(self, content: str) -> List[str]:
         """Split content by delimiter, handling escaped delimiters"""
