@@ -15,6 +15,7 @@ CORE RESPONSIBILITIES:
     - State management across formatting families
     - Error handling and graceful degradation
     - Output mode switching (console vs file)
+    - **Positional arguments support** - convert positional args to synthetic kwargs
 
 RENDERING PIPELINE:
     1. Parse template into sections during initialization
@@ -42,6 +43,15 @@ GRACEFUL MISSING DATA EXAMPLES:
     
     # All missing - empty result
     result = formatter.format()  # ""
+
+POSITIONAL ARGUMENTS EXAMPLES:
+    formatter = DynamicFormatter("{{Error: ;}} {{Count: ;}}")
+    
+    # All arguments present
+    result = formatter.format("Failed", 42)  # "Error: Failed Count: 42"
+    
+    # Missing arguments - later sections disappear
+    result = formatter.format("Failed")  # "Error: Failed"
 """
 
 import logging
@@ -70,6 +80,9 @@ class DynamicFormatter:
     Core Feature: Template sections automatically disappear when their required data
     isn't provided, eliminating the need for manual null checking and conditional
     string building throughout your codebase.
+    
+    New Feature: Positional arguments support using empty field names in templates.
+    Use {{}} instead of {{field_name}} to enable positional argument matching.
     """
     
     def __init__(self, format_string: str, delimiter: str = ';', 
@@ -86,33 +99,65 @@ class DynamicFormatter:
         
         # Parse the format string
         try:
-            parser = TemplateParser(delimiter, TOKEN_FORMATTERS)
-            self.sections = parser.parse_format_string(format_string)
+            self.parser = TemplateParser(delimiter, TOKEN_FORMATTERS)
+            self.sections = self.parser.parse_format_string(format_string)
         except ParseError as e:
             raise DynamicFormattingError(f"Failed to parse format string: {e}")
     
-    def format(self, **data) -> str:
+    def format(self, *args, **kwargs) -> str:
         """
-        Format the template with provided data
+        Format the template with provided data using either positional or keyword arguments
         
         Core Feature: Missing fields cause their template sections to disappear
         automatically, eliminating the need for manual null checking.
         
-        Example:
-            formatter = DynamicFormatter("{{Error: ;message}} {{Count: ;count}}")
+        Positional Arguments:
+            Use empty field names in template: {{}} {{prefix;;suffix}}
+            Arguments are matched by position to empty field sections
             
-            # Complete data
+        Keyword Arguments:  
+            Use named field names in template: {{message}} {{count}}
+            Arguments are matched by field name
+        
+        Examples:
+            # Keyword arguments (original behavior)
+            formatter = DynamicFormatter("{{Error: ;message}} {{Count: ;count}}")
             result = formatter.format(message="Failed", count=42)
             # Returns: "Error: Failed Count: 42"
             
-            # Missing message field - section disappears automatically
-            result = formatter.format(count=42)
-            # Returns: "Count: 42"
+            # Positional arguments (new behavior)
+            formatter = DynamicFormatter("{{Error: ;}} {{Count: ;}}")
+            result = formatter.format("Failed", 42)
+            # Returns: "Error: Failed Count: 42"
             
-            # No data - empty result
-            result = formatter.format()
-            # Returns: ""
+            # Missing fields cause sections to disappear automatically
+            result = formatter.format("Failed")  # Only first argument
+            # Returns: "Error: Failed"
         """
+        # Argument validation
+        if args and kwargs:
+            raise DynamicFormattingError("Cannot mix positional and keyword arguments")
+        
+        # Convert positional args to kwargs
+        if args:
+            # Count actual field sections (not string literals)
+            field_sections = [s for s in self.sections if isinstance(s, FormatSection)]
+            
+            if len(args) > len(field_sections):
+                expected = len(field_sections)
+                got = len(args)
+                raise DynamicFormattingError(
+                    f"Too many positional arguments: expected {expected}, got {got}"
+                )
+            
+            data = {}
+            # Map positional arguments to field sections in order
+            for i, arg in enumerate(args):
+                if i < len(field_sections):
+                    data[field_sections[i].field_name] = arg
+        else:
+            data = kwargs
+        
         result = ""
         
         try:
@@ -122,7 +167,9 @@ class DynamicFormatter:
                 else:
                     result += self._render_section(section, data)
         except (FormatterError, FunctionExecutionError) as e:
-            raise DynamicFormattingError(f"Formatting failed: {e}")
+            # Make error messages user-friendly for positional arguments
+            error_msg = self._make_error_user_friendly(str(e))
+            raise DynamicFormattingError(f"Formatting failed: {error_msg}")
         
         return result
     
@@ -139,7 +186,8 @@ class DynamicFormatter:
         # If field is missing and not required, section disappears (returns empty string)
         if field_value is None:
             if section.is_required:
-                raise RequiredFieldError(f"Required field missing: {section.field_name}")
+                field_name = self._make_error_user_friendly(section.field_name)
+                raise RequiredFieldError(f"Required field missing: {field_name}")
             return ""  # Section disappears when field is missing - core feature
         
         # Check conditional function
@@ -402,6 +450,11 @@ class DynamicFormatter:
             if formatter.get_family_name() == family_name:
                 return formatter
         raise ValueError(f"No formatter found for family: {family_name}")
+    
+    def _make_error_user_friendly(self, text: str) -> str:
+        """Convert synthetic field names to user-friendly position descriptions"""
+        import re
+        return re.sub(r'__pos_(\d+)__', lambda m: f"position {int(m.group(1)) + 1}", text)
 
 
 class DynamicLoggingFormatter(logging.Formatter):
@@ -411,6 +464,9 @@ class DynamicLoggingFormatter(logging.Formatter):
     Automatically handles missing log fields - if duration, error_count, file_count, etc.
     are not present in the log record, their corresponding template sections simply
     disappear from the output without requiring manual null checking.
+    
+    Supports both keyword-style templates ({{field_name}}) and positional-style 
+    templates ({{}}) for different logging scenarios.
     """
     
     def __init__(self, format_string: str, delimiter: str = ';', 

@@ -3,7 +3,7 @@ Comprehensive examples showcasing all dynamic formatting features.
 
 This module demonstrates every capability of the dynamic formatting system
 including function fallback, all token types, escape sequences, custom
-delimiters, and real-world usage patterns.
+delimiters, positional arguments, and real-world usage patterns.
 
 Run this file directly to see all features in action:
     python examples.py
@@ -74,41 +74,52 @@ def demo_core_feature_graceful_missing_data():
     """
     print("=== Core Feature: Graceful Missing Data Handling ===")
     
-    # Single section example
+    # Single section example - keyword arguments
     formatter = DynamicFormatter("{{Error: ;message}}")
     
     result1 = formatter.format(message="Connection failed")
     result2 = formatter.format()  # No message provided
-    print(f"1. With data: '{result1}'")      # "Error: Connection failed"  
-    print(f"2. Without data: '{result2}'")   # "" (empty string)
+    print(f"1. Keyword with data: '{result1}'")      # "Error: Connection failed"  
+    print(f"2. Keyword without data: '{result2}'")   # "" (empty string)
     
-    # Multiple sections example
+    # Single section example - positional arguments (NEW)
+    formatter = DynamicFormatter("{{Error: ;}}")
+    
+    result3 = formatter.format("Connection failed")
+    result4 = formatter.format()  # No arguments provided
+    print(f"3. Positional with data: '{result3}'")      # "Error: Connection failed"  
+    print(f"4. Positional without data: '{result4}'")   # "" (empty string)
+    
+    # Multiple sections example - keyword arguments
     formatter = DynamicFormatter("{{Error: ;message}} {{Processing ;file_count; files}} {{Duration: ;seconds;s}}")
     
     # All data present
-    result3 = formatter.format(message="Failed", file_count=25, seconds=12.5)
-    print(f"3. All data: '{result3}'")
+    result5 = formatter.format(message="Failed", file_count=25, seconds=12.5)
+    print(f"5. Keyword all data: '{result5}'")
     
     # Some data missing
-    result4 = formatter.format(file_count=25, seconds=12.5)  # No error message
-    print(f"4. Partial data: '{result4}'")
+    result6 = formatter.format(file_count=25, seconds=12.5)  # No error message
+    print(f"6. Keyword partial data: '{result6}'")
     
     # Only one piece of data
-    result5 = formatter.format(message="Failed")  # Only error message
-    print(f"5. Minimal data: '{result5}'")
+    result7 = formatter.format(message="Failed")  # Only error message
+    print(f"7. Keyword minimal data: '{result7}'")
     
     # No data at all
-    result6 = formatter.format()
-    print(f"6. No data: '{result6}'")
+    result8 = formatter.format()
+    print(f"8. Keyword no data: '{result8}'")
     
-    # Required field
-    try:
-        print("7. Force a field to be required with '!' token:")
-        formatter = DynamicFormatter("{{!;Error: ;message}} {{Processing ;file_count; files}} {{Duration: ;seconds;s}}")
-        formatter.format(file_count="3")
-    except RequiredFieldError as e:
-        print(e)
-
+    # Multiple sections example - positional arguments (NEW)
+    formatter = DynamicFormatter("{{Error: ;}} {{Processing ; files}} {{Duration: ;s}}")
+    
+    # All data present
+    result9 = formatter.format("Failed", 25, 12.5)
+    print(f"9. Positional all data: '{result9}'")
+    
+    # Some data missing (fewer arguments)
+    result10 = formatter.format("Failed")  # Only first argument
+    print(f"10. Positional partial data: '{result10}'")
+    
     print("\nKey insight: No manual null checking required!")
     print("Compare to manual approach:")
     print("  parts = []")
@@ -116,6 +127,91 @@ def demo_core_feature_graceful_missing_data():
     print("  if file_count: parts.append(f'Processing {file_count} files')")
     print("  if seconds: parts.append(f'Duration: {seconds}s')")
     print("  result = ' '.join(parts)")
+
+
+def demo_positional_arguments():
+    """Demonstrate the new positional arguments feature"""
+    print("\n=== Positional Arguments Feature (NEW) ===")
+    
+    # 1. Basic positional syntax
+    formatter = DynamicFormatter("{{}}")
+    result = formatter.format("Hello")
+    print(f"1. Single field: '{result}'")
+    
+    formatter = DynamicFormatter("{{}} {{}}")
+    result = formatter.format("Hello", "World")
+    print(f"2. Multiple fields: '{result}'")
+    
+    # 3. Positional with prefixes and suffixes
+    formatter = DynamicFormatter("{{Error: ;}}")
+    result = formatter.format("Connection failed")
+    print(f"3. With prefix: '{result}'")
+    
+    formatter = DynamicFormatter("{{Count: ;;items}}")
+    result = formatter.format(25)
+    print(f"4. With prefix and suffix: '{result}'")
+    
+    # 5. Complex formatting with positional args
+    formatter = DynamicFormatter("{{#red@bold;}}")
+    result = formatter.format("URGENT")
+    print(f"5. With formatting: {result}")
+    
+    formatter = DynamicFormatter("{{#red@bold;Alert: ;}}")
+    result = formatter.format("System down")
+    print(f"6. Formatting with prefix: {result}")
+    
+    # 7. Multiple formatted sections
+    formatter = DynamicFormatter("{{#red;Error: ;}} {{#green;Status: ;}}")
+    result = formatter.format("Failed", "Recovered")
+    print(f"7. Multiple formatted: {result}")
+    
+    # 8. Positional with functions
+    def priority_color(priority):
+        return {'high': 'red', 'medium': 'yellow', 'low': 'green'}[priority.lower()]
+    
+    formatter = DynamicFormatter("{{#priority_color@bold;Priority: ;}}", 
+                                functions={'priority_color': priority_color})
+    result = formatter.format("HIGH")
+    print(f"8. With function fallback: {result}")
+    
+    # 9. Positional with conditionals
+    def is_urgent(priority):
+        return priority.lower() in ['high', 'critical']
+    
+    formatter = DynamicFormatter("{{?is_urgent;URGENT: ;}}", 
+                                functions={'is_urgent': is_urgent})
+    result1 = formatter.format("HIGH")
+    result2 = formatter.format("LOW")
+    print(f"9. Conditional (urgent): '{result1}'")
+    print(f"10. Conditional (normal): '{result2}'")
+    
+    # 11. Missing arguments demonstration
+    formatter = DynamicFormatter("{{First: ;}} {{Second: ;}} {{Third: ;}}")
+    result1 = formatter.format("A", "B", "C")
+    result2 = formatter.format("A", "B")
+    result3 = formatter.format("A")
+    print(f"11. All arguments: '{result1}'")
+    print(f"12. Two arguments: '{result2}'")
+    print(f"13. One argument: '{result3}'")
+    
+    # 14. Comparison with keyword arguments
+    print("\n--- Keyword vs Positional Comparison ---")
+    
+    # Same template content, different argument styles
+    kw_formatter = DynamicFormatter("{{Error: ;message}} {{Code: ;code}}")
+    pos_formatter = DynamicFormatter("{{Error: ;}} {{Code: ;}}")
+    
+    kw_result = kw_formatter.format(message="Failed", code=404)
+    pos_result = pos_formatter.format("Failed", 404)
+    
+    print(f"Keyword style: '{kw_result}'")
+    print(f"Positional style: '{pos_result}'")
+    
+    print("\nBenefits of positional arguments:")
+    print("• Cleaner templates: {{}} vs {{field_name}}")
+    print("• Simpler function calls: format('a', 'b') vs format(field1='a', field2='b')")
+    print("• Good for fixed-order data like tuples or API responses")
+    print("• Still supports all formatting features (colors, functions, conditionals)")
 
 
 # ============================================================================
@@ -326,14 +422,6 @@ def demo_escape_sequences():
     result5 = formatter.format(setting="")
     print(f"4. Escaping with conditionals (has value): '{result4}'")
     print(f"5. Escaping with conditionals (no value): '{result5}'")
-    
-    # 6. Multiple fields combined
-    formatter1 = DynamicFormatter("{{Status: ;status}}")
-    formatter2 = DynamicFormatter("{{Count: ;count}}")
-    result1 = formatter1.format(status="success")
-    result2 = formatter2.format(count=42)
-    combined = f"{result1}, {result2}"
-    print(f"6. Multiple field output: {combined}")
 
 
 def demo_custom_delimiters():
@@ -441,7 +529,6 @@ def demo_fun_examples():
         return formatter.format(field="FIELD_VALUE")
     results = [same_code_different_colors(), same_code_different_colors(), same_code_different_colors()]
     print(f"1. Random character colors: \n\ta. {results[0]} \n\tb. {results[1]} \n\tc. {results[2]}")
-    print(f"   Raw: \n\ta. {repr(results[0])} \n\tb. {repr(results[1])} \n\tc. {repr(results[2])}")
     
     # 2. Progress bar simulation
     def progress_color(percentage):
@@ -514,6 +601,7 @@ def demo_real_world_patterns():
     def has_errors(errors):
         return errors > 0
     
+    # Keyword version
     api_formatter = DynamicFormatter(
         "{{#status_color@bold;HTTP ;status_code}} {{?has_data;- ;record_count; records}} {{?has_errors;- ;error_count; errors}}",
         functions={'status_color': status_color, 'has_data': has_data, 'has_errors': has_errors}
@@ -525,9 +613,21 @@ def demo_real_world_patterns():
         {'status_code': 500, 'record_count': 0, 'error_count': 3}
     ]
     
+    print("Keyword style API responses:")
     for i, response in enumerate(responses, 1):
         result = api_formatter.format(**response)
-        print(f"1. API Response {i}: {result}")
+        print(f"  {i}. {result}")
+    
+    # Same formatter using positional arguments
+    api_pos_formatter = DynamicFormatter(
+        "{{#status_color@bold;HTTP ;}} {{?has_data;- ; records}} {{?has_errors;- ; errors}}",
+        functions={'status_color': status_color, 'has_data': has_data, 'has_errors': has_errors}
+    )
+    
+    print("Positional style API responses:")
+    for i, response in enumerate(responses, 1):
+        result = api_pos_formatter.format(response['status_code'], response['record_count'], response['error_count'])
+        print(f"  {i}. {result}")
     
     # 2. Build System Output
     def build_status_color(status):
@@ -550,9 +650,10 @@ def demo_real_world_patterns():
         {'status': 'BUILDING', 'duration': 0, 'test_count': 0}
     ]
     
+    print("Build system output:")
     for i, build in enumerate(builds, 1):
         result = build_formatter.format(**build)
-        print(f"2. Build Status {i}: {result}")
+        print(f"  {i}. {result}")
     
     # 3. File Processing Status
     def processing_color(status):
@@ -584,9 +685,10 @@ def demo_real_world_patterns():
         {'status': '1000/1000', 'rate': 0, 'failures': 8}
     ]
     
+    print("File processing status:")
     for i, update in enumerate(progress_updates, 1):
         result = file_formatter.format(**update)
-        print(f"3. File Processing {i}: {result}")
+        print(f"  {i}. {result}")
 
 
 def demo_edge_cases():
@@ -640,6 +742,30 @@ def demo_edge_cases():
     file_result = file_formatter.format(message="test")
     print(f"5. Console mode: {repr(console_result)}")
     print(f"6. File mode: {repr(file_result)}")
+    
+    # 4. Error handling demonstrations (professional level)
+    print("\n--- Error Handling Examples ---")
+    
+    # Mixed arguments error
+    try:
+        formatter = DynamicFormatter("{{}} {{}}")
+        formatter.format("pos", keyword="kw")
+    except DynamicFormattingError as e:
+        print(f"Mixed args error: {e}")
+    
+    # Too many positional arguments
+    try:
+        formatter = DynamicFormatter("{{}}")
+        formatter.format("first", "second")
+    except DynamicFormattingError as e:
+        print(f"Too many args error: {e}")
+    
+    # Required field missing (positional)
+    try:
+        formatter = DynamicFormatter("{{!}}")
+        formatter.format()
+    except RequiredFieldError as e:
+        print(f"Required field error: {e}")
 
 
 def run_comprehensive_demo():
@@ -650,6 +776,7 @@ def run_comprehensive_demo():
     
     demo_functions = [
         demo_core_feature_graceful_missing_data,  # CORE FEATURE FIRST
+        demo_positional_arguments,  # NEW POSITIONAL ARGUMENTS FEATURE
         demo_all_color_features,
         demo_function_fallback_mechanics,
         demo_all_text_features,
@@ -675,6 +802,7 @@ def run_comprehensive_demo():
     print("✅ Comprehensive demo complete!")
     print("\nKey features demonstrated:")
     print("• CORE: Graceful missing data handling - sections disappear when data is missing")
+    print("• NEW: Positional arguments - simplified syntax for ordered data")
     print("• All color types: ANSI, hex, named, function fallback")
     print("• All text styles: bold, italic, underline, combinations")
     print("• All conditionals: section-level and inline")
@@ -683,11 +811,8 @@ def run_comprehensive_demo():
     print("• Field formatting: inline formatting within field values")
     print("• Function fallback: dynamic token resolution")
     print("• Real-world patterns: APIs, builds, file processing")
-    print("• Edge cases: empty fields, output modes, chaining")
+    print("• Edge cases: empty fields, output modes, error handling")
     print("• Creative uses: random colors, progress bars, dynamic emphasis")
-
-
-
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # Dynamic Formatting System
 
-A sophisticated string formatting system that **gracefully handles missing data** - template sections automatically disappear when their required data isn't provided, eliminating manual null checking. Also features conditional sections, function fallback, and family-based formatting state management.
+A sophisticated string formatting system that **gracefully handles missing data** - template sections automatically disappear when their required data isn't provided, eliminating manual null checking. Also features conditional sections, function fallback, positional arguments, and family-based formatting state management.
 
 ## 🎯 Core Value Proposition
 
@@ -42,16 +42,29 @@ formatter = DynamicFormatter("{{#red@bold;ERROR: ;message}}")
 result = formatter.format(message="File not found")
 # Output: red bold "ERROR: File not found"
 
+# NEW: Positional arguments for simpler syntax
+formatter = DynamicFormatter("{{#red@bold;ERROR: ;}}")
+result = formatter.format("File not found")
+# Output: red bold "ERROR: File not found"
+
 # Function fallback for dynamic formatting
 def level_color(level):
     return {'ERROR': 'red', 'WARNING': 'yellow', 'INFO': 'green'}[level]
 
+# Keyword arguments (original)
 formatter = DynamicFormatter(
     "{{#level_color@bold;[;level;]}} {{message}}",
     functions={'level_color': level_color}
 )
 result = formatter.format(level="ERROR", message="Something failed")
-# Output: red bold "[ERROR] Something failed"
+
+# Positional arguments (new)
+formatter = DynamicFormatter(
+    "{{#level_color@bold;[;]}} {{}}",
+    functions={'level_color': level_color}
+)
+result = formatter.format("ERROR", "Something failed")
+# Both output: red bold "[ERROR] Something failed"
 ```
 
 ## 🎯 Key Features
@@ -60,6 +73,13 @@ result = formatter.format(level="ERROR", message="Something failed")
 - **Core Feature**: Template sections automatically disappear when data is missing
 - No manual null checking or conditional string building required
 - Clean, declarative templates that handle incomplete data gracefully
+- **NEW**: Works with both keyword and positional arguments
+
+### **Positional Arguments Support**
+- **NEW**: Simplified syntax using empty field names: `{{}}` instead of `{{field_name}}`
+- Cleaner templates for ordered data (tuples, API responses, etc.)
+- All formatting features work with positional args (colors, functions, conditionals)
+- Cannot mix positional and keyword arguments in same call
 
 ### **Family-Based Architecture**
 - **Colors** (`#red`, `#blue`, `#hex_color`)
@@ -97,6 +117,18 @@ result = formatter.format(level="ERROR", message="Something failed")
 - `?function` = Conditional (show section only if function returns True)
 - `#token` = Color formatting (red, blue, hex, or function name)
 - `@token` = Text formatting (bold, italic, underline, or function name)
+
+### Field Types
+```
+# Keyword arguments (original)
+{{field_name}}        - Named field
+{{prefix;field_name}}  - Named field with prefix
+
+# Positional arguments (NEW)
+{{}}                   - Positional field (matched by order)
+{{prefix;}}            - Positional field with prefix
+{{prefix;;suffix}}     - Positional field with prefix and suffix
+```
 
 ### Inline Formatting
 ```
@@ -143,16 +175,22 @@ formatter = DynamicFormatter(
 ### API Response Formatting
 ```python
 # Gracefully handles responses with missing fields
+# Keyword style
 formatter = DynamicFormatter(
     "{{#blue;API Response:}} {{Success - ;record_count; records}} {{Errors: ;error_count}} {{Duration: ;response_time;ms}}"
 )
 
+# Positional style (NEW)
+formatter = DynamicFormatter(
+    "{{#blue;API Response:}} {{Success - ; records}} {{Errors: ;}} {{Duration: ;ms}}"
+)
+
 # All sections appear when data is complete
-response1 = formatter.format(record_count=150, error_count=0, response_time=245)
+response1 = formatter.format(150, 0, 245)  # Using positional args
 # "API Response: Success - 150 records Duration: 245ms"
 
 # Missing sections disappear automatically  
-response2 = formatter.format(record_count=150)
+response2 = formatter.format(150)  # Only record count provided
 # "API Response: Success - 150 records"
 ```
 
@@ -173,20 +211,33 @@ result = formatter.format(status="OK")  # "Status: OK"
 result = formatter.format()  # ""
 ```
 
-### **2. Family-Based State Management**
+### **2. Positional Arguments Implementation**
+Converts positional args to synthetic keyword args internally:
+```python
+# Template with empty fields
+formatter = DynamicFormatter("{{Error: ;}} {{Count: ;}}")
+
+# Positional args converted to: {'__pos_0__': 'Failed', '__pos_1__': 42}
+result = formatter.format("Failed", 42)  # "Error: Failed Count: 42"
+
+# Graceful handling of missing positional args
+result = formatter.format("Failed")  # "Error: Failed"
+```
+
+### **3. Family-Based State Management**
 Colors, text styles, and conditionals operate in separate "families":
 ```python
 "{{#red@bold;Text}} {#blue@normal;More}} {@italic;End}}"
 # "Text" = red+bold, "More" = blue+normal, "End" = blue+italic
 ```
 
-### **3. Performance Optimizations**
+### **4. Performance Optimizations**
 - **Simple sections**: Efficient string concatenation for basic templates
 - **Complex sections**: Optimized span rendering with minimal resets for advanced formatting
 - **Template compilation**: Parse once, format many times
 - **Lazy formatting**: ANSI codes only applied for console output
 
-### **4. Comprehensive Error Handling**
+### **5. Comprehensive Error Handling**
 ```python
 try:
     result = formatter.format(**data)
@@ -244,6 +295,13 @@ def show_progress(processed, total, errors=None, duration=None):
         "{{#green;Progress:}} {{processed}}/{{total}} {{Errors: ;errors}} {{Duration: ;duration;s}}"
     )
     print(formatter.format(processed=processed, total=total, errors=errors, duration=duration))
+
+# Positional version
+def show_progress_positional(*args):
+    formatter = DynamicFormatter(
+        "{{#green;Progress:}} {{}}/{{}} {{Errors: ;}} {{Duration: ;s}}"
+    )
+    print(formatter.format(*args))
 ```
 
 ## 🎨 Output Modes
@@ -287,6 +345,31 @@ TOKEN_FORMATTERS['%'] = CustomFormatter()
 - **`FormatterError`** - Invalid color/style token
 - **`FunctionExecutionError`** - Function execution failed
 
+## 🆕 What's New in v2.1.0
+
+### Positional Arguments Support
+- **New Syntax**: Use `{{}}` instead of `{{field_name}}` for positional matching
+- **Cleaner Templates**: Better for ordered data like tuples, API responses
+- **Full Feature Support**: Colors, functions, conditionals all work with positional args
+- **Error Handling**: User-friendly error messages convert internal field names to "position 1", "position 2", etc.
+
+### Examples
+```python
+# Before (keyword only)
+formatter = DynamicFormatter("{{#red;Error: ;message}} {{Code: ;code}}")
+result = formatter.format(message="Failed", code=404)
+
+# After (positional support)
+formatter = DynamicFormatter("{{#red;Error: ;}} {{Code: ;}}")
+result = formatter.format("Failed", 404)
+# Same output: red "Error: Failed Code: 404"
+
+# Mixed templates (positional + named fields)
+formatter = DynamicFormatter("{{#red;Alert: ;}} {{details: ;named_field}}")
+result = formatter.format("System down")  # named_field section disappears
+# Output: red "Alert: System down"
+```
+
 ## 🚀 Getting Started
 
 1. **Install**: Copy the `shared_utils/dynamic_formatting/` package to your project
@@ -298,12 +381,24 @@ TOKEN_FORMATTERS['%'] = CustomFormatter()
 
 See `examples.py` for comprehensive real-world usage examples including:
 - Graceful missing data handling (core feature)
+- **NEW**: Positional arguments demonstrations
 - Advanced logging setups
 - CLI progress reporting
 - API response formatting
 - Error handling patterns
 - Performance optimization techniques
 
+Run the examples: `python shared_utils/dynamic_formatting/examples.py`
+
+## 🧪 Testing
+
+Run the comprehensive regression test suite:
+```bash
+python shared_utils/dynamic_formatting/test_positional_regression.py
+```
+
+This ensures all existing functionality remains intact while testing the new positional arguments feature.
+
 ---
 
-**Built for enterprise environments where data completeness varies and manual null checking becomes tedious. The primary benefit is eliminating conditional string building through automatic missing data handling.**
+**Built for enterprise environments where data completeness varies and manual null checking becomes tedious. The primary benefit is eliminating conditional string building through automatic missing data handling, now enhanced with positional arguments for cleaner, more readable templates.**

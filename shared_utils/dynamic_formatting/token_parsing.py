@@ -8,12 +8,14 @@ The parser supports:
 - Comprehensive escape sequence handling (\\{, \\}, \\;)
 - Function fallback integration
 - Family-based formatting state management
+- Positional arguments via field position tracking
 
 PARSING ARCHITECTURE:
     1. Top-level parsing splits format strings into literal text and template sections
     2. Template content parsing extracts functions, formatting tokens, and field references  
     3. Formatted text parsing handles inline formatting within text spans
     4. Escape sequence processing converts \\{ → { throughout all levels
+    5. All field sections are tracked for positional argument support
 
 PERFORMANCE:
     - Single-pass parsing with O(n) time complexity
@@ -41,6 +43,7 @@ class TemplateParser:
     def __init__(self, delimiter: str = ';', token_formatters: Dict = None):
         self.delimiter = delimiter
         self.token_formatters = token_formatters or {}
+        self.positional_sections = []  # Track all field sections for positional argument support
     
     def parse_format_string(self, format_string: str) -> List[Union[str, FormatSection]]:
         """Parse a format string into sections, handling escape sequences"""
@@ -157,10 +160,16 @@ class TemplateParser:
         # Parse remaining content (prefix;field;suffix pattern)
         parts = self._split_content(content)
         
+        # Always track this section for positional argument support
+        # Generate synthetic field name for positional tracking
+        synthetic_field = f"__pos_{len(self.positional_sections)}__"
+        self.positional_sections.append(synthetic_field)
+        
         if len(parts) == 1:
             field_name, field_formatting = self._parse_field_with_formatting(parts[0])
+            
             return FormatSection(
-                field_name=field_name, 
+                field_name=field_name or synthetic_field,  # Use synthetic if field is empty
                 is_required=is_required,
                 field_formatting_tokens=field_formatting,
                 function_name=function_name,
@@ -171,7 +180,7 @@ class TemplateParser:
             field_name, field_formatting = self._parse_field_with_formatting(parts[1])
             
             return FormatSection(
-                field_name=field_name, 
+                field_name=field_name or synthetic_field,  # Use synthetic if field is empty
                 is_required=is_required,
                 prefix=prefix,
                 field_formatting_tokens=field_formatting,
@@ -208,7 +217,7 @@ class TemplateParser:
                 processed_suffix = self._parse_formatted_text(suffix_text)
             
             return FormatSection(
-                field_name=field_name, 
+                field_name=field_name or synthetic_field,  # Use synthetic if field is empty
                 is_required=is_required,
                 prefix=processed_prefix, 
                 suffix=processed_suffix,
