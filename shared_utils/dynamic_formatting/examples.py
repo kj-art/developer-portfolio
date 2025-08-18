@@ -27,7 +27,8 @@ try:
         DynamicLoggingFormatter,
         DynamicFormattingError,
         FunctionExecutionError,
-        FormatterError
+        FormatterError,
+        RequiredFieldError
     )
     print("✓ Successfully imported dynamic formatting package!")
 except ImportError:
@@ -44,7 +45,7 @@ except ImportError:
         DynamicFormattingError = df_module.DynamicFormattingError
         FunctionExecutionError = formatters.FunctionExecutionError
         FormatterError = formatters.FormatterError
-        
+        RequiredFieldError = formatters.RequiredFieldError
         print("✓ Successfully imported via fallback method!")
         
     except ImportError as e:
@@ -100,6 +101,14 @@ def demo_core_feature_graceful_missing_data():
     result6 = formatter.format()
     print(f"6. No data: '{result6}'")
     
+    # Required field
+    try:
+        print("7. Force a field to be required with '!' token:")
+        formatter = DynamicFormatter("{{!;Error: ;message}} {{Processing ;file_count; files}} {{Duration: ;seconds;s}}")
+        formatter.format(file_count="3")
+    except RequiredFieldError as e:
+        print(e)
+
     print("\nKey insight: No manual null checking required!")
     print("Compare to manual approach:")
     print("  parts = []")
