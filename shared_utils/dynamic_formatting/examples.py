@@ -60,12 +60,62 @@ except ImportError:
 
 
 # ============================================================================
+# CORE FEATURE DEMONSTRATION
+# ============================================================================
+
+def demo_core_feature_graceful_missing_data():
+    """
+    THE CORE FEATURE: Graceful handling of missing data
+    
+    This is the fundamental value proposition - template sections automatically
+    disappear when their required data isn't provided, eliminating the need for
+    manual null checking and conditional string building.
+    """
+    print("=== Core Feature: Graceful Missing Data Handling ===")
+    
+    # Single section example
+    formatter = DynamicFormatter("{{Error: ;message}}")
+    
+    result1 = formatter.format(message="Connection failed")
+    result2 = formatter.format()  # No message provided
+    print(f"1. With data: '{result1}'")      # "Error: Connection failed"  
+    print(f"2. Without data: '{result2}'")   # "" (empty string)
+    
+    # Multiple sections example
+    formatter = DynamicFormatter("{{Error: ;message}} {{Processing ;file_count; files}} {{Duration: ;seconds;s}}")
+    
+    # All data present
+    result3 = formatter.format(message="Failed", file_count=25, seconds=12.5)
+    print(f"3. All data: '{result3}'")
+    
+    # Some data missing
+    result4 = formatter.format(file_count=25, seconds=12.5)  # No error message
+    print(f"4. Partial data: '{result4}'")
+    
+    # Only one piece of data
+    result5 = formatter.format(message="Failed")  # Only error message
+    print(f"5. Minimal data: '{result5}'")
+    
+    # No data at all
+    result6 = formatter.format()
+    print(f"6. No data: '{result6}'")
+    
+    print("\nKey insight: No manual null checking required!")
+    print("Compare to manual approach:")
+    print("  parts = []")
+    print("  if message: parts.append(f'Error: {message}')")
+    print("  if file_count: parts.append(f'Processing {file_count} files')")
+    print("  if seconds: parts.append(f'Duration: {seconds}s')")
+    print("  result = ' '.join(parts)")
+
+
+# ============================================================================
 # COMPREHENSIVE FEATURE SHOWCASE
 # ============================================================================
 
 def demo_all_color_features():
     """Demonstrate all color formatting capabilities"""
-    print("=== Color Features ===")
+    print("\n=== Color Features ===")
     
     # 1. Built-in ANSI colors
     formatter = DynamicFormatter("{{#red;ANSI Red: ;message}} {{#blue;ANSI Blue: ;message}}")
@@ -590,6 +640,7 @@ def run_comprehensive_demo():
     print("This demo showcases every feature of the dynamic formatting system.\n")
     
     demo_functions = [
+        demo_core_feature_graceful_missing_data,  # CORE FEATURE FIRST
         demo_all_color_features,
         demo_function_fallback_mechanics,
         demo_all_text_features,
@@ -614,6 +665,7 @@ def run_comprehensive_demo():
     print("\n" + "=" * 60)
     print("✅ Comprehensive demo complete!")
     print("\nKey features demonstrated:")
+    print("• CORE: Graceful missing data handling - sections disappear when data is missing")
     print("• All color types: ANSI, hex, named, function fallback")
     print("• All text styles: bold, italic, underline, combinations")
     print("• All conditionals: section-level and inline")
@@ -626,79 +678,7 @@ def run_comprehensive_demo():
     print("• Creative uses: random colors, progress bars, dynamic emphasis")
 
 
-# ============================================================================
-# LEGACY EXAMPLES (Preserved for Reference)
-# ============================================================================
 
-def setup_advanced_logging():
-    """
-    Example: Advanced logging setup with dynamic formatting
-    
-    Demonstrates:
-    - Function fallback for log levels
-    - Conditional sections for optional data
-    - Performance indicators
-    - Memory usage formatting
-    """
-    
-    def level_color(level_name):
-        """Map log levels to colors"""
-        colors = {
-            'DEBUG': 'cyan',
-            'INFO': 'green', 
-            'WARNING': 'yellow',
-            'ERROR': 'red',
-            'CRITICAL': 'magenta'
-        }
-        return colors.get(level_name.upper(), 'white')
-    
-    def performance_indicator(duration):
-        """Add performance indicators based on duration"""
-        if duration < 0.1:
-            return "⚡"  # Fast
-        elif duration < 1.0:
-            return "✓"   # Normal
-        elif duration < 5.0:
-            return "⏳"  # Slow
-        else:
-            return "🐌"  # Very slow
-    
-    def has_duration(duration):
-        """Check if duration should be displayed"""
-        return duration and duration > 0
-    
-    def has_memory_info(memory_mb):
-        """Check if memory info should be displayed"""
-        return memory_mb and memory_mb > 0
-    
-    def has_file_count(count):
-        """Check if file count should be displayed"""
-        return count and count > 0
-    
-    # Create formatter with comprehensive features
-    formatter = DynamicLoggingFormatter(
-        "{{#level_color@bold;[;levelname;]}} {{asctime}} - {{name}} - {{message}}"
-        "{{?has_file_count; (;file_count; files)}}"
-        "{{?has_duration; in ;duration;s}}"
-        "{{?has_memory_info; memory: ;memory_mb;MB}}"
-        "{{?has_duration; ;performance_indicator;duration}}",
-        functions={
-            'level_color': level_color,
-            'performance_indicator': performance_indicator,
-            'has_duration': has_duration,
-            'has_memory_info': has_memory_info,
-            'has_file_count': has_file_count
-        }
-    )
-    
-    # Setup logger
-    logger = logging.getLogger('example')
-    handler = logging.StreamHandler()
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.setLevel(logging.DEBUG)
-    
-    return logger
 
 
 if __name__ == "__main__":

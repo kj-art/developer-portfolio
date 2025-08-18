@@ -1,6 +1,9 @@
 """
 Main dynamic formatting classes with function fallback support.
 
+PRIMARY BENEFIT: Template sections gracefully disappear when required data is missing,
+eliminating tedious manual null checking and conditional string building.
+
 This module contains the primary DynamicFormatter and DynamicLoggingFormatter
 classes that orchestrate the entire formatting system.
 
@@ -8,6 +11,7 @@ CORE RESPONSIBILITIES:
     - Template compilation and caching
     - Function registry management  
     - Section rendering with conditional logic
+    - **Graceful missing data handling** - sections return empty strings for missing fields
     - State management across formatting families
     - Error handling and graceful degradation
     - Output mode switching (console vs file)
@@ -15,6 +19,7 @@ CORE RESPONSIBILITIES:
 RENDERING PIPELINE:
     1. Parse template into sections during initialization
     2. For each section during formatting:
+       - **Check if required field exists in data** - return "" if missing (core feature)
        - Check conditional functions (section-level show/hide)
        - Build base formatting state from section tokens
        - Render prefix, field, and suffix with proper state isolation
@@ -25,6 +30,18 @@ PERFORMANCE OPTIMIZATIONS:
     - Complex sections use span-based rendering with minimal resets
     - Lazy ANSI code application based on output mode
     - Efficient state copying for span isolation
+
+GRACEFUL MISSING DATA EXAMPLES:
+    formatter = DynamicFormatter("{{Error: ;message}} {{Count: ;count}}")
+    
+    # Missing message field - only count section appears
+    result = formatter.format(count=42)  # "Count: 42"
+    
+    # Missing count field - only message section appears
+    result = formatter.format(message="Failed")  # "Error: Failed"
+    
+    # All missing - empty result
+    result = formatter.format()  # ""
 """
 
 import logging
@@ -47,7 +64,13 @@ class FunctionNotFoundError(DynamicFormattingError):
 
 
 class DynamicFormatter:
-    """Main dynamic formatter with function fallback and enhanced error handling"""
+    """
+    Main dynamic formatter with graceful missing data handling and function fallback
+    
+    Core Feature: Template sections automatically disappear when their required data
+    isn't provided, eliminating the need for manual null checking and conditional
+    string building throughout your codebase.
+    """
     
     def __init__(self, format_string: str, delimiter: str = ';', 
                  functions: Optional[Dict[str, Callable]] = None,
@@ -69,7 +92,27 @@ class DynamicFormatter:
             raise DynamicFormattingError(f"Failed to parse format string: {e}")
     
     def format(self, **data) -> str:
-        """Format the template with provided data"""
+        """
+        Format the template with provided data
+        
+        Core Feature: Missing fields cause their template sections to disappear
+        automatically, eliminating the need for manual null checking.
+        
+        Example:
+            formatter = DynamicFormatter("{{Error: ;message}} {{Count: ;count}}")
+            
+            # Complete data
+            result = formatter.format(message="Failed", count=42)
+            # Returns: "Error: Failed Count: 42"
+            
+            # Missing message field - section disappears automatically
+            result = formatter.format(count=42)
+            # Returns: "Count: 42"
+            
+            # No data - empty result
+            result = formatter.format()
+            # Returns: ""
+        """
         result = ""
         
         try:
@@ -84,13 +127,20 @@ class DynamicFormatter:
         return result
     
     def _render_section(self, section: FormatSection, data: Dict[str, Any]) -> str:
-        """Render a complete format section"""
+        """
+        Render a complete format section
+        
+        Core Feature Implementation: Returns empty string when the required field
+        is missing from the data dictionary, causing the entire section to disappear.
+        """
         field_value = data.get(section.field_name)
         
+        # Core feature: graceful missing data handling
+        # If field is missing and not required, section disappears (returns empty string)
         if field_value is None:
             if section.is_required:
                 raise RequiredFieldError(f"Required field missing: {section.field_name}")
-            return ""
+            return ""  # Section disappears when field is missing - core feature
         
         # Check conditional function
         if section.function_name:
@@ -355,7 +405,13 @@ class DynamicFormatter:
 
 
 class DynamicLoggingFormatter(logging.Formatter):
-    """Logging formatter that uses dynamic formatting with proper error handling"""
+    """
+    Logging formatter that uses dynamic formatting with graceful missing data handling
+    
+    Automatically handles missing log fields - if duration, error_count, file_count, etc.
+    are not present in the log record, their corresponding template sections simply
+    disappear from the output without requiring manual null checking.
+    """
     
     def __init__(self, format_string: str, delimiter: str = ';', 
                  functions: Optional[Dict[str, Callable]] = None,
@@ -394,6 +450,8 @@ class DynamicLoggingFormatter(logging.Formatter):
                 log_data[key] = value
         
         try:
+            # Core feature in action: missing fields (duration, file_count, etc.) 
+            # cause their template sections to disappear automatically
             return self.formatter.format(**log_data)
         except DynamicFormattingError as e:
             # Return error message with original log message
