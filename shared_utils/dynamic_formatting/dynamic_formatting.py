@@ -227,11 +227,33 @@ class DynamicFormatter:
         result = ""
         
         for span in spans:
+            # Check conditionals first - if any say to hide, skip this span
+            should_show_span = True
+            if 'conditional' in span.formatting_tokens:
+                conditional_formatter = self._get_formatter_by_family('conditional')
+                for raw_token in span.formatting_tokens['conditional']:
+                    try:
+                        parsed_token = conditional_formatter.parse_token(str(raw_token), field_value)
+                        if parsed_token == 'hide':
+                            should_show_span = False
+                            break
+                    except FormatterError:
+                        # If conditional function fails, hide the span (safe default)
+                        should_show_span = False
+                        break
+            
+            if not should_show_span:
+                continue  # Skip this span entirely
+            
             # Start with base state
             span_state = base_state.copy()
             
             # Apply span-specific formatting - REPLACE families, don't add to them
             for family_name, raw_tokens in span.formatting_tokens.items():
+                # Skip conditional tokens - they were already processed
+                if family_name == 'conditional':
+                    continue
+                    
                 span_state.clear_family(family_name)
                 formatter = self._get_formatter_by_family(family_name)
                 

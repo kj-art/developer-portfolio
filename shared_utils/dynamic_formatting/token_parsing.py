@@ -84,8 +84,8 @@ class TemplateParser:
         while True:
             found_token = False
             
-            # Look for conditional function ($function_name)
-            if content.startswith('$') and ';' in content:
+            # Look for conditional function (?function_name)
+            if content.startswith('?') and ';' in content:
                 end_pos = content.find(';')
                 function_name = content[1:end_pos]
                 content = content[end_pos + 1:]
@@ -223,82 +223,107 @@ class TemplateParser:
         return field_part, formatting_tokens
     
     def _parse_formatted_text(self, text: str) -> Union[str, List[FormattedSpan]]:
-        """Parse text with inline formatting tokens like 'prefix{@bold}text{@normal}suffix'"""
+        """Parse text with inline formatting tokens including conditionals"""
         if '{' not in text:
             return text
         
         spans = []
-        current_span = FormattedSpan("")
         i = 0
         
         while i < len(text):
             if text[i] == '{':
-                # Look for formatting tokens
-                formatting_tokens = {}
+                # Look for formatting tokens or conditionals
                 token_end = text.find('}', i)
                 if token_end == -1:
-                    current_span.text += text[i]
-                    i += 1
-                    continue
+                    # No closing brace, treat as literal
+                    if len(spans) == 0:
+                        spans.append(FormattedSpan(text[i:]))
+                    else:
+                        spans[-1].text += text[i:]
+                    break
                 
                 token_content = text[i+1:token_end]
                 
-                # Parse multiple consecutive tokens within {} like {@italic@bold}
-                token_pos = 0
-                while token_pos < len(token_content):
-                    found_token = False
-                    for token_char, formatter in self.token_formatters.items():
-                        if token_content[token_pos:token_pos+1] == token_char:
-                            # Find the end of this specific token
-                            value_start = token_pos + 1
-                            value_end = value_start
-                            
-                            # Read until we hit another token char or end
-                            while value_end < len(token_content):
-                                if token_content[value_end] in self.token_formatters:
-                                    break
-                                value_end += 1
-                            
-                            token_value = token_content[value_start:value_end]
-                            if token_value:  # Only if we found a value
-                                family_name = formatter.get_family_name()
-                                if family_name not in formatting_tokens:
-                                    formatting_tokens[family_name] = []
-                                
-                                # Store raw token value - will be parsed with field_value later
-                                formatting_tokens[family_name].append(token_value)
-                                
-                                token_pos = value_end
-                                found_token = True
-                                break
+                # Check if this is a conditional token
+                if token_content.startswith('?'):
+                    # This is an inline conditional: {?function}
+                    function_name = token_content[1:]  # Remove the '?'
                     
-                    if not found_token:
-                        token_pos += 1
+                    # Find the text that this conditional controls
+                    # Everything from after the } until the next { or end of string
+                    controlled_start = token_end + 1
+                    controlled_end = text.find('{', controlled_start)
+                    if controlled_end == -1:
+                        controlled_end = len(text)
+                    
+                    controlled_text = text[controlled_start:controlled_end]
+                    
+                    # Create a span for the controlled text with conditional formatting
+                    if controlled_text:
+                        conditional_tokens = {'conditional': [function_name]}
+                        spans.append(FormattedSpan(controlled_text, conditional_tokens))
+                    
+                    # Move past the controlled text
+                    i = controlled_end
+                    continue
                 
-                # Find the end of this formatted section
-                section_start = token_end + 1
-                section_end = text.find('{', section_start)
-                if section_end == -1:
-                    section_end = len(text)
-                
-                # Save current span if it has text
-                if current_span.text:
-                    spans.append(current_span)
-                
-                # Create formatted span
-                formatted_text = text[section_start:section_end]
-                spans.append(FormattedSpan(formatted_text, formatting_tokens))
-                
-                # Start new span
-                current_span = FormattedSpan("")
-                i = section_end
+                else:
+                    # Regular formatting tokens like #red, @bold
+                    formatting_tokens = {}
+                    
+                    # Parse multiple consecutive tokens within {} like {@italic@bold}
+                    token_pos = 0
+                    while token_pos < len(token_content):
+                        found_token = False
+                        for token_char, formatter in self.token_formatters.items():
+                            if token_content[token_pos:token_pos+1] == token_char:
+                                # Find the end of this specific token
+                                value_start = token_pos + 1
+                                value_end = value_start
+                                
+                                # Read until we hit another token char or end
+                                while value_end < len(token_content):
+                                    if token_content[value_end] in self.token_formatters:
+                                        break
+                                    value_end += 1
+                                
+                                token_value = token_content[value_start:value_end]
+                                if token_value:  # Only if we found a value
+                                    family_name = formatter.get_family_name()
+                                    if family_name not in formatting_tokens:
+                                        formatting_tokens[family_name] = []
+                                    formatting_tokens[family_name].append(token_value)
+                                    
+                                    token_pos = value_end
+                                    found_token = True
+                                    break
+                        
+                        if not found_token:
+                            token_pos += 1
+                    
+                    # Find the text that this formatting controls
+                    section_start = token_end + 1
+                    section_end = text.find('{', section_start)
+                    if section_end == -1:
+                        section_end = len(text)
+                    
+                    formatted_text = text[section_start:section_end]
+                    
+                    if formatted_text or formatting_tokens:
+                        spans.append(FormattedSpan(formatted_text, formatting_tokens))
+                    
+                    # Move past the formatted text
+                    i = section_end
+                    continue
             else:
-                current_span.text += text[i]
+                # Regular character - add to current span or create new span
+                if not spans or spans[-1].formatting_tokens:
+                    # Need a new unformatted span
+                    spans.append(FormattedSpan(text[i]))
+                else:
+                    # Add to existing unformatted span
+                    spans[-1].text += text[i]
                 i += 1
-        
-        # Add final span if it has content
-        if current_span.text:
-            spans.append(current_span)
         
         # Return simple string if no formatting
         if len(spans) == 1 and not spans[0].formatting_tokens:

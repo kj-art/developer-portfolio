@@ -300,8 +300,63 @@ class TextFormatter(FormatterBase):
         return f"{prefix}{text}"
 
 
-# Token Registry - maps token characters to their formatter instances
+class ConditionalFormatter(FormatterBase):
+    """Handles conditional formatting tokens (?function_name, etc.)"""
+    
+    # Stacking configuration
+    self_stacking = True  # Multiple conditionals can be chained
+    
+    def get_family_name(self) -> str:
+        return 'conditional'
+    
+    def parse_token(self, token_value: str, field_value: Any = None) -> str:
+        """Parse conditional token - always try function fallback"""
+        original_token = token_value
+        
+        # For conditionals, we always try function execution
+        if not self.function_registry or original_token not in self.function_registry:
+            raise FormatterError(f"Conditional token '{original_token}' requires a valid function name.")
+        
+        try:
+            func = self.function_registry[original_token]
+            
+            # Try calling with field_value first, then without arguments
+            try:
+                if field_value is not None:
+                    result = func(field_value)
+                else:
+                    result = func()
+            except TypeError:
+                # Function might not accept field_value parameter
+                result = func()
+            
+            # For conditionals, we expect boolean-ish results, not strings
+            # Convert the result to 'show' or 'hide' based on truthiness
+            return 'show' if result else 'hide'
+            
+        except Exception as e:
+            raise FunctionExecutionError(f"Conditional function '{original_token}' failed: {e}")
+    
+    def apply_formatting(self, text: str, parsed_tokens: List[str], output_mode: str = 'console') -> str:
+        """Apply conditional logic - show/hide text"""
+        # For conditionals, we don't format the text, we decide visibility
+        # This method shouldn't be called directly for conditionals
+        # Instead, the conditional logic is handled during parsing
+        return text
+    
+    def should_show_text(self, parsed_tokens: List[str]) -> bool:
+        """Determine if text should be shown based on conditional tokens"""
+        # If any token says 'hide', hide the text
+        # If all tokens say 'show' (or list is empty), show the text
+        for token in parsed_tokens:
+            if token == 'hide':
+                return False
+        return True
+
+
+# Token Registry - add the new conditional formatter
 TOKEN_FORMATTERS = {
     '#': ColorFormatter(),
     '@': TextFormatter(),
+    '?': ConditionalFormatter(),
 }
