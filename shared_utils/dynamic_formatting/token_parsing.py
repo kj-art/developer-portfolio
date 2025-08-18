@@ -1,8 +1,24 @@
 """
 Template parsing logic for dynamic formatting system.
 
-This module handles parsing of format strings into structured
-format sections and spans.
+This module handles parsing of format strings into structured format sections and spans.
+The parser supports:
+- Template sections with {{...}} syntax
+- Inline formatting tokens (#color, @style, ?conditional)
+- Comprehensive escape sequence handling (\{, \}, \;)
+- Function fallback integration
+- Family-based formatting state management
+
+PARSING ARCHITECTURE:
+    1. Top-level parsing splits format strings into literal text and template sections
+    2. Template content parsing extracts functions, formatting tokens, and field references  
+    3. Formatted text parsing handles inline formatting within text spans
+    4. Escape sequence processing converts \{ → { throughout all levels
+
+PERFORMANCE:
+    - Single-pass parsing with O(n) time complexity
+    - Efficient escape sequence handling
+    - Minimal object creation for simple cases
 """
 
 from typing import Dict, List, Union, Callable, Optional

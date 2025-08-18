@@ -3,6 +3,28 @@ Main dynamic formatting classes with function fallback support.
 
 This module contains the primary DynamicFormatter and DynamicLoggingFormatter
 classes that orchestrate the entire formatting system.
+
+CORE RESPONSIBILITIES:
+    - Template compilation and caching
+    - Function registry management  
+    - Section rendering with conditional logic
+    - State management across formatting families
+    - Error handling and graceful degradation
+    - Output mode switching (console vs file)
+
+RENDERING PIPELINE:
+    1. Parse template into sections during initialization
+    2. For each section during formatting:
+       - Check conditional functions (section-level show/hide)
+       - Build base formatting state from section tokens
+       - Render prefix, field, and suffix with proper state isolation
+       - Apply resets and cleanup formatting codes
+    
+PERFORMANCE OPTIMIZATIONS:
+    - Simple sections use efficient string concatenation
+    - Complex sections use span-based rendering with minimal resets
+    - Lazy ANSI code application based on output mode
+    - Efficient state copying for span isolation
 """
 
 import logging

@@ -2,8 +2,26 @@
 Enhanced token formatters with function fallback support.
 
 This module contains all the token formatter classes that handle different
-types of formatting (colors, text styles, etc.) with proper error handling
-and function fallback capabilities.
+types of formatting (colors, text styles, conditionals) with proper error 
+handling and function fallback capabilities.
+
+ARCHITECTURE:
+    - FormatterBase: Abstract base class defining the formatter interface
+    - ColorFormatter: Handles #color tokens with ANSI/hex color support
+    - TextFormatter: Handles @style tokens (bold, italic, underline)
+    - ConditionalFormatter: Handles ?function tokens for show/hide logic
+
+FUNCTION FALLBACK SYSTEM:
+    When a token like #level_color isn't a built-in formatter token:
+    1. Check if 'level_color' exists in the function registry
+    2. Call the function with the field value as parameter
+    3. Recursively parse the function result as a formatting token
+    4. Apply the resolved formatting to the text
+
+FAMILY-BASED STACKING:
+    - Colors don't stack: #red#blue is invalid (StackingError)
+    - Text styles do stack: @bold@italic creates bold+italic text
+    - Each family maintains independent state for proper isolation
 """
 
 import re
