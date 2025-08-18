@@ -5,7 +5,7 @@ This module handles parsing of format strings into structured format sections an
 The parser supports:
 - Template sections with {{...}} syntax
 - Inline formatting tokens (#color, @style, ?conditional)
-- Comprehensive escape sequence handling (\{, \}, \;)
+- Comprehensive escape sequence handling (\\{, \\}, \\;)
 - Function fallback integration
 - Family-based formatting state management
 
@@ -13,7 +13,7 @@ PARSING ARCHITECTURE:
     1. Top-level parsing splits format strings into literal text and template sections
     2. Template content parsing extracts functions, formatting tokens, and field references  
     3. Formatted text parsing handles inline formatting within text spans
-    4. Escape sequence processing converts \{ → { throughout all levels
+    4. Escape sequence processing converts \\{ → { throughout all levels
 
 PERFORMANCE:
     - Single-pass parsing with O(n) time complexity
@@ -23,7 +23,6 @@ PERFORMANCE:
 
 from typing import Dict, List, Union, Callable, Optional
 from .span_structures import FormattedSpan, FormatSection
-from .formatting_state import StackingError
 
 
 class DynamicFormattingError(Exception):
@@ -179,8 +178,17 @@ class TemplateParser:
                 function_name=function_name,
                 whole_section_formatting_tokens=whole_section_tokens
             )
-        elif len(parts) == 3:
-            prefix_text, field_part, suffix_text = parts
+        elif len(parts) >= 3:
+            # Handle 3+ parts: take first as prefix, last as suffix, middle parts as field
+            prefix_text = parts[0]
+            suffix_text = parts[-1]
+            
+            # Join middle parts as the field (handles cases where field contains delimiters)
+            if len(parts) == 3:
+                field_part = parts[1]
+            else:
+                # For 4+ parts, join the middle parts with the delimiter
+                field_part = self.delimiter.join(parts[1:-1])
             
             field_name, field_formatting = self._parse_field_with_formatting(field_part)
             
@@ -211,7 +219,7 @@ class TemplateParser:
                 whole_section_formatting_tokens=whole_section_tokens
             )
         else:
-            raise ParseError(f"Invalid template syntax: expected 1-3 parts, got {len(parts)}")
+            raise ParseError("Invalid template syntax: empty template content")
     
     def _parse_field_with_formatting(self, field_part: str) -> tuple[str, Dict[str, List]]:
         """Parse field that might have formatting at the start like {#red}field_name"""

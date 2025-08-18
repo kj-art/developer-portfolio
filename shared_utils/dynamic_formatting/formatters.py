@@ -1,9 +1,8 @@
 """
-Enhanced token formatters with function fallback support.
+Token formatters with function fallback support.
 
-This module contains all the token formatter classes that handle different
-types of formatting (colors, text styles, conditionals) with proper error 
-handling and function fallback capabilities.
+This module contains formatter classes that handle different types of formatting
+(colors, text styles, conditionals) with proper error handling and function fallback.
 
 ARCHITECTURE:
     - FormatterBase: Abstract base class defining the formatter interface
@@ -18,10 +17,10 @@ FUNCTION FALLBACK SYSTEM:
     3. Recursively parse the function result as a formatting token
     4. Apply the resolved formatting to the text
 
-FAMILY-BASED STACKING:
-    - Colors don't stack: #red#blue is invalid (StackingError)
-    - Text styles do stack: @bold@italic creates bold+italic text
-    - Each family maintains independent state for proper isolation
+FORMATTING BEHAVIOR:
+    - Colors: Later colors override earlier colors naturally via ANSI codes
+    - Text styles: Multiple styles combine naturally (bold + italic = bold italic)
+    - Conditionals: Multiple conditionals are evaluated in sequence
 """
 
 import re
@@ -52,9 +51,6 @@ class FunctionExecutionError(FormatterError):
 
 class FormatterBase(ABC):
     """Base class for all token formatters"""
-    
-    # Stacking configuration
-    self_stacking = True  # Can this formatter stack with itself? (e.g., @bold@italic)
     
     def __init__(self):
         self.function_registry = {}  # Will be set by DynamicFormatter
@@ -127,9 +123,6 @@ class FormatterBase(ABC):
 class ColorFormatter(FormatterBase):
     """Handles color formatting tokens (#red, #FF0000, etc.) with function fallback"""
     
-    # Stacking configuration
-    self_stacking = False  # Colors don't stack: {#red#blue} should error
-    
     # ANSI color code mappings
     ANSI_COLORS = {
         'black': 30, 'red': 31, 'green': 32, 'yellow': 33,
@@ -196,23 +189,24 @@ class ColorFormatter(FormatterBase):
         return self._hex_to_ansi_name(hex_color)
     
     def apply_formatting(self, text: str, parsed_tokens: List[str], output_mode: str = 'console') -> str:
-        """Apply color formatting"""
+        """Apply color formatting - later colors override earlier ones"""
         if output_mode != 'console' or not parsed_tokens:
-            return text  # Strip colors for file output
+            return text
         
-        # Since colors don't stack, we should only have one active token
-        active_color = None
+        # Apply all color codes in sequence - terminal will use the last one
+        color_codes = []
         for token in parsed_tokens:
             if token == 'reset':
-                active_color = None
+                color_codes = []  # Reset clears all previous colors
             else:
-                active_color = token
+                ansi_code = self._get_ansi_code(token)
+                color_codes.append(f"\033[{ansi_code}m")
         
-        if active_color is None:
-            return text  # No active color
+        if not color_codes:
+            return text
         
-        ansi_code = self._get_ansi_code(active_color)
-        return f"\033[{ansi_code}m{text}"
+        prefix = ''.join(color_codes)
+        return f"{prefix}{text}"
     
     def _get_ansi_code(self, color: str) -> int:
         """Convert color to ANSI code"""
@@ -252,9 +246,6 @@ class ColorFormatter(FormatterBase):
 
 class TextFormatter(FormatterBase):
     """Handles text formatting tokens (@bold, @italic, etc.) with function fallback"""
-    
-    # Stacking configuration  
-    self_stacking = True  # Text styles can stack: {@bold@italic} makes sense
     
     # Valid text formatting styles
     VALID_STYLES = {
@@ -296,33 +287,27 @@ class TextFormatter(FormatterBase):
                            f"or valid function name.")
     
     def apply_formatting(self, text: str, parsed_tokens: List[str], output_mode: str = 'console') -> str:
-        """Apply text formatting with proper stacking"""
+        """Apply text formatting - multiple styles combine naturally"""
         if output_mode != 'console' or not parsed_tokens:
             return text
         
-        # Build list of active formats, handling resets
-        active_formats = []
+        # Apply all style codes in sequence - they combine naturally
+        style_codes = []
         for token in parsed_tokens:
             if token == 'reset':
-                active_formats.clear()  # Reset clears all text formatting
+                style_codes = []  # Reset clears all previous styles
             elif token in self.VALID_STYLES:
-                if token not in active_formats:  # Avoid duplicates
-                    active_formats.append(token)
-            # Note: Invalid tokens should have been caught during parsing
+                style_codes.append(self.VALID_STYLES[token])
         
-        if not active_formats:
+        if not style_codes:
             return text
         
-        # Apply all active formats
-        prefix = ''.join(self.VALID_STYLES[fmt] for fmt in active_formats)
+        prefix = ''.join(style_codes)
         return f"{prefix}{text}"
 
 
 class ConditionalFormatter(FormatterBase):
     """Handles conditional formatting tokens (?function_name, etc.)"""
-    
-    # Stacking configuration
-    self_stacking = True  # Multiple conditionals can be chained
     
     def get_family_name(self) -> str:
         return 'conditional'
@@ -372,7 +357,7 @@ class ConditionalFormatter(FormatterBase):
         return True
 
 
-# Token Registry - add the new conditional formatter
+# Token Registry
 TOKEN_FORMATTERS = {
     '#': ColorFormatter(),
     '@': TextFormatter(),

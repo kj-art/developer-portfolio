@@ -33,7 +33,7 @@ from typing import Dict, Any, Callable, Optional, Union, List
 from .formatters import TOKEN_FORMATTERS, FormatterError, FunctionExecutionError
 from .token_parsing import TemplateParser, DynamicFormattingError, ParseError
 from .span_structures import FormattedSpan, FormatSection
-from .formatting_state import FormattingState, StackingError
+from .formatting_state import FormattingState
 
 
 class RequiredFieldError(DynamicFormattingError):
@@ -235,10 +235,7 @@ class DynamicFormatter:
                 except FormatterError as e:
                     raise DynamicFormattingError(f"Token parsing failed for '{raw_token}': {e}")
             
-            try:
-                state.add_tokens(family_name, parsed_tokens, formatter.self_stacking)
-            except StackingError as e:
-                raise DynamicFormattingError(f"Stacking error: {e}")
+            state.add_tokens(family_name, parsed_tokens)
     
     def _render_formatted_spans_no_reset(self, spans: Union[str, List[FormattedSpan]], 
                                        base_state: FormattingState, field_value: Any) -> str:
@@ -293,10 +290,7 @@ class DynamicFormatter:
                     continue  # Keep family cleared
                 else:
                     # Add new tokens
-                    try:
-                        span_state.add_tokens(family_name, parsed_tokens, formatter.self_stacking)
-                    except StackingError as e:
-                        raise DynamicFormattingError(f"Span stacking error: {e}")
+                    span_state.add_tokens(family_name, parsed_tokens)
             
             # Format this span with individual reset to prevent bleeding
             if span_state.has_active_formatting() and self.output_mode == 'console':

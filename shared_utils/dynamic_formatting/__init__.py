@@ -71,8 +71,9 @@ COMPREHENSIVE EXAMPLES:
     )
 
 3. MIXED FORMATTING FAMILIES:
-    # Colors and text styles operate independently
-    formatter = DynamicFormatter("{{#red@bold@italic;Multi-format: ;field}}")
+    # Colors and text styles operate independently - later colors override earlier ones
+    formatter = DynamicFormatter("{{#red#blue@bold@italic;Multi-format: ;field}}")
+    # Result: blue, bold, italic text (blue overrides red)
     
     # Reset individual families
     formatter = DynamicFormatter("{{#red@bold;Start} {#blue@normal;Middle} {@italic;End: ;field}}")
@@ -153,8 +154,7 @@ Exception Hierarchy:
     ├── FunctionNotFoundError   - Conditional function not provided  
     ├── ParseError             - Malformed template syntax
     ├── FormatterError         - Invalid color/style token
-    ├── FunctionExecutionError - Function execution failed
-    └── StackingError          - Invalid formatting combination
+    └── FunctionExecutionError - Function execution failed
 
 Best Practices:
     try:
@@ -193,9 +193,9 @@ Large Dataset Recommendations:
 ARCHITECTURAL HIGHLIGHTS:
 
 1. Family-Based State Management:
-   Colors, text styles, and conditionals operate in separate "families" to prevent
-   interference. This allows sophisticated combinations like:
-   {{#red@bold;Text}} {#blue@normal;More}} {@italic;End}}
+   Colors, text styles, and conditionals operate in separate "families". Later
+   tokens within the same family override earlier ones naturally via ANSI codes:
+   {{#red#blue@bold@italic;Text}} → blue, bold, italic text
    
 2. Function Fallback System:
    If a token like #level_color isn't a built-in color, the system automatically
@@ -255,8 +255,7 @@ try:
     )
 
     from .formatting_state import (
-        FormattingState,
-        StackingError
+        FormattingState
     )
 
     from .token_parsing import (
@@ -285,8 +284,7 @@ except ImportError:
     )
 
     from formatting_state import (
-        FormattingState,
-        StackingError
+        FormattingState
     )
 
     from token_parsing import (
@@ -310,7 +308,6 @@ __all__ = [
     'FunctionNotFoundError',
     'FormatterError',
     'FunctionExecutionError',
-    'StackingError',
     'ParseError',
     
     # Advanced classes for extension

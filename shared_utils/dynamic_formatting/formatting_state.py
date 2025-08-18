@@ -1,47 +1,26 @@
 """
 Formatting state management for dynamic formatting system.
 
-This module handles the state tracking across formatting families,
-ensuring proper isolation and stacking behavior.
+This module handles state tracking across formatting families,
+maintaining lists of tokens for each family without restrictions.
 """
 
 from typing import Dict, List, Any
-
-
-class StackingError(Exception):
-    """Raised when invalid stacking is attempted"""
-    pass
 
 
 class FormattingState:
     """Tracks formatting state across families"""
     
     def __init__(self):
-        # Each family maintains its own list of active formatting tokens
+        # Each family maintains its own list of formatting tokens
         self.family_states = {}  # family_name -> list of parsed tokens
     
-    def add_tokens(self, family_name: str, tokens: List[Any], allow_stacking: bool):
+    def add_tokens(self, family_name: str, tokens: List[Any]):
         """Add formatting tokens to a family"""
         if family_name not in self.family_states:
             self.family_states[family_name] = []
         
-        family_tokens = self.family_states[family_name]
-        
-        for token in tokens:
-            # Handle reset tokens
-            if str(token) == 'reset':
-                family_tokens.clear()
-                continue
-            
-            # Check stacking rules
-            if not allow_stacking and family_tokens:
-                # Find non-reset tokens
-                non_reset_tokens = [t for t in family_tokens if str(t) != 'reset']
-                if non_reset_tokens:
-                    raise StackingError(f"Formatter family '{family_name}' does not allow stacking. "
-                                      f"Already has: {non_reset_tokens}, trying to add: {token}")
-            
-            family_tokens.append(token)
+        self.family_states[family_name].extend(tokens)
     
     def get_family_tokens(self, family_name: str) -> List[Any]:
         """Get active tokens for a family"""
@@ -55,10 +34,9 @@ class FormattingState:
         return new_state
     
     def has_active_formatting(self) -> bool:
-        """Check if state has any active (non-reset) formatting"""
+        """Check if state has any active formatting"""
         for family_name, tokens in self.family_states.items():
-            active_tokens = [t for t in tokens if str(t) != 'reset']
-            if active_tokens:
+            if tokens:
                 return True
         return False
     
