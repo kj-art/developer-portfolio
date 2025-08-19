@@ -9,21 +9,9 @@ The parser supports:
 - Function fallback integration
 - Family-based formatting state management
 - Positional arguments via field position tracking
-
-PARSING ARCHITECTURE:
-    1. Top-level parsing splits format strings into literal text and template sections
-    2. Template content parsing extracts functions, formatting tokens, and field references  
-    3. Formatted text parsing handles inline formatting within text spans
-    4. Escape sequence processing converts \\{ → { throughout all levels
-    5. All field sections are tracked for positional argument support
-
-PERFORMANCE:
-    - Single-pass parsing with O(n) time complexity
-    - Efficient escape sequence handling
-    - Minimal object creation for simple cases
 """
 
-from typing import Dict, List, Union, Callable, Optional
+from typing import Dict, List, Union, Optional, Any, Tuple
 from .span_structures import FormattedSpan, FormatSection
 
 
@@ -38,16 +26,34 @@ class ParseError(DynamicFormattingError):
 
 
 class TemplateParser:
-    """Handles parsing of format template strings"""
+    """Handles parsing of format template strings with full type safety"""
     
-    def __init__(self, delimiter: str = ';', token_formatters: Dict = None):
+    def __init__(self, delimiter: str = ';', token_formatters: Optional[Dict[str, Any]] = None) -> None:
+        """
+        Initialize template parser
+        
+        Args:
+            delimiter: Character used to separate template parts
+            token_formatters: Dictionary mapping token prefixes to formatter instances
+        """
         self.delimiter = delimiter
         self.token_formatters = token_formatters or {}
-        self.positional_sections = []  # Track all field sections for positional argument support
+        self.positional_sections: List[str] = []  # Track all field sections for positional argument support
     
     def parse_format_string(self, format_string: str) -> List[Union[str, FormatSection]]:
-        """Parse a format string into sections, handling escape sequences"""
-        sections = []
+        """
+        Parse a format string into sections, handling escape sequences
+        
+        Args:
+            format_string: Template string to parse
+            
+        Returns:
+            List of string literals and FormatSection objects
+            
+        Raises:
+            ParseError: If template syntax is invalid
+        """
+        sections: List[Union[str, FormatSection]] = []
         i = 0
         current_literal = ""
         
@@ -94,7 +100,18 @@ class TemplateParser:
         return sections
     
     def _parse_template_content(self, content: str) -> FormatSection:
-        """Parse the content of a template section {{...}}"""
+        """
+        Parse the content of a template section {{...}}
+        
+        Args:
+            content: Content inside the template braces
+            
+        Returns:
+            Parsed FormatSection object
+            
+        Raises:
+            ParseError: If template content is malformed
+        """
         # Handle required field marker
         is_required = False
         if content.startswith('!'):
@@ -102,8 +119,8 @@ class TemplateParser:
             content = content[1:]
         
         # Extract leading tokens (functions and formatting that apply to whole section)
-        function_name = None
-        whole_section_tokens = {}
+        function_name: Optional[str] = None
+        whole_section_tokens: Dict[str, List[str]] = {}
         
         while True:
             found_token = False
@@ -201,10 +218,10 @@ class TemplateParser:
             
             field_name, field_formatting = self._parse_field_with_formatting(field_part)
             
-            prefix_func = None
-            suffix_func = None
-            processed_prefix = ""
-            processed_suffix = ""
+            prefix_func: Optional[str] = None
+            suffix_func: Optional[str] = None
+            processed_prefix: Union[str, List[FormattedSpan]] = ""
+            processed_suffix: Union[str, List[FormattedSpan]] = ""
             
             if prefix_text.startswith('$'):
                 prefix_func = prefix_text[1:]
@@ -230,9 +247,17 @@ class TemplateParser:
         else:
             raise ParseError("Invalid template syntax: empty template content")
     
-    def _parse_field_with_formatting(self, field_part: str) -> tuple[str, Dict[str, List]]:
-        """Parse field that might have formatting at the start like {#red}field_name"""
-        formatting_tokens = {}
+    def _parse_field_with_formatting(self, field_part: str) -> Tuple[str, Dict[str, List[str]]]:
+        """
+        Parse field that might have formatting at the start like {#red}field_name
+        
+        Args:
+            field_part: Field portion of template to parse
+            
+        Returns:
+            Tuple of (field_name, formatting_tokens_dict)
+        """
+        formatting_tokens: Dict[str, List[str]] = {}
         
         # Extract formatting tokens from the beginning
         while field_part.startswith('{'):
@@ -262,11 +287,19 @@ class TemplateParser:
         return field_part, formatting_tokens
     
     def _parse_formatted_text(self, text: str) -> Union[str, List[FormattedSpan]]:
-        """Parse text with inline formatting tokens including conditionals, handling escape sequences"""
+        """
+        Parse text with inline formatting tokens including conditionals, handling escape sequences
+        
+        Args:
+            text: Text to parse for inline formatting
+            
+        Returns:
+            Simple string if no formatting, list of FormattedSpan objects if formatting present
+        """
         if '{' not in text:
             return text
         
-        spans = []
+        spans: List[FormattedSpan] = []
         i = 0
         
         while i < len(text):
@@ -312,7 +345,7 @@ class TemplateParser:
                     
                     # Create a span for the controlled text with conditional formatting
                     if processed_controlled_text:
-                        conditional_tokens = {'conditional': [function_name]}
+                        conditional_tokens: Dict[str, List[str]] = {'conditional': [function_name]}
                         spans.append(FormattedSpan(processed_controlled_text, conditional_tokens))
                     
                     # Move past the controlled text
@@ -321,14 +354,14 @@ class TemplateParser:
                 
                 else:
                     # Regular formatting tokens like #red, @bold
-                    formatting_tokens = {}
+                    formatting_tokens: Dict[str, List[str]] = {}
                     
                     # Parse multiple consecutive tokens within {} like {@italic@bold}
                     token_pos = 0
                     while token_pos < len(token_content):
                         found_token = False
                         for token_char, formatter in self.token_formatters.items():
-                            if token_content[token_pos:token_pos+1] == token_char:
+                            if token_pos < len(token_content) and token_content[token_pos] == token_char:
                                 # Find the end of this specific token
                                 value_start = token_pos + 1
                                 value_end = value_start
@@ -385,7 +418,16 @@ class TemplateParser:
         return spans
     
     def _find_next_unescaped_brace(self, text: str, start_pos: int) -> int:
-        """Find the next unescaped { character starting from start_pos"""
+        """
+        Find the next unescaped { character starting from start_pos
+        
+        Args:
+            text: Text to search in
+            start_pos: Position to start searching from
+            
+        Returns:
+            Position of next unescaped brace or end of string
+        """
         i = start_pos
         while i < len(text):
             if text[i] == '\\' and i + 1 < len(text) and text[i + 1] in '{}':
@@ -400,7 +442,15 @@ class TemplateParser:
         return len(text)  # No more braces found
     
     def _process_escape_sequences(self, text: str) -> str:
-        """Process escape sequences in text, converting \\{ to { and \\} to }"""
+        """
+        Process escape sequences in text, converting \\{ to { and \\} to }
+        
+        Args:
+            text: Text containing potential escape sequences
+            
+        Returns:
+            Text with escape sequences converted to literal characters
+        """
         result = ""
         i = 0
         
@@ -416,8 +466,16 @@ class TemplateParser:
         return result
     
     def _split_content(self, content: str) -> List[str]:
-        """Split content by delimiter, handling escaped delimiters"""
-        parts = []
+        """
+        Split content by delimiter, handling escaped delimiters
+        
+        Args:
+            content: Content to split
+            
+        Returns:
+            List of split parts with escape sequences preserved
+        """
+        parts: List[str] = []
         current = ""
         i = 0
         

@@ -1,64 +1,18 @@
 """
-Main dynamic formatting classes with function fallback support.
+Main dynamic formatting classes with function fallback support and type annotations.
 
 PRIMARY BENEFIT: Template sections gracefully disappear when required data is missing,
 eliminating tedious manual null checking and conditional string building.
 
 This module contains the primary DynamicFormatter and DynamicLoggingFormatter
 classes that orchestrate the entire formatting system.
-
-CORE RESPONSIBILITIES:
-    - Template compilation and caching
-    - Function registry management  
-    - Section rendering with conditional logic
-    - **Graceful missing data handling** - sections return empty strings for missing fields
-    - State management across formatting families
-    - Error handling and graceful degradation
-    - Output mode switching (console vs file)
-    - **Positional arguments support** - convert positional args to synthetic kwargs
-
-RENDERING PIPELINE:
-    1. Parse template into sections during initialization
-    2. For each section during formatting:
-       - **Check if required field exists in data** - return "" if missing (core feature)
-       - Check conditional functions (section-level show/hide)
-       - Build base formatting state from section tokens
-       - Render prefix, field, and suffix with proper state isolation
-       - Apply resets and cleanup formatting codes
-    
-PERFORMANCE OPTIMIZATIONS:
-    - Simple sections use efficient string concatenation
-    - Complex sections use span-based rendering with minimal resets
-    - Lazy ANSI code application based on output mode
-    - Efficient state copying for span isolation
-
-GRACEFUL MISSING DATA EXAMPLES:
-    formatter = DynamicFormatter("{{Error: ;message}} {{Count: ;count}}")
-    
-    # Missing message field - only count section appears
-    result = formatter.format(count=42)  # "Count: 42"
-    
-    # Missing count field - only message section appears
-    result = formatter.format(message="Failed")  # "Error: Failed"
-    
-    # All missing - empty result
-    result = formatter.format()  # ""
-
-POSITIONAL ARGUMENTS EXAMPLES:
-    formatter = DynamicFormatter("{{Error: ;}} {{Count: ;}}")
-    
-    # All arguments present
-    result = formatter.format("Failed", 42)  # "Error: Failed Count: 42"
-    
-    # Missing arguments - later sections disappear
-    result = formatter.format("Failed")  # "Error: Failed"
 """
 
 import logging
 from typing import Dict, Any, Callable, Optional, Union, List
 
 from .formatters import TOKEN_FORMATTERS, FormatterError, FunctionExecutionError
-from .token_parsing import TemplateParser, DynamicFormattingError, ParseError
+from .template_parser import TemplateParser, DynamicFormattingError, ParseError
 from .span_structures import FormattedSpan, FormatSection
 from .formatting_state import FormattingState
 
@@ -87,7 +41,7 @@ class DynamicFormatter:
     
     def __init__(self, format_string: str, delimiter: str = ';', 
                  functions: Optional[Dict[str, Callable]] = None,
-                 output_mode: str = 'console'):
+                 output_mode: str = 'console') -> None:
         self.format_string = format_string
         self.delimiter = delimiter
         self.functions = functions or {}
@@ -104,35 +58,23 @@ class DynamicFormatter:
         except ParseError as e:
             raise DynamicFormattingError(f"Failed to parse format string: {e}")
     
-    def format(self, *args, **kwargs) -> str:
+    def format(self, *args: Any, **kwargs: Any) -> str:
         """
         Format the template with provided data using either positional or keyword arguments
         
         Core Feature: Missing fields cause their template sections to disappear
         automatically, eliminating the need for manual null checking.
         
-        Positional Arguments:
-            Use empty field names in template: {{}} {{prefix;;suffix}}
-            Arguments are matched by position to empty field sections
+        Args:
+            *args: Positional arguments for templates with empty field names
+            **kwargs: Keyword arguments for templates with named fields
             
-        Keyword Arguments:  
-            Use named field names in template: {{message}} {{count}}
-            Arguments are matched by field name
-        
-        Examples:
-            # Keyword arguments (original behavior)
-            formatter = DynamicFormatter("{{Error: ;message}} {{Count: ;count}}")
-            result = formatter.format(message="Failed", count=42)
-            # Returns: "Error: Failed Count: 42"
+        Returns:
+            Formatted string with missing data sections automatically omitted
             
-            # Positional arguments (new behavior)
-            formatter = DynamicFormatter("{{Error: ;}} {{Count: ;}}")
-            result = formatter.format("Failed", 42)
-            # Returns: "Error: Failed Count: 42"
-            
-            # Missing fields cause sections to disappear automatically
-            result = formatter.format("Failed")  # Only first argument
-            # Returns: "Error: Failed"
+        Raises:
+            DynamicFormattingError: If arguments are invalid or formatting fails
+            RequiredFieldError: If a required field is missing
         """
         # Argument validation
         if args and kwargs:
@@ -150,7 +92,7 @@ class DynamicFormatter:
                     f"Too many positional arguments: expected {expected}, got {got}"
                 )
             
-            data = {}
+            data: Dict[str, Any] = {}
             # Map positional arguments to field sections in order
             for i, arg in enumerate(args):
                 if i < len(field_sections):
@@ -179,6 +121,18 @@ class DynamicFormatter:
         
         Core Feature Implementation: Returns empty string when the required field
         is missing from the data dictionary, causing the entire section to disappear.
+        
+        Args:
+            section: Format section to render
+            data: Data dictionary containing field values
+            
+        Returns:
+            Rendered section text or empty string if field missing
+            
+        Raises:
+            RequiredFieldError: If required field is missing
+            FunctionNotFoundError: If conditional function not found
+            FunctionExecutionError: If function execution fails
         """
         field_value = data.get(section.field_name)
         
@@ -217,7 +171,7 @@ class DynamicFormatter:
                              base_state: FormattingState) -> str:
         """Render a simple section (no inline formatting) efficiently"""
         # Build complete text and apply formatting once
-        text_parts = []
+        text_parts: List[str] = []
         
         if section.prefix_function:
             func = self.functions.get(section.prefix_function)
@@ -249,7 +203,7 @@ class DynamicFormatter:
     def _render_complex_section(self, section: FormatSection, field_value: Any, 
                               base_state: FormattingState) -> str:
         """Render a complex section with inline formatting"""
-        result_parts = []
+        result_parts: List[str] = []
         has_any_formatting = False
         
         # Render prefix
@@ -320,11 +274,11 @@ class DynamicFormatter:
         return state
     
     def _add_parsed_tokens_to_state(self, state: FormattingState, token_dict: Dict[str, List], 
-                                   field_value: Any):
+                                   field_value: Any) -> None:
         """Parse and add tokens to formatting state"""
         for family_name, raw_tokens in token_dict.items():
             formatter = self._get_formatter_by_family(family_name)
-            parsed_tokens = []
+            parsed_tokens: List[Union[str, int, bool]] = []
             
             for raw_token in raw_tokens:
                 try:
@@ -374,7 +328,7 @@ class DynamicFormatter:
                 span_state.clear_family(family_name)
                 formatter = self._get_formatter_by_family(family_name)
                 
-                parsed_tokens = []
+                parsed_tokens: List[Union[str, int, bool]] = []
                 for raw_token in raw_tokens:
                     try:
                         parsed_token = formatter.parse_token(str(raw_token), field_value)
@@ -428,7 +382,7 @@ class DynamicFormatter:
     
     def _get_formatting_codes(self, formatting_state: FormattingState) -> str:
         """Extract formatting codes from a formatting state"""
-        format_codes = []
+        format_codes: List[str] = []
         
         for family_name, tokens in formatting_state.family_states.items():
             if tokens:
@@ -446,6 +400,8 @@ class DynamicFormatter:
     
     def _get_formatter_by_family(self, family_name: str):
         """Get formatter instance by family name"""
+        from .formatters.base import FormatterBase
+        
         for formatter in TOKEN_FORMATTERS.values():
             if formatter.get_family_name() == family_name:
                 return formatter
@@ -471,23 +427,24 @@ class DynamicLoggingFormatter(logging.Formatter):
     
     def __init__(self, format_string: str, delimiter: str = ';', 
                  functions: Optional[Dict[str, Callable]] = None,
-                 output_mode: str = 'console'):
+                 output_mode: str = 'console') -> None:
         super().__init__()
         try:
             self.formatter = DynamicFormatter(format_string, delimiter, functions, output_mode)
         except DynamicFormattingError as e:
             # Fall back to a basic formatter if dynamic formatting fails
             logging.getLogger(__name__).error(f"Dynamic formatting setup failed: {e}")
-            self.formatter = None
+            self.formatter: Optional[DynamicFormatter] = None
             self.fallback_format = format_string
     
     def format(self, record: logging.LogRecord) -> str:
+        """Format a log record using dynamic formatting"""
         # If dynamic formatter failed to initialize, use basic formatting
         if self.formatter is None:
             return f"[FORMATTING ERROR] {record.getMessage()}"
         
         # Build log data dictionary
-        log_data = {
+        log_data: Dict[str, Any] = {
             'message': record.getMessage(),
             'levelname': record.levelname,
             'name': record.name,

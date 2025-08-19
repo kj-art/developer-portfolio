@@ -1,0 +1,188 @@
+"""
+Color formatting implementation.
+
+Handles color formatting tokens (#red, #FF0000, etc.) with function fallback
+support. Supports ANSI colors, hex colors, named colors, and dynamic color
+selection through function calls.
+"""
+
+from typing import Any, List, Dict, Optional
+from .base import FormatterBase, FormatterError
+
+try:
+    import matplotlib.colors as mcolors
+    NAMED_COLORS: Dict[str, str] = mcolors.CSS4_COLORS
+except ImportError:
+    # Fallback basic colors if matplotlib not available
+    NAMED_COLORS = {
+        'red': '#FF0000', 'green': '#00FF00', 'blue': '#0000FF',
+        'yellow': '#FFFF00', 'cyan': '#00FFFF', 'magenta': '#FF00FF',
+        'black': '#000000', 'white': '#FFFFFF', 'gray': '#808080'
+    }
+
+
+class ColorFormatter(FormatterBase):
+    """
+    Handles color formatting tokens (#red, #FF0000, etc.) with function fallback
+    
+    Supports multiple color formats:
+    - ANSI color names: red, blue, green, etc.
+    - Hex colors: FF0000, 0000FF, etc. (with or without #)
+    - Named colors: Any color name from matplotlib's CSS4_COLORS
+    - Function fallback: Any function that returns a valid color
+    
+    Color behavior:
+    - Later colors override earlier colors naturally via ANSI codes
+    - Reset tokens clear all color formatting
+    - File output mode strips all color codes
+    """
+    
+    # ANSI color code mappings
+    ANSI_COLORS: Dict[str, int] = {
+        'black': 30, 'red': 31, 'green': 32, 'yellow': 33,
+        'blue': 34, 'magenta': 35, 'cyan': 36, 'white': 37,
+        'bright_black': 90, 'bright_red': 91, 'bright_green': 92,
+        'bright_yellow': 93, 'bright_blue': 94, 'bright_magenta': 95,
+        'bright_cyan': 96, 'bright_white': 97
+    }
+    
+    def get_family_name(self) -> str:
+        return 'color'
+    
+    def parse_token(self, token_value: str, field_value: Optional[Any] = None) -> str:
+        """
+        Parse color token with function fallback and proper error handling
+        
+        Parsing order:
+        1. Check for reset tokens (normal, default, reset)
+        2. Try direct ANSI color lookup
+        3. Try hex color parsing
+        4. Try named colors from matplotlib
+        5. Try function fallback
+        6. Raise error if nothing works
+        
+        Args:
+            token_value: Color token to parse
+            field_value: Field value for function fallback
+            
+        Returns:
+            Parsed color token (ANSI name, hex, or 'reset')
+            
+        Raises:
+            FormatterError: If token is invalid and no function fallback
+        """
+        original_token = token_value
+        token_value = token_value.lower()
+        
+        # Handle reset tokens
+        if self.is_reset_token(token_value):
+            return 'reset'
+        
+        # Try direct ANSI color lookup
+        if token_value in self.ANSI_COLORS:
+            return token_value
+        
+        # Try hex color
+        if len(token_value) == 6 and all(c in '0123456789abcdef' for c in token_value):
+            return f"#{token_value}"
+        
+        # Try named colors from matplotlib
+        if token_value in NAMED_COLORS:
+            return self._map_named_color_to_ansi(token_value)
+        
+        # Function fallback - use original case for function names
+        try:
+            function_result = self._try_function_fallback(original_token, field_value)
+            if function_result is not None:
+                # Recursively parse the function result as a color
+                return self.parse_token(function_result, field_value)
+        except Exception as e:
+            # Re-raise function errors - they should not fail silently
+            raise e
+        
+        # If we get here, the token is invalid
+        raise FormatterError(f"Invalid color token: '{original_token}'. "
+                           f"Expected: ANSI color name, hex color (6 digits), "
+                           f"matplotlib color name, or valid function name.")
+    
+    def apply_formatting(self, text: str, parsed_tokens: List[str], output_mode: str = 'console') -> str:
+        """
+        Apply color formatting - later colors override earlier ones
+        
+        Args:
+            text: Text to format
+            parsed_tokens: List of parsed color tokens
+            output_mode: 'console' for ANSI codes, 'file' for plain text
+            
+        Returns:
+            Formatted text with color codes (console) or plain text (file)
+        """
+        if output_mode != 'console' or not parsed_tokens:
+            return text
+        
+        # Apply all color codes in sequence - terminal will use the last one
+        color_codes: List[str] = []
+        for token in parsed_tokens:
+            if token == 'reset':
+                color_codes = []  # Reset clears all previous colors
+            else:
+                ansi_code = self._get_ansi_code(token)
+                color_codes.append(f"\033[{ansi_code}m")
+        
+        if not color_codes:
+            return text
+        
+        prefix = ''.join(color_codes)
+        return f"{prefix}{text}"
+    
+    def _map_named_color_to_ansi(self, color_name: str) -> str:
+        """Map matplotlib color name to closest ANSI color"""
+        # Direct mapping for common colors
+        color_mapping: Dict[str, str] = {
+            'red': 'red', 'green': 'green', 'blue': 'blue', 
+            'yellow': 'yellow', 'cyan': 'cyan', 'magenta': 'magenta',
+            'black': 'black', 'white': 'white', 'gray': 'bright_black',
+            'grey': 'bright_black'
+        }
+        
+        if color_name in color_mapping:
+            return color_mapping[color_name]
+        
+        # For other colors, convert through hex
+        hex_color = NAMED_COLORS[color_name].lower()
+        return self._hex_to_ansi_name(hex_color)
+    
+    def _get_ansi_code(self, color: str) -> int:
+        """Convert color to ANSI code"""
+        color_lower = color.lower().lstrip('#')
+        
+        # Direct ANSI color name mapping
+        if color_lower in self.ANSI_COLORS:
+            return self.ANSI_COLORS[color_lower]
+        
+        # Hex color mapping to closest ANSI
+        return self._hex_to_ansi_code(color_lower)
+    
+    def _hex_to_ansi_name(self, hex_color: str) -> str:
+        """Convert hex color to closest ANSI color name"""
+        hex_color = hex_color.lstrip('#').lower()
+        
+        # Simple mapping of common hex values to ANSI names
+        hex_to_ansi_name: Dict[str, str] = {
+            '000000': 'black', 'ff0000': 'red', '00ff00': 'green', 'ffff00': 'yellow',
+            '0000ff': 'blue', 'ff00ff': 'magenta', '00ffff': 'cyan', 'ffffff': 'white',
+            '008000': 'green',  # CSS 'green' 
+            '800080': 'magenta', # CSS 'purple' -> magenta
+            '808080': 'bright_black'  # CSS 'gray'
+        }
+        
+        if hex_color in hex_to_ansi_name:
+            return hex_to_ansi_name[hex_color]
+        
+        # Fallback to closest basic color (could be enhanced with color distance calculation)
+        return 'white'
+    
+    def _hex_to_ansi_code(self, hex_color: str) -> int:
+        """Convert hex color to ANSI code"""
+        ansi_name = self._hex_to_ansi_name(hex_color)
+        return self.ANSI_COLORS.get(ansi_name, 37)
