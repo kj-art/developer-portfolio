@@ -5,8 +5,11 @@ Provides enterprise-style configuration handling with validation modes,
 performance settings, and professional deployment options.
 """
 
+import json
+import os
 from dataclasses import dataclass, field
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional, Callable, Union
+from pathlib import Path
 from enum import Enum
 
 
@@ -47,33 +50,29 @@ class FormatterConfig:
         prod_config = FormatterConfig(
             validation_mode=ValidationMode.GRACEFUL,
             validation_level=ValidationLevel.ERROR,
-            enable_colors=True,
-            enable_performance_monitoring=False
+            enable_validation=False
         )
         
-        # Create formatter with config
-        formatter = DynamicFormatter(template, config=dev_config)
+        # From JSON config file
+        config = FormatterConfig.from_config_file('config.json')
     """
     
-    # Core formatting behavior
-    output_mode: str = "console"                    # 'console' or 'file'
-    delimiter: str = ";"                            # Template delimiter character
-    enable_colors: bool = True                      # Enable color formatting
-    enable_function_fallback: bool = True           # Enable function fallback system
+    # Core formatting settings
+    delimiter: str = ';'                            # Token delimiter character
+    output_mode: str = 'console'                    # 'console' or 'file' output mode
+    enable_colors: bool = True                      # Enable ANSI color codes
+    functions: Dict[str, Callable] = field(default_factory=dict)  # Custom function registry
     
     # Validation and error handling
     validation_mode: ValidationMode = ValidationMode.GRACEFUL    # How to handle invalid tokens
-    validation_level: ValidationLevel = ValidationLevel.WARNING  # What to report
-    enable_validation: bool = True                  # Enable template validation
+    validation_level: ValidationLevel = ValidationLevel.WARNING  # Minimum level to report
+    enable_validation: bool = True                  # Whether to perform validation
     
     # Performance and monitoring
-    max_recursion_depth: int = 5                    # Function fallback recursion limit
     enable_performance_monitoring: bool = False     # Track performance metrics
-    max_template_sections: int = 200                # Warning threshold for large templates
-    max_template_length: int = 2000                 # Warning threshold for long templates
-    
-    # Function registry
-    functions: Dict[str, Callable] = field(default_factory=dict)  # Available functions
+    max_recursion_depth: int = 10                   # Maximum template nesting depth
+    max_template_sections: int = 100                # Maximum number of template sections
+    max_template_length: int = 10000                # Maximum template string length
     
     # Advanced options
     strict_argument_validation: bool = True         # Validate positional/keyword mixing
@@ -157,7 +156,7 @@ class FormatterConfig:
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> 'FormatterConfig':
         """
-        Create configuration from dictionary (useful for JSON/YAML config files)
+        Create configuration from dictionary (useful for JSON config files)
         
         Args:
             config_dict: Dictionary containing configuration values
@@ -185,9 +184,95 @@ class FormatterConfig:
         config.functions = functions
         return config
     
+    @classmethod
+    def from_config_file(cls, config_path: Union[str, Path]) -> 'FormatterConfig':
+        """
+        Load configuration from JSON file
+        
+        Args:
+            config_path: Path to JSON configuration file
+            
+        Returns:
+            FormatterConfig instance
+            
+        Raises:
+            FileNotFoundError: If config file doesn't exist
+            json.JSONDecodeError: If config file contains invalid JSON
+            ValueError: If config contains invalid values
+            
+        Example:
+            # config.json contains:
+            # {
+            #   "formatting": {
+            #     "validation_mode": "graceful",
+            #     "output_mode": "console", 
+            #     "enable_colors": true,
+            #     "max_template_sections": 200
+            #   }
+            # }
+            
+            config = FormatterConfig.from_config_file('config.json')
+            formatter = DynamicFormatter(template, config=config)
+        """
+        config_path = Path(config_path)
+        
+        if not config_path.exists():
+            raise FileNotFoundError(f"Configuration file not found: {config_path}")
+        
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config_data = json.load(f)
+        except json.JSONDecodeError as e:
+            raise json.JSONDecodeError(
+                f"Invalid JSON in configuration file {config_path}: {e.msg}",
+                e.doc, e.pos
+            )
+        
+        # Support nested 'formatting' key for organized config files
+        if 'formatting' in config_data:
+            config_data = config_data['formatting']
+        
+        return cls.from_dict(config_data)
+    
+    @classmethod
+    def from_environment(cls, prefix: str = 'FORMATTER_') -> 'FormatterConfig':
+        """
+        Load configuration from environment variables
+        
+        Args:
+            prefix: Environment variable prefix (default: 'FORMATTER_')
+            
+        Returns:
+            FormatterConfig instance with values from environment variables
+            
+        Example:
+            # Set environment variables:
+            # FORMATTER_VALIDATION_MODE=graceful
+            # FORMATTER_OUTPUT_MODE=file
+            # FORMATTER_ENABLE_COLORS=false
+            
+            config = FormatterConfig.from_environment()
+        """
+        config_dict = {}
+        
+        for key, value in os.environ.items():
+            if key.startswith(prefix):
+                # Convert FORMATTER_VALIDATION_MODE to validation_mode
+                config_key = key[len(prefix):].lower()
+                
+                # Type conversion for common config values
+                if value.lower() in ('true', 'false'):
+                    config_dict[config_key] = value.lower() == 'true'
+                elif value.isdigit():
+                    config_dict[config_key] = int(value)
+                else:
+                    config_dict[config_key] = value
+        
+        return cls.from_dict(config_dict) if config_dict else cls()
+    
     def to_dict(self) -> Dict[str, Any]:
         """
-        Convert configuration to dictionary (useful for saving to JSON/YAML)
+        Convert configuration to dictionary (useful for saving to JSON)
         
         Note: Functions are not included in the output as they can't be serialized.
         """
@@ -201,6 +286,25 @@ class FormatterConfig:
             else:
                 result[key] = value
         return result
+    
+    def to_config_file(self, config_path: Union[str, Path], nested: bool = True) -> None:
+        """
+        Save configuration to JSON file
+        
+        Args:
+            config_path: Path where to save the configuration file
+            nested: If True, wrap config in 'formatting' key for organization
+        """
+        config_path = Path(config_path)
+        config_dict = self.to_dict()
+        
+        if nested:
+            output_dict = {'formatting': config_dict}
+        else:
+            output_dict = config_dict
+        
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(output_dict, f, indent=2, sort_keys=True)
     
     def copy(self, **overrides) -> 'FormatterConfig':
         """
