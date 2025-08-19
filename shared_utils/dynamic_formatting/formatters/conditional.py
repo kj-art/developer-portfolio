@@ -1,9 +1,9 @@
 """
-Conditional formatting implementation with enhanced error context and graceful degradation.
+Conditional formatting implementation with configurable graceful degradation.
 
 Handles conditional formatting tokens (?function_name) that control
 whether sections or inline content should be shown or hidden based
-on function results.
+on function results. Now supports configurable error handling modes.
 """
 
 from typing import Any, List, Optional
@@ -12,15 +12,18 @@ from .base import FormatterBase, FormatterError, FunctionExecutionError
 
 class ConditionalFormatter(FormatterBase):
     """
-    Handles conditional formatting tokens (?function_name) with enhanced error context
-    and graceful degradation
+    Handles conditional formatting tokens (?function_name) with configurable graceful degradation
     
     Conditionals work differently from color/text formatters:
     - They always require a function (no built-in conditionals)
     - Functions should return boolean-ish values
     - Results control visibility, not formatting
     - Used at both section level and inline level
-    - Invalid functions gracefully degrade to 'hide' (safer default)
+    
+    Graceful Degradation Modes:
+    - STRICT: Missing functions raise FunctionNotFoundError
+    - GRACEFUL: Missing functions default to 'hide' (safer default)
+    - AUTO_CORRECT: Not applicable for conditionals (falls back to graceful)
     
     Usage patterns:
     - Section level: {{?has_items;Found ;count; items}}
@@ -39,7 +42,7 @@ class ConditionalFormatter(FormatterBase):
     
     def parse_token(self, token_value: str, field_value: Optional[Any] = None) -> str:
         """
-        Parse conditional token with graceful degradation
+        Parse conditional token with configurable graceful degradation
         
         Unlike color/text formatters, conditionals don't have built-in tokens.
         Every conditional token must map to a function that returns a boolean.
@@ -51,16 +54,33 @@ class ConditionalFormatter(FormatterBase):
         Returns:
             'show' if function returns truthy, 'hide' if falsy or function missing/failed
             
-        Note:
-            Missing or failing functions return 'hide' instead of raising errors,
-            allowing validation to warn but formatting to continue safely.
+        Behavior by validation mode:
+        - STRICT: Missing functions raise FormatterError
+        - GRACEFUL: Missing functions return 'hide' (safe default)
+        - AUTO_CORRECT: Same as graceful (no auto-correction for missing functions)
         """
         original_token = token_value
         
-        # For conditionals, we always try function execution
+        # Check if function exists
         if not self.function_registry or original_token not in self.function_registry:
-            # Graceful degradation: missing function defaults to 'hide' (safer)
-            return 'hide'
+            # Behavior depends on validation mode
+            if hasattr(self, '_config') and self._config.is_strict_mode():
+                # Strict mode: raise error for missing functions
+                available = list(self.function_registry.keys()) if self.function_registry else []
+                suggestion = self._suggest_similar_function(original_token, available)
+                
+                error_msg = f"Conditional function '{original_token}' not found"
+                if suggestion:
+                    error_msg += f". Did you mean '{suggestion}'?"
+                elif available:
+                    error_msg += f". Available functions: {', '.join(available[:5])}"
+                else:
+                    error_msg += ". No conditional functions registered"
+                
+                self._raise_formatter_error(error_msg, original_token)
+            else:
+                # Graceful/auto-correct mode: missing function defaults to 'hide' (safer)
+                return 'hide'
         
         try:
             func = self.function_registry[original_token]
@@ -75,17 +95,44 @@ class ConditionalFormatter(FormatterBase):
                 # Function might not accept field_value parameter
                 try:
                     result = func()
-                except Exception:
-                    # Function signature issues - gracefully degrade to hide
-                    return 'hide'
+                except Exception as e:
+                    # Function signature issues
+                    if hasattr(self, '_config') and self._config.is_strict_mode():
+                        raise FunctionExecutionError(
+                            f"Function signature mismatch - function may require parameters",
+                            function_name=original_token,
+                            original_error=e,
+                            template=self.current_template,
+                            position=self.current_position
+                        )
+                    else:
+                        # Graceful: function signature issues default to hide
+                        return 'hide'
             
             # For conditionals, we expect boolean-ish results, not strings
             # Convert the result to 'show' or 'hide' based on truthiness
             return 'show' if result else 'hide'
             
-        except Exception:
-            # Any function execution error - gracefully degrade to hide
-            return 'hide'
+        except FunctionExecutionError:
+            # Re-raise function execution errors in strict mode
+            if hasattr(self, '_config') and self._config.is_strict_mode():
+                raise
+            else:
+                # Graceful: function execution errors default to hide
+                return 'hide'
+        except Exception as e:
+            # Any other function execution error
+            if hasattr(self, '_config') and self._config.is_strict_mode():
+                raise FunctionExecutionError(
+                    f"Unexpected error during conditional function execution: {e}",
+                    function_name=original_token,
+                    original_error=e,
+                    template=self.current_template,
+                    position=self.current_position
+                )
+            else:
+                # Graceful: any function error defaults to hide
+                return 'hide'
     
     def apply_formatting(self, text: str, parsed_tokens: List[str], output_mode: str = 'console') -> str:
         """
@@ -124,3 +171,35 @@ class ConditionalFormatter(FormatterBase):
             if token == 'hide':
                 return False
         return True
+    
+    def set_config(self, config) -> None:
+        """Set configuration for validation mode handling"""
+        self._config = config
+    
+    def _suggest_similar_function(self, func_name: str, available: List[str]) -> Optional[str]:
+        """Suggest a similar function name"""
+        if not available:
+            return None
+        
+        func_lower = func_name.lower()
+        
+        # Look for substring matches first
+        for func in available:
+            if func_lower in func.lower() or func.lower() in func_lower:
+                return func
+        
+        # Simple similarity
+        best_match = None
+        best_score = float('inf')
+        
+        for func in available:
+            score = abs(len(func_name) - len(func))
+            for i, char in enumerate(func_lower):
+                if i < len(func) and char != func[i].lower():
+                    score += 1
+            
+            if score < best_score and score <= 2:
+                best_score = score
+                best_match = func
+        
+        return best_match

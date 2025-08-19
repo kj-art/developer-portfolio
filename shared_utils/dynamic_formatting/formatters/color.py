@@ -1,12 +1,11 @@
 """
-Color formatting implementation with enhanced error context and graceful degradation.
+Color formatting implementation with configurable graceful degradation.
 
 Handles color formatting tokens (#red, #FF0000, etc.) with function fallback
 support. Supports ANSI colors, hex colors, named colors, and dynamic color
 selection through function calls.
 
-Enhanced with graceful degradation: Invalid tokens are treated as plain text
-rather than causing runtime failures.
+Enhanced with configurable graceful degradation modes for professional deployment.
 """
 
 from typing import Any, List, Dict, Optional
@@ -26,8 +25,8 @@ except ImportError:
 
 class ColorFormatter(FormatterBase):
     """
-    Handles color formatting tokens (#red, #FF0000, etc.) with function fallback,
-    enhanced error context, and graceful degradation
+    Handles color formatting tokens (#red, #FF0000, etc.) with function fallback
+    and configurable graceful degradation
     
     Supports multiple color formats:
     - ANSI color names: red, blue, green, etc.
@@ -35,11 +34,15 @@ class ColorFormatter(FormatterBase):
     - Named colors: Any color name from matplotlib's CSS4_COLORS
     - Function fallback: Any function that returns a valid color
     
+    Graceful Degradation Modes:
+    - STRICT: Invalid tokens raise FormatterError
+    - GRACEFUL: Invalid tokens return 'invalid' (no formatting applied)
+    - AUTO_CORRECT: Invalid tokens auto-correct to suggested alternatives
+    
     Color behavior:
     - Later colors override earlier colors naturally via ANSI codes
     - Reset tokens clear all color formatting
     - File output mode strips all color codes
-    - Invalid tokens gracefully degrade to no formatting (validation warns but formatting continues)
     """
     
     # ANSI color code mappings
@@ -65,7 +68,7 @@ class ColorFormatter(FormatterBase):
     
     def parse_token(self, token_value: str, field_value: Optional[Any] = None) -> str:
         """
-        Parse color token with function fallback, enhanced error context, and graceful degradation
+        Parse color token with function fallback and configurable graceful degradation
         
         Parsing order:
         1. Check for reset tokens (normal, default, reset)
@@ -73,7 +76,7 @@ class ColorFormatter(FormatterBase):
         3. Try hex color parsing
         4. Try named colors from matplotlib
         5. Try function fallback
-        6. Gracefully degrade to 'invalid' token (no formatting applied)
+        6. Handle invalid tokens based on validation mode
         
         Args:
             token_value: Color token to parse
@@ -82,9 +85,10 @@ class ColorFormatter(FormatterBase):
         Returns:
             Parsed color token (ANSI name, hex, 'reset', or 'invalid')
             
-        Note:
-            Invalid tokens return 'invalid' instead of raising errors,
-            allowing validation to warn but formatting to continue.
+        Behavior by validation mode:
+        - STRICT: Invalid tokens raise FormatterError
+        - GRACEFUL: Invalid tokens return 'invalid' (no formatting applied)
+        - AUTO_CORRECT: Invalid tokens auto-correct to suggested alternatives
         """
         original_token = token_value
         token_value = token_value.lower()
@@ -112,12 +116,72 @@ class ColorFormatter(FormatterBase):
                 # Recursively parse the function result as a color
                 return self.parse_token(function_result, field_value)
         except Exception:
-            # Function failed - treat as invalid token
+            # Function failed - handle based on validation mode
             pass
         
-        # Graceful degradation: return 'invalid' instead of raising error
-        # This allows validation to catch the issue but formatting to continue
-        return 'invalid'
+        # Handle invalid tokens based on validation mode
+        return self._handle_invalid_token(original_token)
+    
+    def _handle_invalid_token(self, token_value: str) -> str:
+        """Handle invalid tokens based on validation mode"""
+        if hasattr(self, '_config'):
+            if self._config.is_strict_mode():
+                # Strict mode: raise error for invalid tokens
+                suggestion = self._suggest_similar_token(token_value)
+                error_msg = f"Invalid color token: '{token_value}'"
+                if suggestion:
+                    error_msg += f". Did you mean '{suggestion}'?"
+                self._raise_formatter_error(error_msg, token_value)
+                
+            elif self._config.is_auto_correct_mode():
+                # Auto-correct mode: automatically use suggested alternative
+                suggestion = self._suggest_similar_token(token_value)
+                if suggestion:
+                    # Recursively parse the suggested token
+                    return self.parse_token(suggestion)
+                else:
+                    # No suggestion available, fall back to graceful
+                    return 'invalid'
+            else:
+                # Graceful mode: return 'invalid' (no formatting applied)
+                return 'invalid'
+        else:
+            # No config available, default to graceful behavior
+            return 'invalid'
+    
+    def _suggest_similar_token(self, token_value: str) -> Optional[str]:
+        """Suggest a similar valid token using fuzzy matching"""
+        valid_tokens = set(self.ANSI_COLORS.keys())
+        valid_tokens.update(['reset', 'normal', 'default'])
+        valid_tokens.update(NAMED_COLORS.keys())
+        
+        if not valid_tokens:
+            return None
+        
+        # Simple similarity check - could be enhanced with proper fuzzy matching
+        token_lower = token_value.lower()
+        
+        # Exact substring matches
+        for valid_token in valid_tokens:
+            if token_lower in valid_token.lower() or valid_token.lower() in token_lower:
+                return valid_token
+        
+        # Edit distance approximation (simple version)
+        best_match = None
+        best_score = float('inf')
+        
+        for valid_token in valid_tokens:
+            # Simple score: length difference + character differences
+            score = abs(len(token_value) - len(valid_token))
+            for i, char in enumerate(token_lower):
+                if i < len(valid_token) and char != valid_token[i].lower():
+                    score += 1
+            
+            if score < best_score and score <= 3:  # Only suggest if reasonably close
+                best_score = score
+                best_match = valid_token
+        
+        return best_match
     
     def apply_formatting(self, text: str, parsed_tokens: List[str], output_mode: str = 'console') -> str:
         """
@@ -151,6 +215,10 @@ class ColorFormatter(FormatterBase):
         
         prefix = ''.join(color_codes)
         return f"{prefix}{text}"
+    
+    def set_config(self, config) -> None:
+        """Set configuration for validation mode handling"""
+        self._config = config
     
     def _map_named_color_to_ansi(self, color_name: str) -> str:
         """Map matplotlib color name to closest ANSI color"""

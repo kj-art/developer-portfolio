@@ -10,14 +10,7 @@ development rather than at runtime.
 import re
 from typing import List, Dict, Set, Optional, Any, Callable
 from dataclasses import dataclass
-from enum import Enum
-
-
-class ValidationLevel(Enum):
-    """Severity levels for validation warnings"""
-    INFO = "info"
-    WARNING = "warning" 
-    ERROR = "error"
+from .config import ValidationLevel
 
 
 @dataclass
