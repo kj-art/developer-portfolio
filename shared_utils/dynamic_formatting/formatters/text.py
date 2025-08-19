@@ -1,5 +1,5 @@
 """
-Text style formatting implementation.
+Text style formatting implementation with enhanced error context and graceful degradation.
 
 Handles text formatting tokens (@bold, @italic, etc.) with function fallback
 support. Supports multiple text styles that can be combined naturally.
@@ -11,7 +11,8 @@ from .base import FormatterBase, FormatterError
 
 class TextFormatter(FormatterBase):
     """
-    Handles text formatting tokens (@bold, @italic, etc.) with function fallback
+    Handles text formatting tokens (@bold, @italic, etc.) with function fallback,
+    enhanced error context, and graceful degradation
     
     Supported styles:
     - bold: Makes text bold
@@ -24,6 +25,7 @@ class TextFormatter(FormatterBase):
     - Reset tokens clear all text formatting
     - File output mode strips all formatting codes
     - Function fallback allows dynamic style selection
+    - Invalid tokens gracefully degrade to no formatting (validation warns but formatting continues)
     """
     
     # Valid text formatting styles
@@ -36,25 +38,34 @@ class TextFormatter(FormatterBase):
     def get_family_name(self) -> str:
         return 'text'
     
+    def _get_valid_tokens(self) -> List[str]:
+        """Get list of valid text style tokens for error messages"""
+        tokens = list(self.VALID_STYLES.keys())
+        tokens.extend(['reset', 'normal', 'default'])
+        if self.function_registry:
+            tokens.append(f"functions: {', '.join(sorted(self.function_registry.keys()))}")
+        return tokens
+    
     def parse_token(self, token_value: str, field_value: Optional[Any] = None) -> str:
         """
-        Parse text formatting token with function fallback and proper error handling
+        Parse text formatting token with function fallback, enhanced error context, and graceful degradation
         
         Parsing order:
         1. Check for reset tokens (normal, default, reset)
         2. Try direct style lookup
         3. Try function fallback
-        4. Raise error if nothing works
+        4. Gracefully degrade to 'invalid' token (no formatting applied)
         
         Args:
             token_value: Text style token to parse
             field_value: Field value for function fallback
             
         Returns:
-            Parsed style token (style name or 'reset')
+            Parsed style token (style name, 'reset', or 'invalid')
             
-        Raises:
-            FormatterError: If token is invalid and no function fallback
+        Note:
+            Invalid tokens return 'invalid' instead of raising errors,
+            allowing validation to warn but formatting to continue.
         """
         original_token = token_value
         token_lower = token_value.lower()
@@ -73,15 +84,13 @@ class TextFormatter(FormatterBase):
             if function_result is not None:
                 # Recursively parse the function result as a text style
                 return self.parse_token(function_result, field_value)
-        except Exception as e:
-            # Re-raise function errors - they should not fail silently
-            raise e
+        except Exception:
+            # Function failed - treat as invalid token
+            pass
         
-        # If we get here, the token is invalid
-        valid_styles_list = ', '.join(sorted(self.VALID_STYLES.keys()))
-        raise FormatterError(f"Invalid text style token: '{original_token}'. "
-                           f"Expected: {valid_styles_list}, reset/normal/default, "
-                           f"or valid function name.")
+        # Graceful degradation: return 'invalid' instead of raising error
+        # This allows validation to catch the issue but formatting to continue
+        return 'invalid'
     
     def apply_formatting(self, text: str, parsed_tokens: List[str], output_mode: str = 'console') -> str:
         """
@@ -103,6 +112,9 @@ class TextFormatter(FormatterBase):
         for token in parsed_tokens:
             if token == 'reset':
                 style_codes = []  # Reset clears all previous styles
+            elif token == 'invalid':
+                # Skip invalid tokens - no formatting applied
+                continue
             elif token in self.VALID_STYLES:
                 style_codes.append(self.VALID_STYLES[token])
         

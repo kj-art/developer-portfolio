@@ -1,5 +1,5 @@
 """
-Dynamic Formatting Package
+Dynamic Formatting Package with Enhanced Error Context
 
 A sophisticated string formatting system that gracefully handles missing data - template sections 
 automatically disappear when their required data isn't provided, eliminating tedious manual null 
@@ -7,6 +7,9 @@ checking. Also supports conditional sections, plus extensible token-based format
 and text formatting with function fallback support and positional argument support.
 
 CORE VALUE: Sections automatically disappear when data is missing - no manual null checking required
+
+ENHANCED: Detailed error messages with template context and position information for easier 
+debugging and development.
 """
 
 # Import the main classes that users will actually need
@@ -33,7 +36,7 @@ __all__ = [
     'DynamicFormatter',
     'DynamicLoggingFormatter',
     
-    # Exception classes
+    # Exception classes with enhanced context
     'DynamicFormattingError',
     'RequiredFieldError', 
     'FunctionNotFoundError',

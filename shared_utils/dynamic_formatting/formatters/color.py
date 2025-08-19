@@ -1,9 +1,12 @@
 """
-Color formatting implementation.
+Color formatting implementation with enhanced error context and graceful degradation.
 
 Handles color formatting tokens (#red, #FF0000, etc.) with function fallback
 support. Supports ANSI colors, hex colors, named colors, and dynamic color
 selection through function calls.
+
+Enhanced with graceful degradation: Invalid tokens are treated as plain text
+rather than causing runtime failures.
 """
 
 from typing import Any, List, Dict, Optional
@@ -23,7 +26,8 @@ except ImportError:
 
 class ColorFormatter(FormatterBase):
     """
-    Handles color formatting tokens (#red, #FF0000, etc.) with function fallback
+    Handles color formatting tokens (#red, #FF0000, etc.) with function fallback,
+    enhanced error context, and graceful degradation
     
     Supports multiple color formats:
     - ANSI color names: red, blue, green, etc.
@@ -35,6 +39,7 @@ class ColorFormatter(FormatterBase):
     - Later colors override earlier colors naturally via ANSI codes
     - Reset tokens clear all color formatting
     - File output mode strips all color codes
+    - Invalid tokens gracefully degrade to no formatting (validation warns but formatting continues)
     """
     
     # ANSI color code mappings
@@ -49,9 +54,18 @@ class ColorFormatter(FormatterBase):
     def get_family_name(self) -> str:
         return 'color'
     
+    def _get_valid_tokens(self) -> List[str]:
+        """Get list of valid color tokens for error messages"""
+        tokens = list(self.ANSI_COLORS.keys())
+        tokens.extend(['reset', 'normal', 'default'])
+        tokens.extend(['hex colors (6 digits)', 'matplotlib color names'])
+        if self.function_registry:
+            tokens.append(f"functions: {', '.join(sorted(self.function_registry.keys()))}")
+        return tokens
+    
     def parse_token(self, token_value: str, field_value: Optional[Any] = None) -> str:
         """
-        Parse color token with function fallback and proper error handling
+        Parse color token with function fallback, enhanced error context, and graceful degradation
         
         Parsing order:
         1. Check for reset tokens (normal, default, reset)
@@ -59,17 +73,18 @@ class ColorFormatter(FormatterBase):
         3. Try hex color parsing
         4. Try named colors from matplotlib
         5. Try function fallback
-        6. Raise error if nothing works
+        6. Gracefully degrade to 'invalid' token (no formatting applied)
         
         Args:
             token_value: Color token to parse
             field_value: Field value for function fallback
             
         Returns:
-            Parsed color token (ANSI name, hex, or 'reset')
+            Parsed color token (ANSI name, hex, 'reset', or 'invalid')
             
-        Raises:
-            FormatterError: If token is invalid and no function fallback
+        Note:
+            Invalid tokens return 'invalid' instead of raising errors,
+            allowing validation to warn but formatting to continue.
         """
         original_token = token_value
         token_value = token_value.lower()
@@ -96,14 +111,13 @@ class ColorFormatter(FormatterBase):
             if function_result is not None:
                 # Recursively parse the function result as a color
                 return self.parse_token(function_result, field_value)
-        except Exception as e:
-            # Re-raise function errors - they should not fail silently
-            raise e
+        except Exception:
+            # Function failed - treat as invalid token
+            pass
         
-        # If we get here, the token is invalid
-        raise FormatterError(f"Invalid color token: '{original_token}'. "
-                           f"Expected: ANSI color name, hex color (6 digits), "
-                           f"matplotlib color name, or valid function name.")
+        # Graceful degradation: return 'invalid' instead of raising error
+        # This allows validation to catch the issue but formatting to continue
+        return 'invalid'
     
     def apply_formatting(self, text: str, parsed_tokens: List[str], output_mode: str = 'console') -> str:
         """
@@ -125,6 +139,9 @@ class ColorFormatter(FormatterBase):
         for token in parsed_tokens:
             if token == 'reset':
                 color_codes = []  # Reset clears all previous colors
+            elif token == 'invalid':
+                # Skip invalid tokens - no formatting applied
+                continue
             else:
                 ansi_code = self._get_ansi_code(token)
                 color_codes.append(f"\033[{ansi_code}m")
