@@ -1,0 +1,22 @@
+{
+  "validation_mode": "AUTO_CORRECT",
+  "validation_level": "WARNING",
+  "enable_validation": true,
+  "output_mode": "console",
+  "enable_colors": true,
+  "performance_monitoring": {
+    "enabled": true,
+    "memory_tracking": true,
+    "regression_detection": true,
+    "baseline_duration_ms": 0.8,
+    "baseline_memory_mb": 3.0,
+    "regression_threshold": 2.5,
+    "sample_interval": 200
+  },
+  "functions": {
+    "level_color": "lambda level: {'ERROR': 'red', 'WARNING': 'yellow', 'INFO': 'blue', 'DEBUG': 'green'}.get(level.upper(), 'white')",
+    "status_color": "lambda status: 'green' if 200 <= status < 300 else 'red' if status >= 400 else 'yellow'",
+    "is_critical": "lambda level: level.upper() in ['ERROR', 'CRITICAL', 'FATAL']"
+  },
+  "description": "Staging environment configuration with auto-correction capabilities, moderate monitoring, and essential debugging functions for assisted development and production validation testing."
+}

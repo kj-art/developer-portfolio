@@ -1,0 +1,18 @@
+{
+  "validation_mode": "GRACEFUL",
+  "validation_level": "WARNING",
+  "enable_validation": false,
+  "output_mode": "file",
+  "enable_colors": false,
+  "performance_monitoring": {
+    "enabled": true,
+    "memory_tracking": false,
+    "regression_detection": false,
+    "baseline_duration_ms": 0.5,
+    "baseline_memory_mb": 2.0,
+    "regression_threshold": 3.0,
+    "sample_interval": 1000
+  },
+  "functions": {},
+  "description": "Production environment configuration optimized for performance and reliability with graceful degradation, minimal overhead monitoring, and no debugging functions for maximum production stability."
+}
