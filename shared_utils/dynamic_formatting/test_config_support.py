@@ -393,7 +393,7 @@ def test_configuration_examples():
     """Test that configuration examples run without errors"""
     # This would import and run the examples to ensure they work
     try:
-        import examples_config
+        import examples.examples_config as examples_config
         # Test that examples can be imported and basic functionality works
         assert hasattr(examples_config, 'example_config_file_usage')
         assert hasattr(examples_config, 'example_dictionary_config')
