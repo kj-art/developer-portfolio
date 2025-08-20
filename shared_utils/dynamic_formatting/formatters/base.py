@@ -1,19 +1,24 @@
 """
-Base formatter class and common formatting exceptions with enhanced error context.
+Base classes for all formatting implementations.
 
-This module provides the abstract base class that all formatters must
-implement, along with enhanced exception types that provide detailed
-context information for debugging.
+Provides the foundation for color, text style, and conditional formatters
+with function fallback support and enhanced error context.
 """
 
-import inspect
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Callable, Optional, Union
+from typing import Dict, Callable, List, Optional, Any, Union
+import inspect
 
 
 class FormatterError(Exception):
-    """Base exception for formatter errors with enhanced context"""
-    def __init__(self, message: str, token: Optional[str] = None, 
+    """
+    Comprehensive formatter error with enhanced debugging context
+    
+    Provides detailed information about formatting failures including
+    the specific token that failed, available alternatives, and
+    template context for easier debugging.
+    """
+    def __init__(self, message: str, token: Optional[str] = None,
                  formatter_family: Optional[str] = None,
                  template: Optional[str] = None, position: Optional[int] = None,
                  valid_tokens: Optional[List[str]] = None):
@@ -23,71 +28,75 @@ class FormatterError(Exception):
         self.position = position
         self.valid_tokens = valid_tokens or []
         
-        # Build enhanced error message
-        enhanced_message = message
-        if token and formatter_family:
-            enhanced_message = f"Invalid {formatter_family} token: '{token}'"
-            if self.valid_tokens:
-                enhanced_message += f". Valid tokens: {', '.join(sorted(self.valid_tokens))}"
-        
-        if template and position is not None:
-            # Add template context
-            context_start = max(0, position - 15)
-            context_end = min(len(template), position + 15)
-            template_context = template[context_start:context_end]
+        # Build comprehensive error message
+        full_message = message
+        if token:
+            full_message += f"\nToken: '{token}'"
+        if formatter_family:
+            full_message += f"\nFormatter: {formatter_family}"
+        if self.valid_tokens:
+            full_message += f"\nValid tokens: {', '.join(self.valid_tokens[:10])}"
+            if len(self.valid_tokens) > 10:
+                full_message += f" (and {len(self.valid_tokens) - 10} more)"
+        if template:
+            full_message += f"\nTemplate: '{template}'"
+        if position is not None:
+            full_message += f"\nPosition: {position}"
             
-            if context_start > 0:
-                template_context = "..." + template_context
-            if context_end < len(template):
-                template_context = template_context + "..."
-                
-            enhanced_message += f"\nNear: {template_context}"
-        
-        super().__init__(enhanced_message)
+        super().__init__(full_message)
 
 
-class FunctionExecutionError(FormatterError):
-    """Raised when a function fallback fails with enhanced context"""
+class FunctionExecutionError(Exception):
+    """Raised when function execution fails during formatting"""
     def __init__(self, message: str, function_name: Optional[str] = None,
                  original_error: Optional[Exception] = None,
                  template: Optional[str] = None, position: Optional[int] = None):
         self.function_name = function_name
         self.original_error = original_error
+        self.template = template
+        self.position = position
         
-        enhanced_message = message
+        full_message = message
         if function_name:
-            enhanced_message = f"Function '{function_name}' failed: {message}"
-            if original_error:
-                enhanced_message += f" (Original error: {type(original_error).__name__}: {original_error})"
-        
-        super().__init__(enhanced_message, template=template, position=position)
+            full_message += f"\nFunction: '{function_name}'"
+        if original_error:
+            full_message += f"\nOriginal error: {original_error}"
+        if template:
+            full_message += f"\nTemplate: '{template}'"
+        if position is not None:
+            full_message += f"\nPosition: {position}"
+            
+        super().__init__(full_message)
 
 
 class FormatterBase(ABC):
     """
-    Base class for all token formatters with enhanced error context
+    Abstract base class for all formatting implementations
     
-    Each formatter handles a specific family of formatting tokens (e.g., colors,
-    text styles, conditionals) and provides both parsing and application logic.
-    
-    The formatter system supports function fallback - if a token like #level_color
-    isn't a built-in formatter token, the system automatically tries to execute
-    it as a function and re-parse the result.
+    Formatters are organized by "family" (color, text, conditional) and support
+    function fallback - if a token like #level_color isn't a built-in formatter
+    token, the system automatically tries to execute it as a function and 
+    re-parse the result.
     """
     
     def __init__(self) -> None:
         self.function_registry: Dict[str, Callable] = {}  # Will be set by DynamicFormatter
         self.current_template: Optional[str] = None  # For error context
         self.current_position: Optional[int] = None  # For error context
+        self.config = None  # Will be set by DynamicFormatter
     
     def set_function_registry(self, functions: Dict[str, Callable]) -> None:
         """Set available functions for fallback execution"""
-        self.function_registry = functions
+        self.function_registry = functions or {}
     
     def set_error_context(self, template: Optional[str], position: Optional[int]) -> None:
         """Set current template and position for error context"""
         self.current_template = template
         self.current_position = position
+    
+    def set_config(self, config) -> None:
+        """Set formatter configuration"""
+        self.config = config
     
     @abstractmethod
     def parse_token(self, token_value: str, field_value: Optional[Any] = None) -> Union[str, int, bool]:
@@ -166,57 +175,57 @@ class FormatterBase(ABC):
         
         Args:
             token_value: Function name to try
-            field_value: Field value to pass to function
+            field_value: Value to pass to the function
             
         Returns:
-            Function result if successful, None if function doesn't exist
+            Function result as string, or None if function not found
             
         Raises:
-            FunctionExecutionError: If function exists but fails
+            FunctionExecutionError: If function exists but execution fails
         """
         if not self.function_registry or token_value not in self.function_registry:
             return None
         
+        func = self.function_registry[token_value]
+        
         try:
-            func = self.function_registry[token_value]
+            # Inspect function signature to determine how to call it
+            sig = inspect.signature(func)
+            params = list(sig.parameters.keys())
             
-            # Try calling with field_value first, then without arguments
-            try:
-                if field_value is not None:
-                    result = func(field_value)
-                else:
-                    result = func()
-            except TypeError:
-                # Function might not accept field_value parameter
-                try:
-                    result = func()
-                except Exception as e:
-                    raise FunctionExecutionError(
-                        f"Function signature mismatch - function may require parameters",
-                        function_name=token_value,
-                        original_error=e,
-                        template=self.current_template,
-                        position=self.current_position
-                    )
+            if len(params) == 0:
+                # Function takes no parameters
+                result = func()
+            elif len(params) == 1:
+                # Function takes one parameter (the field value)
+                result = func(field_value)
+            else:
+                # Function takes multiple parameters - pass the field value and 
+                # any other context we might have available
+                # For now, just pass the field value to the first parameter
+                result = func(field_value)
             
-            if not isinstance(result, str):
-                raise FunctionExecutionError(
-                    f"Function must return a string, got {type(result).__name__}: {result}",
-                    function_name=token_value,
-                    template=self.current_template,
-                    position=self.current_position
-                )
+            return str(result) if result is not None else None
             
-            return result
-            
-        except FunctionExecutionError:
-            # Re-raise function execution errors
-            raise
         except Exception as e:
             raise FunctionExecutionError(
-                f"Unexpected error during function execution: {e}",
+                f"Function '{token_value}' execution failed",
                 function_name=token_value,
                 original_error=e,
                 template=self.current_template,
                 position=self.current_position
             )
+    
+    def _is_graceful_mode(self) -> bool:
+        """Check if we're in graceful degradation mode"""
+        if self.config and hasattr(self.config, 'validation_mode'):
+            from ..config import ValidationMode
+            return self.config.validation_mode == ValidationMode.GRACEFUL
+        return False
+    
+    def _is_strict_mode(self) -> bool:
+        """Check if we're in strict mode"""
+        if self.config and hasattr(self.config, 'validation_mode'):
+            from ..config import ValidationMode
+            return self.config.validation_mode == ValidationMode.STRICT
+        return True  # Default to strict if no config

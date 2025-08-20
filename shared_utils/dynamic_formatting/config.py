@@ -1,213 +1,75 @@
 """
-Configuration management for dynamic formatting system.
+Configuration management for dynamic formatting with professional deployment support.
 
-Provides enterprise-style configuration handling with validation modes,
-performance settings, and professional deployment options.
+This module provides comprehensive configuration options for different deployment
+scenarios, from development to production, with proper validation and environment
+variable integration.
 """
 
 import json
 import os
-from dataclasses import dataclass, field
-from typing import Dict, Any, Optional, Callable, Union
-from pathlib import Path
+from dataclasses import dataclass, field, asdict
 from enum import Enum
+from pathlib import Path
+from typing import Dict, Any, Callable, Optional, Union
 
 
 class ValidationMode(Enum):
-    """Validation and error handling modes for professional deployment"""
-    STRICT = "strict"           # Invalid tokens cause runtime errors (development)
-    GRACEFUL = "graceful"       # Invalid tokens fall back to safe defaults (production)
-    AUTO_CORRECT = "auto_correct"  # Invalid tokens auto-correct to suggestions (assisted development)
+    """Validation modes for error handling"""
+    STRICT = "strict"      # Raise errors for any issues
+    GRACEFUL = "graceful"  # Handle errors gracefully, continue processing
+    AUTO_CORRECT = "auto_correct"  # Try to auto-correct minor issues
 
 
 class ValidationLevel(Enum):
-    """Minimum validation level to report"""
-    ERROR = "error"     # Only report errors
-    WARNING = "warning" # Report errors and warnings
-    INFO = "info"       # Report everything
-    NONE = "none"       # No validation reporting
+    """Validation strictness levels"""
+    ERROR = "error"      # Only show critical errors
+    WARNING = "warning"  # Show warnings and errors
+    INFO = "info"        # Show all validation messages
 
 
 @dataclass
 class FormatterConfig:
     """
-    Comprehensive configuration for dynamic formatting with enterprise features
+    Comprehensive configuration for dynamic formatting with professional features
     
-    This configuration system enables professional deployment scenarios:
-    - Development: strict mode with full validation for catching issues early
-    - Production: graceful mode with minimal validation for reliability
-    - Assisted Development: auto-correct mode for productivity
-    
-    Example usage:
-        # Development configuration
-        dev_config = FormatterConfig(
-            validation_mode=ValidationMode.STRICT,
-            validation_level=ValidationLevel.INFO,
-            enable_performance_monitoring=True
-        )
-        
-        # Production configuration  
-        prod_config = FormatterConfig(
-            validation_mode=ValidationMode.GRACEFUL,
-            validation_level=ValidationLevel.ERROR,
-            enable_validation=False
-        )
-        
-        # From JSON config file
-        config = FormatterConfig.from_config_file('config.json')
+    Supports different deployment scenarios with appropriate defaults for
+    development, testing, and production environments.
     """
     
-    # Core formatting settings
-    delimiter: str = ';'                            # Token delimiter character
-    output_mode: str = 'console'                    # 'console' or 'file' output mode
-    enable_colors: bool = True                      # Enable ANSI color codes
-    functions: Dict[str, Callable] = field(default_factory=dict)  # Custom function registry
+    # Core formatting options
+    delimiter: str = ';'
+    output_mode: str = 'console'  # 'console' or 'file'
+    enable_colors: bool = True
     
     # Validation and error handling
-    validation_mode: ValidationMode = ValidationMode.GRACEFUL    # How to handle invalid tokens
-    validation_level: ValidationLevel = ValidationLevel.WARNING  # Minimum level to report
-    enable_validation: bool = True                  # Whether to perform validation
+    validation_mode: ValidationMode = ValidationMode.GRACEFUL
+    validation_level: ValidationLevel = ValidationLevel.WARNING
+    enable_validation: bool = True
+    strict_argument_validation: bool = True
     
-    # Performance and monitoring
-    enable_performance_monitoring: bool = False     # Track performance metrics
-    max_recursion_depth: int = 10                   # Maximum template nesting depth
-    max_template_sections: int = 100                # Maximum number of template sections
-    max_template_length: int = 10000                # Maximum template string length
+    # Performance options
+    cache_parsed_templates: bool = True
+    max_template_sections: int = 100
+    
+    # Function registry
+    functions: Dict[str, Callable] = field(default_factory=dict)
     
     # Advanced options
-    strict_argument_validation: bool = True         # Validate positional/keyword mixing
-    auto_correct_suggestions: bool = True           # Enable suggestion system
-    cache_parsed_templates: bool = True             # Cache parsed templates for reuse
+    auto_correct_suggestions: bool = True
+    enable_function_fallback: bool = True
     
     def __post_init__(self):
         """Validate configuration after initialization"""
-        # Convert string enums to proper enum types if needed
+        # Ensure enums are properly set
         if isinstance(self.validation_mode, str):
-            self.validation_mode = ValidationMode(self.validation_mode.lower())
+            self.validation_mode = ValidationMode(self.validation_mode)
         if isinstance(self.validation_level, str):
-            self.validation_level = ValidationLevel(self.validation_level.lower())
+            self.validation_level = ValidationLevel(self.validation_level)
         
-        # Validate numeric limits
-        if self.max_recursion_depth < 1:
-            raise ValueError("max_recursion_depth must be at least 1")
-        if self.max_template_sections < 1:
-            raise ValueError("max_template_sections must be at least 1")
-        if self.max_template_length < 1:
-            raise ValueError("max_template_length must be at least 1")
-        
-        # Validate output mode
-        if self.output_mode not in ['console', 'file']:
-            raise ValueError("output_mode must be 'console' or 'file'")
-    
-    @classmethod
-    def development(cls, **overrides) -> 'FormatterConfig':
-        """
-        Create development configuration with strict validation
-        
-        Best for catching issues early during development with full feedback.
-        """
-        defaults = {
-            'validation_mode': ValidationMode.STRICT,
-            'validation_level': ValidationLevel.INFO,
-            'enable_validation': True,
-            'enable_performance_monitoring': True,
-            'auto_correct_suggestions': True,
-            'strict_argument_validation': True,
-        }
-        defaults.update(overrides)
-        return cls(**defaults)
-    
-    @classmethod
-    def production(cls, **overrides) -> 'FormatterConfig':
-        """
-        Create production configuration with graceful degradation
-        
-        Best for production environments where reliability is critical.
-        """
-        defaults = {
-            'validation_mode': ValidationMode.GRACEFUL,
-            'validation_level': ValidationLevel.ERROR,
-            'enable_validation': False,  # Skip validation in production for performance
-            'enable_performance_monitoring': False,
-            'auto_correct_suggestions': False,
-            'strict_argument_validation': True,
-        }
-        defaults.update(overrides)
-        return cls(**defaults)
-    
-    @classmethod
-    def assisted_development(cls, **overrides) -> 'FormatterConfig':
-        """
-        Create assisted development configuration with auto-correction
-        
-        Best for productivity-focused development with automatic fixes.
-        """
-        defaults = {
-            'validation_mode': ValidationMode.AUTO_CORRECT,
-            'validation_level': ValidationLevel.WARNING,
-            'enable_validation': True,
-            'enable_performance_monitoring': True,
-            'auto_correct_suggestions': True,
-            'strict_argument_validation': False,  # More forgiving
-        }
-        defaults.update(overrides)
-        return cls(**defaults)
-    
-    @classmethod
-    def from_dict(cls, config_dict: Dict[str, Any]) -> 'FormatterConfig':
-        """
-        Create configuration from dictionary (useful for JSON config files)
-
-        Args:
-            config_dict: Dictionary containing configuration values
-
-        Returns:
-            FormatterConfig instance
-
-        Example:
-            config_data = {
-                "validation_mode": "graceful",
-                "validation_level": "warning",
-                "enable_colors": True
-            }
-            config = FormatterConfig.from_dict(config_data)
-        """
-        # Make a copy to avoid modifying the original
-        config_data = config_dict.copy()
-        
-        # Handle nested formatting structure (some configs wrap everything in "formatting")
-        if 'formatting' in config_data and isinstance(config_data['formatting'], dict):
-            # Extract the formatting configuration
-            config_data = config_data['formatting'].copy()
-        
-        # Handle nested performance_monitoring configuration
-        if 'performance_monitoring' in config_data:
-            perf_config = config_data.pop('performance_monitoring')
-            if isinstance(perf_config, dict):
-                # Map nested performance_monitoring fields to flat config parameters
-                if 'enabled' in perf_config:
-                    config_data['enable_performance_monitoring'] = perf_config['enabled']
-                # Note: Other performance_monitoring fields like memory_tracking,
-                # regression_detection, etc. are used by PerformanceMonitor directly,
-                # not by FormatterConfig
-
-        # Handle nested function definitions if present
-        functions = {}
-        if 'functions' in config_data:
-            functions_data = config_data.pop('functions')
-            if isinstance(functions_data, dict):
-                # For now, we can't easily serialize/deserialize actual functions
-                # This would typically be handled by a more sophisticated config system
-                functions = functions_data
-
-        # Filter out any keys that aren't valid FormatterConfig parameters
-        valid_fields = set(cls.__dataclass_fields__.keys())
-        filtered_config = {k: v for k, v in config_data.items() if k in valid_fields}
-
-        # Create config without functions first
-        config = cls(**filtered_config)
-        config.functions = functions
-        return config
+        # Ensure functions is a dict
+        if self.functions is None:
+            self.functions = {}
     
     @classmethod
     def from_config_file(cls, config_path: Union[str, Path]) -> 'FormatterConfig':
@@ -234,156 +96,189 @@ class FormatterConfig:
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON in configuration file {config_path}: {e}")
         
-        return cls.from_dict(config_data)
+        # Handle nested configuration structure
+        if 'formatting' in config_data:
+            # Flatten nested structure
+            flat_config = {}
+            for key, value in config_data.items():
+                if isinstance(value, dict):
+                    flat_config.update(value)
+                else:
+                    flat_config[key] = value
+            config_data = flat_config
+        
+        # Convert string enums back to enum instances
+        if 'validation_mode' in config_data:
+            config_data['validation_mode'] = ValidationMode(config_data['validation_mode'])
+        if 'validation_level' in config_data:
+            config_data['validation_level'] = ValidationLevel(config_data['validation_level'])
+        
+        # Functions can't be serialized, so they're not loaded from config files
+        config_data.pop('functions', None)
+        
+        return cls(**config_data)
+    
+    def to_config_file(self, config_path: Union[str, Path], nested: bool = False) -> None:
+        """
+        Save configuration to JSON file
+        
+        Args:
+            config_path: Path where to save configuration
+            nested: Whether to use nested structure for organization
+            
+        Example:
+            config.to_config_file('configs/production.json', nested=True)
+        """
+        config_path = Path(config_path)
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Convert to dict and handle enums
+        config_dict = asdict(self)
+        config_dict['validation_mode'] = self.validation_mode.value
+        config_dict['validation_level'] = self.validation_level.value
+        
+        # Remove functions (can't be serialized)
+        config_dict.pop('functions', None)
+        
+        if nested:
+            # Organize into logical groups
+            nested_config = {
+                'formatting': {
+                    'delimiter': config_dict.pop('delimiter'),
+                    'output_mode': config_dict.pop('output_mode'),
+                    'enable_colors': config_dict.pop('enable_colors'),
+                },
+                'validation': {
+                    'validation_mode': config_dict.pop('validation_mode'),
+                    'validation_level': config_dict.pop('validation_level'),
+                    'enable_validation': config_dict.pop('enable_validation'),
+                    'strict_argument_validation': config_dict.pop('strict_argument_validation'),
+                },
+                'performance': {
+                    'cache_parsed_templates': config_dict.pop('cache_parsed_templates'),
+                    'max_template_sections': config_dict.pop('max_template_sections'),
+                },
+                'advanced': {
+                    'auto_correct_suggestions': config_dict.pop('auto_correct_suggestions'),
+                    'enable_function_fallback': config_dict.pop('enable_function_fallback'),
+                }
+            }
+            # Add any remaining keys
+            nested_config.update(config_dict)
+            config_dict = nested_config
+        
+        with open(config_path, 'w') as f:
+            json.dump(config_dict, f, indent=2)
     
     @classmethod
-    def from_environment(cls, prefix: str = 'FORMATTER_') -> 'FormatterConfig':
+    def from_environment(cls, prefix: str = "DYNAMIC_FORMATTING") -> 'FormatterConfig':
         """
         Load configuration from environment variables
         
         Args:
-            prefix: Environment variable prefix (default: 'FORMATTER_')
+            prefix: Environment variable prefix
             
         Returns:
             FormatterConfig instance with values from environment
             
         Example:
-            # Set environment variables:
-            # FORMATTER_VALIDATION_MODE=graceful
-            # FORMATTER_OUTPUT_MODE=file
+            # With environment variables:
+            # DYNAMIC_FORMATTING_OUTPUT_MODE=file
+            # DYNAMIC_FORMATTING_ENABLE_COLORS=false
             config = FormatterConfig.from_environment()
         """
-        config_data = {}
+        config_dict = {}
         
         # Map environment variables to config fields
-        env_mapping = {
-            f'{prefix}VALIDATION_MODE': 'validation_mode',
-            f'{prefix}VALIDATION_LEVEL': 'validation_level', 
-            f'{prefix}ENABLE_VALIDATION': 'enable_validation',
-            f'{prefix}OUTPUT_MODE': 'output_mode',
-            f'{prefix}ENABLE_COLORS': 'enable_colors',
-            f'{prefix}ENABLE_PERFORMANCE_MONITORING': 'enable_performance_monitoring',
-            f'{prefix}MAX_RECURSION_DEPTH': 'max_recursion_depth',
-            f'{prefix}MAX_TEMPLATE_SECTIONS': 'max_template_sections',
-            f'{prefix}MAX_TEMPLATE_LENGTH': 'max_template_length',
-            f'{prefix}STRICT_ARGUMENT_VALIDATION': 'strict_argument_validation',
-            f'{prefix}AUTO_CORRECT_SUGGESTIONS': 'auto_correct_suggestions',
-            f'{prefix}CACHE_PARSED_TEMPLATES': 'cache_parsed_templates',
+        env_mappings = {
+            f"{prefix}_DELIMITER": 'delimiter',
+            f"{prefix}_OUTPUT_MODE": 'output_mode',
+            f"{prefix}_ENABLE_COLORS": 'enable_colors',
+            f"{prefix}_VALIDATION_MODE": 'validation_mode',
+            f"{prefix}_VALIDATION_LEVEL": 'validation_level',
+            f"{prefix}_ENABLE_VALIDATION": 'enable_validation',
+            f"{prefix}_STRICT_ARGUMENT_VALIDATION": 'strict_argument_validation',
+            f"{prefix}_CACHE_PARSED_TEMPLATES": 'cache_parsed_templates',
+            f"{prefix}_MAX_TEMPLATE_SECTIONS": 'max_template_sections',
+            f"{prefix}_AUTO_CORRECT_SUGGESTIONS": 'auto_correct_suggestions',
+            f"{prefix}_ENABLE_FUNCTION_FALLBACK": 'enable_function_fallback',
         }
         
-        for env_var, config_field in env_mapping.items():
+        for env_var, config_key in env_mappings.items():
             if env_var in os.environ:
                 value = os.environ[env_var]
                 
-                # Convert string values to appropriate types
-                if config_field in ['enable_validation', 'enable_colors', 'enable_performance_monitoring',
-                                   'strict_argument_validation', 'auto_correct_suggestions', 
-                                   'cache_parsed_templates']:
-                    config_data[config_field] = value.lower() in ('true', '1', 'yes', 'on')
-                elif config_field in ['max_recursion_depth', 'max_template_sections', 'max_template_length']:
-                    config_data[config_field] = int(value)
+                # Type conversion
+                if config_key in ['enable_colors', 'enable_validation', 'strict_argument_validation',
+                                'cache_parsed_templates', 'auto_correct_suggestions', 'enable_function_fallback']:
+                    config_dict[config_key] = value.lower() in ('true', '1', 'yes', 'on')
+                elif config_key == 'max_template_sections':
+                    config_dict[config_key] = int(value)
+                elif config_key == 'validation_mode':
+                    config_dict[config_key] = ValidationMode(value)
+                elif config_key == 'validation_level':
+                    config_dict[config_key] = ValidationLevel(value)
                 else:
-                    config_data[config_field] = value
+                    config_dict[config_key] = value
         
-        return cls.from_dict(config_data)
-    
-    def to_dict(self, include_functions: bool = False) -> Dict[str, Any]:
-        """
-        Convert configuration to dictionary (useful for JSON serialization)
-        
-        Args:
-            include_functions: Whether to include function definitions (default: False)
-            
-        Returns:
-            Dictionary representation of configuration
-        """
-        result = {}
-        
-        for field_name, field_def in self.__dataclass_fields__.items():
-            value = getattr(self, field_name)
-            
-            # Convert enums to string values
-            if isinstance(value, Enum):
-                result[field_name] = value.value
-            elif field_name == 'functions' and not include_functions:
-                # Skip functions unless explicitly requested
-                continue
-            else:
-                result[field_name] = value
-        
-        return result
-    
-    def to_config_file(self, config_path: Union[str, Path], nested: bool = True) -> None:
-        """
-        Save configuration to JSON file
-        
-        Args:
-            config_path: Path where to save the configuration
-            nested: Whether to use nested structure for performance_monitoring
-        """
-        config_path = Path(config_path)
-        
-        config_data = self.to_dict(include_functions=False)
-        
-        if nested and 'enable_performance_monitoring' in config_data:
-            # Convert flat performance monitoring to nested structure
-            perf_enabled = config_data.pop('enable_performance_monitoring')
-            config_data['performance_monitoring'] = {
-                'enabled': perf_enabled
-            }
-        
-        # Ensure directory exists
-        config_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        with open(config_path, 'w') as f:
-            json.dump(config_data, f, indent=2)
-    
-    def copy(self, **overrides) -> 'FormatterConfig':
-        """
-        Create a copy of this configuration with optional overrides
-        
-        Args:
-            **overrides: Configuration fields to override
-            
-        Returns:
-            New FormatterConfig instance
-            
-        Example:
-            dev_config = FormatterConfig.development()
-            test_config = dev_config.copy(output_mode='file', enable_colors=False)
-        """
-        current_config = self.to_dict(include_functions=True)
-        current_config.update(overrides)
-        return self.__class__.from_dict(current_config)
+        return cls(**config_dict)
     
     def is_strict_mode(self) -> bool:
-        """Check if validation mode is strict"""
+        """Check if running in strict validation mode"""
         return self.validation_mode == ValidationMode.STRICT
     
     def is_graceful_mode(self) -> bool:
-        """Check if validation mode is graceful"""
+        """Check if running in graceful degradation mode"""
         return self.validation_mode == ValidationMode.GRACEFUL
     
-    def is_auto_correct_mode(self) -> bool:
-        """Check if validation mode is auto-correct"""
-        return self.validation_mode == ValidationMode.AUTO_CORRECT
-    
     def should_validate(self) -> bool:
-        """Check if validation should be performed"""
-        return self.enable_validation and self.validation_level != ValidationLevel.NONE
+        """Check if validation is enabled"""
+        return self.enable_validation
+    
+    def should_cache_templates(self) -> bool:
+        """Check if template caching is enabled"""
+        return self.cache_parsed_templates
+    
+    def copy(self, **overrides) -> 'FormatterConfig':
+        """Create a copy of this config with optional overrides"""
+        config_dict = asdict(self)
+        config_dict.update(overrides)
+        return FormatterConfig(**config_dict)
 
 
-# Convenience factory functions for common configurations
-def dev_config(**overrides) -> FormatterConfig:
-    """Quick development configuration"""
-    return FormatterConfig.development(**overrides)
+# Predefined configuration templates for common scenarios
+def create_development_config(**overrides) -> FormatterConfig:
+    """Create configuration optimized for development"""
+    return FormatterConfig(
+        validation_mode=ValidationMode.STRICT,
+        validation_level=ValidationLevel.INFO,
+        enable_validation=True,
+        auto_correct_suggestions=True,
+        cache_parsed_templates=False,  # Disable caching for development
+        **overrides
+    )
 
 
-def prod_config(**overrides) -> FormatterConfig:
-    """Quick production configuration"""
-    return FormatterConfig.production(**overrides)
+def create_production_config(**overrides) -> FormatterConfig:
+    """Create configuration optimized for production"""
+    return FormatterConfig(
+        validation_mode=ValidationMode.GRACEFUL,
+        validation_level=ValidationLevel.ERROR,
+        enable_validation=True,
+        auto_correct_suggestions=False,
+        cache_parsed_templates=True,
+        strict_argument_validation=False,  # More lenient in production
+        **overrides
+    )
 
 
-def assisted_config(**overrides) -> FormatterConfig:
-    """Quick assisted development configuration"""
-    return FormatterConfig.assisted_development(**overrides)
+def create_testing_config(**overrides) -> FormatterConfig:
+    """Create configuration optimized for testing"""
+    return FormatterConfig(
+        validation_mode=ValidationMode.STRICT,
+        validation_level=ValidationLevel.WARNING,
+        enable_validation=True,
+        auto_correct_suggestions=False,
+        cache_parsed_templates=False,
+        **overrides
+    )
