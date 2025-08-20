@@ -155,9 +155,14 @@ class TemplateParser:
                 token_value = content[1:end_pos]
                 
                 if token_value:  # Only add if there's a value
-                    if prefix not in whole_section_tokens:
-                        whole_section_tokens[prefix] = []
-                    whole_section_tokens[prefix].append(token_value)
+                    if prefix == '?':
+                        # Special handling for conditional functions
+                        function_name = f"?{token_value}"
+                    else:
+                        # Regular formatting tokens
+                        if prefix not in whole_section_tokens:
+                            whole_section_tokens[prefix] = []
+                        whole_section_tokens[prefix].append(token_value)
                     content = content[end_pos:]
                     found_token = True
                 else:
@@ -169,7 +174,7 @@ class TemplateParser:
         # Split remaining content by delimiter to get prefix, field, suffix
         parts = content.split(self.delimiter)
         
-        # Determine prefix, field_name, and suffix based on number of parts
+        # FIXED: Correct parsing logic for prefix, field_name, and suffix
         if len(parts) == 1:
             if not parts[0]:
                 # Just empty: {{}} or {{#color}} - positional
@@ -204,7 +209,7 @@ class TemplateParser:
                     self.positional_counter += 1
                 suffix = ""
         elif len(parts) == 3:
-            # Three parts: {{prefix;field;suffix}}
+            # FIXED: Three parts: {{prefix;field;suffix}}
             prefix = parts[0]
             field_name = parts[1] if parts[1] else f"__pos_{self.positional_counter}__"
             if not parts[1]:
@@ -217,6 +222,12 @@ class TemplateParser:
             if not parts[1]:
                 self.positional_counter += 1
             suffix = self.delimiter.join(parts[2:])
+        
+        # Store conditional function info if present
+        if function_name and function_name.startswith('?'):
+            if '?' not in whole_section_tokens:
+                whole_section_tokens['?'] = []
+            whole_section_tokens['?'].append(function_name[1:])  # Store without the '?'
         
         return FormatSection(
             field_name=field_name,

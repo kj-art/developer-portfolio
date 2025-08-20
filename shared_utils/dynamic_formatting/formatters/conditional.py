@@ -1,5 +1,5 @@
 """
-Conditional formatter for handling ?function tokens.
+Conditional formatter for ?function conditionals.
 """
 
 from typing import Any, Dict, List
@@ -7,7 +7,7 @@ from .base import BaseFormatter, FormatterError, FunctionExecutionError
 
 
 class ConditionalFormatter(BaseFormatter):
-    """Formatter for conditional tokens (?function_name)"""
+    """Formatter for conditional tokens (?function)"""
     
     def parse_token(self, token: str, field_value: Any) -> Dict[str, Any]:
         """
@@ -18,33 +18,31 @@ class ConditionalFormatter(BaseFormatter):
             field_value: Field value to pass to function
             
         Returns:
-            Dictionary with conditional information
+            Dictionary with conditional result
         """
-        if not token:
-            if self.config and self.config.is_strict_mode():
-                raise FormatterError("Empty conditional function name")
-            return {'type': 'unknown', 'result': False}
-        
         # Check if function exists
         if token not in self.function_registry:
             if self.config and self.config.is_strict_mode():
-                available = list(self.function_registry.keys())
-                raise FormatterError(
-                    f"Conditional function '{token}' not found. "
-                    f"Available functions: {available}"
-                )
-            # In graceful mode, assume false
-            return {'type': 'missing', 'function_name': token, 'result': False}
+                raise FormatterError(f"Conditional function not found: '{token}'")
+            else:
+                # In graceful mode, return False (hide section)
+                return {
+                    'type': 'missing_function',
+                    'function_name': token,
+                    'result': False
+                }
         
-        # Execute the function
+        # Execute the conditional function
         try:
             func = self.function_registry[token]
             result = func(field_value)
+            
             return {
                 'type': 'conditional',
                 'function_name': token,
                 'result': bool(result)
             }
+            
         except Exception as e:
             if self.config and self.config.is_strict_mode():
                 raise FunctionExecutionError(
@@ -52,29 +50,35 @@ class ConditionalFormatter(BaseFormatter):
                     function_name=token,
                     original_error=e
                 )
-            # In graceful mode, assume false
-            return {
-                'type': 'error',
-                'function_name': token,
-                'result': False,
-                'error': str(e)
-            }
+            else:
+                # In graceful mode, return False (hide section)
+                return {
+                    'type': 'function_error',
+                    'function_name': token,
+                    'result': False,
+                    'error': str(e)
+                }
     
     def apply_formatting(self, text: str, parsed_tokens: List[Dict[str, Any]], output_mode: str) -> str:
         """
-        Apply conditional formatting (really just returns text or empty based on condition)
+        Apply conditional formatting (show/hide section based on result)
         
         Args:
-            text: Text to conditionally show
+            text: Text to potentially show/hide
             parsed_tokens: List of parsed conditional tokens
-            output_mode: Output mode (not used for conditionals)
+            output_mode: Output mode ('console' or 'file')
             
         Returns:
-            Text if all conditions are true, empty string otherwise
+            Text if condition is true, empty string if false
         """
-        # All conditional tokens must be true for text to be shown
-        for token in parsed_tokens:
-            if not token.get('result', False):
-                return ""  # Hide the text if any condition is false
+        if not parsed_tokens:
+            return text
         
-        return text  # Show the text if all conditions are true
+        # Use the last conditional result (if multiple conditionals)
+        conditional_token = parsed_tokens[-1]
+        result = conditional_token.get('result', False)
+        
+        if result:
+            return text
+        else:
+            return ""  # Hide the section
