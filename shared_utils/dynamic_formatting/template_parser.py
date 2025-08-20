@@ -120,6 +120,20 @@ class TemplateParser:
         Raises:
             ParseError: If template content is malformed
         """
+        if not content.strip():
+            # Empty content like {{}} is a positional argument
+            field_name = f"__pos_{self.positional_counter}__"
+            self.positional_counter += 1
+            return FormatSection(
+                field_name=field_name,
+                prefix="",
+                suffix="",
+                is_required=False,
+                function_name=None,
+                whole_section_formatting_tokens={},
+                spans=[]
+            )
+        
         # Handle required field marker
         is_required = False
         if content.startswith('!'):
@@ -134,24 +148,20 @@ class TemplateParser:
         while True:
             found_token = False
             
-            # Look for conditional function (?function_name)
-            if content.startswith('?'):
-                end_pos = self._find_token_end(content, 1)
-                function_name = content[1:end_pos]
-                content = content[end_pos:]
-                found_token = True
-            
-            # Look for formatting tokens (#color, @style)
-            elif content and content[0] in self.token_formatters:
+            # Look for any formatter tokens (including ?)
+            if content and content[0] in self.token_formatters:
                 prefix = content[0]
                 end_pos = self._find_token_end(content, 1)
                 token_value = content[1:end_pos]
                 
-                if prefix not in whole_section_tokens:
-                    whole_section_tokens[prefix] = []
-                whole_section_tokens[prefix].append(token_value)
-                content = content[end_pos:]
-                found_token = True
+                if token_value:  # Only add if there's a value
+                    if prefix not in whole_section_tokens:
+                        whole_section_tokens[prefix] = []
+                    whole_section_tokens[prefix].append(token_value)
+                    content = content[end_pos:]
+                    found_token = True
+                else:
+                    break
             
             if not found_token:
                 break
@@ -159,22 +169,21 @@ class TemplateParser:
         # Split remaining content by delimiter to get prefix, field, suffix
         parts = content.split(self.delimiter)
         
-        # Handle positional arguments (empty field name)
-        if len(parts) == 1 and not parts[0]:
-            # Empty template like {{}} - this is a positional argument
-            field_name = f"__pos_{self.positional_counter}__"
-            prefix = ""
-            suffix = ""
-            self.positional_counter += 1
-        elif len(parts) == 1:
-            # Just field name: {{field}}
-            field_name = parts[0] if parts[0] else f"__pos_{self.positional_counter}__"
+        # Determine prefix, field_name, and suffix based on number of parts
+        if len(parts) == 1:
             if not parts[0]:
+                # Just empty: {{}} or {{#color}} - positional
+                field_name = f"__pos_{self.positional_counter}__"
                 self.positional_counter += 1
-            prefix = ""
-            suffix = ""
+                prefix = ""
+                suffix = ""
+            else:
+                # Just field name: {{field}} or {{#color;field}}
+                field_name = parts[0]
+                prefix = ""
+                suffix = ""
         elif len(parts) == 2:
-            # Two parts - could be prefix;field or field;suffix
+            # Two parts - could be prefix;field or field;suffix or prefix; or ;suffix
             if parts[0] and not parts[1]:
                 # Pattern: {{prefix;}} - treat as prefix and positional field
                 prefix = parts[0]

@@ -1,66 +1,90 @@
 """
-Data structures for formatted text spans and template sections.
+Data structures for formatting spans and sections.
 
-These classes represent the parsed structure of templates and manage
-the state needed for applying formatting across different token families.
+This module defines the core data structures used throughout the dynamic
+formatting system for representing parsed template sections and formatting spans.
 """
 
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 
 
 @dataclass
 class FormattedSpan:
     """
-    Represents a span of text with associated formatting tokens
+    Represents a formatted text span with specific styling
     
-    Used for complex inline formatting where different parts of a section
-    can have different formatting applied.
+    This allows for complex inline formatting where different parts
+    of a section can have different colors, styles, etc.
     """
     text: str
-    tokens: Dict[str, List[str]]  # Maps token family to list of tokens
+    formatting_tokens: Dict[str, List[str]]  # prefix -> list of tokens
     
-    def __post_init__(self):
-        # Ensure tokens is a proper dict
-        if not isinstance(self.tokens, dict):
-            self.tokens = {}
+    def __str__(self) -> str:
+        return self.text
+    
+    def is_empty(self) -> bool:
+        """Check if this span contains any text"""
+        return not self.text
 
 
 @dataclass
 class FormatSection:
     """
-    Represents a complete template section like {{prefix;field;suffix}}
+    Represents a complete format section with field, formatting, and structure
     
-    Handles both simple sections (just text with field substitution) and
-    complex sections (with multiple formatted spans).
+    This is the main unit of template processing, containing all information
+    needed to render a section of the template.
     """
-    field_name: str
-    prefix: str = ""
-    suffix: str = ""
-    is_required: bool = False
-    function_name: Optional[str] = None
-    whole_section_formatting_tokens: Optional[Dict[str, List[str]]] = None
-    spans: Optional[List[FormattedSpan]] = None
+    field_name: str  # Name of the field to extract data from
+    prefix: str  # Text before the field value
+    suffix: str  # Text after the field value
+    is_required: bool  # Whether this field is required (marked with !)
+    function_name: Optional[str]  # Name of conditional or other function
+    whole_section_formatting_tokens: Dict[str, List[str]]  # Formatting for entire section
+    spans: List[FormattedSpan]  # For complex inline formatting
     
-    def __post_init__(self):
-        # Ensure default values are proper types
-        if self.whole_section_formatting_tokens is None:
-            self.whole_section_formatting_tokens = {}
-        if self.spans is None:
-            self.spans = []
+    def __str__(self) -> str:
+        return f"FormatSection(field='{self.field_name}', prefix='{self.prefix}', suffix='{self.suffix}')"
     
     def is_simple_section(self) -> bool:
-        """Check if this is a simple section (no complex spans)"""
-        return not self.spans or len(self.spans) == 0
-    
-    def get_text_content(self, field_value: Any) -> str:
-        """Get the basic text content without formatting"""
-        return f"{self.prefix}{field_value}{self.suffix}"
-    
-    def has_conditional(self) -> bool:
-        """Check if this section has a conditional function"""
-        return self.function_name is not None
+        """
+        Check if this is a simple section (no complex spans)
+        
+        Simple sections can be rendered more efficiently as they don't
+        require complex span processing.
+        """
+        return len(self.spans) == 0
     
     def has_formatting(self) -> bool:
         """Check if this section has any formatting tokens"""
         return bool(self.whole_section_formatting_tokens)
+    
+    def get_text_content(self, field_value: Any) -> str:
+        """
+        Get the complete text content for this section
+        
+        Args:
+            field_value: The value of the field
+            
+        Returns:
+            Complete text with prefix + field + suffix
+        """
+        # Convert field value to string
+        if field_value is None:
+            field_str = ""
+        else:
+            field_str = str(field_value)
+        
+        # Combine prefix, field, and suffix
+        return f"{self.prefix}{field_str}{self.suffix}"
+    
+    def is_conditional(self) -> bool:
+        """Check if this section has a conditional function"""
+        return self.function_name is not None and self.function_name.startswith('?')
+    
+    def get_conditional_function_name(self) -> Optional[str]:
+        """Get the name of the conditional function (without '?' prefix)"""
+        if self.is_conditional():
+            return self.function_name[1:]  # Remove '?' prefix
+        return None

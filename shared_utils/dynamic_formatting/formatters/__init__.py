@@ -1,20 +1,27 @@
-from .base import FormatterBase, FormatterError, FunctionExecutionError
+"""
+Formatters module for dynamic formatting system.
+
+This module provides token formatters for colors, text styles, and conditionals.
+"""
+
+from .base import FormatterError, FunctionExecutionError, BaseFormatter
 from .color import ColorFormatter
 from .text import TextFormatter
 from .conditional import ConditionalFormatter
 
+# Registry of all token formatters
 TOKEN_FORMATTERS = {
     '#': ColorFormatter(),
-    '@': TextFormatter(), 
+    '@': TextFormatter(),
     '?': ConditionalFormatter(),
 }
 
 __all__ = [
-    'FormatterBase',
+    'TOKEN_FORMATTERS',
     'FormatterError',
-    'FunctionExecutionError', 
-    'ColorFormatter', 
+    'FunctionExecutionError',
+    'BaseFormatter',
+    'ColorFormatter',
     'TextFormatter',
     'ConditionalFormatter',
-    'TOKEN_FORMATTERS',
 ]

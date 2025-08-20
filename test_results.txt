@@ -3,167 +3,169 @@ platform win32 -- Python 3.12.4, pytest-8.4.1, pluggy-1.6.0 -- C:\Program Files\
 cachedir: .pytest_cache
 rootdir: C:\Users\krjar\OneDrive\work\training\scripting_engineer
 plugins: anyio-4.9.0
-collecting ... collected 207 items
+collecting ... collected 209 items
 
 shared_utils/dynamic_formatting/test_fixes.py::test_basic_formatting PASSED [  0%]
-shared_utils/dynamic_formatting/test_fixes.py::test_missing_data_handling PASSED [  0%]
-shared_utils/dynamic_formatting/test_fixes.py::test_none_value_handling PASSED [  1%]
-shared_utils/dynamic_formatting/test_fixes.py::test_positional_arguments PASSED [  1%]
+shared_utils/dynamic_formatting/test_fixes.py::test_configuration PASSED [  0%]
+shared_utils/dynamic_formatting/test_fixes.py::test_performance_monitoring PASSED [  1%]
+shared_utils/dynamic_formatting/test_fixes.py::test_color_formatting PASSED [  1%]
+shared_utils/dynamic_formatting/test_fixes.py::test_positional_arguments PASSED [  2%]
 shared_utils/dynamic_formatting/test_fixes.py::test_function_fallback PASSED [  2%]
-shared_utils/dynamic_formatting/test_fixes.py::test_conditional_logic PASSED [  2%]
+shared_utils/dynamic_formatting/test_fixes.py::test_conditional_logic PASSED [  3%]
 shared_utils/dynamic_formatting/test_fixes.py::test_output_modes PASSED  [  3%]
-shared_utils/dynamic_formatting/test_fixes.py::test_escape_sequences PASSED [  3%]
-shared_utils/dynamic_formatting/tests/test_actual_config_files.py::TestActualConfigFiles::test_configs_directory_exists PASSED [  4%]
-shared_utils/dynamic_formatting/tests/test_actual_config_files.py::TestActualConfigFiles::test_config_file_valid_json PASSED [  4%]
-shared_utils/dynamic_formatting/tests/test_actual_config_files.py::TestActualConfigFiles::test_config_file_loads_with_formatterconfig FAILED [  5%]
-shared_utils/dynamic_formatting/tests/test_actual_config_files.py::TestActualConfigFiles::test_config_file_creates_working_formatter FAILED [  5%]
-shared_utils/dynamic_formatting/tests/test_actual_config_files.py::TestActualConfigFiles::test_config_files_have_expected_structure PASSED [  6%]
-shared_utils/dynamic_formatting/tests/test_actual_config_files.py::TestActualConfigFiles::test_all_configs_different_settings FAILED [  6%]
-shared_utils/dynamic_formatting/tests/test_actual_config_files.py::TestActualConfigFiles::test_config_round_trip FAILED [  7%]
-shared_utils/dynamic_formatting/tests/test_actual_config_files.py::test_discover_and_run FAILED [  7%]
-shared_utils/dynamic_formatting/tests/test_basic.py::test_import_config PASSED [  8%]
-shared_utils/dynamic_formatting/tests/test_basic.py::test_import_dynamic_formatter PASSED [  8%]
-shared_utils/dynamic_formatting/tests/test_basic.py::test_basic_formatter_creation PASSED [  9%]
-shared_utils/dynamic_formatting/tests/test_basic.py::test_basic_config_creation PASSED [  9%]
-shared_utils/dynamic_formatting/tests/test_basic.py::test_simple_formatting PASSED [ 10%]
-shared_utils/dynamic_formatting/tests/test_config_support.py::TestFormatterConfigFileSupport::test_from_config_file_basic PASSED [ 10%]
+shared_utils/dynamic_formatting/test_fixes.py::test_escape_sequences PASSED [  4%]
+shared_utils/dynamic_formatting/test_fixes.py::test_required_fields PASSED [  4%]
+shared_utils/dynamic_formatting/tests/test_actual_config_files.py::TestActualConfigFiles::test_configs_directory_exists PASSED [  5%]
+shared_utils/dynamic_formatting/tests/test_actual_config_files.py::TestActualConfigFiles::test_config_file_valid_json PASSED [  5%]
+shared_utils/dynamic_formatting/tests/test_actual_config_files.py::TestActualConfigFiles::test_config_file_loads_with_formatterconfig PASSED [  6%]
+shared_utils/dynamic_formatting/tests/test_actual_config_files.py::TestActualConfigFiles::test_config_file_creates_working_formatter PASSED [  6%]
+shared_utils/dynamic_formatting/tests/test_actual_config_files.py::TestActualConfigFiles::test_config_files_have_expected_structure PASSED [  7%]
+shared_utils/dynamic_formatting/tests/test_actual_config_files.py::TestActualConfigFiles::test_all_configs_different_settings PASSED [  7%]
+shared_utils/dynamic_formatting/tests/test_actual_config_files.py::TestActualConfigFiles::test_config_round_trip PASSED [  8%]
+shared_utils/dynamic_formatting/tests/test_actual_config_files.py::test_discover_and_run PASSED [  8%]
+shared_utils/dynamic_formatting/tests/test_basic.py::test_import_config PASSED [  9%]
+shared_utils/dynamic_formatting/tests/test_basic.py::test_import_dynamic_formatter PASSED [  9%]
+shared_utils/dynamic_formatting/tests/test_basic.py::test_basic_formatter_creation PASSED [ 10%]
+shared_utils/dynamic_formatting/tests/test_basic.py::test_basic_config_creation PASSED [ 10%]
+shared_utils/dynamic_formatting/tests/test_basic.py::test_simple_formatting PASSED [ 11%]
+shared_utils/dynamic_formatting/tests/test_config_support.py::TestFormatterConfigFileSupport::test_from_config_file_basic PASSED [ 11%]
 shared_utils/dynamic_formatting/tests/test_config_support.py::TestFormatterConfigFileSupport::test_from_config_file_flat_structure PASSED [ 11%]
-shared_utils/dynamic_formatting/tests/test_config_support.py::TestFormatterConfigFileSupport::test_from_config_file_not_found PASSED [ 11%]
+shared_utils/dynamic_formatting/tests/test_config_support.py::TestFormatterConfigFileSupport::test_from_config_file_not_found PASSED [ 12%]
 shared_utils/dynamic_formatting/tests/test_config_support.py::TestFormatterConfigFileSupport::test_from_config_file_invalid_json FAILED [ 12%]
-shared_utils/dynamic_formatting/tests/test_config_support.py::TestFormatterConfigFileSupport::test_to_config_file_nested FAILED [ 12%]
+shared_utils/dynamic_formatting/tests/test_config_support.py::TestFormatterConfigFileSupport::test_to_config_file_nested FAILED [ 13%]
 shared_utils/dynamic_formatting/tests/test_config_support.py::TestFormatterConfigFileSupport::test_to_config_file_flat PASSED [ 13%]
-shared_utils/dynamic_formatting/tests/test_config_support.py::TestFormatterConfigEnvironment::test_from_environment_basic FAILED [ 13%]
+shared_utils/dynamic_formatting/tests/test_config_support.py::TestFormatterConfigEnvironment::test_from_environment_basic PASSED [ 14%]
 shared_utils/dynamic_formatting/tests/test_config_support.py::TestFormatterConfigEnvironment::test_from_environment_custom_prefix FAILED [ 14%]
-shared_utils/dynamic_formatting/tests/test_config_support.py::TestFormatterConfigEnvironment::test_from_environment_empty PASSED [ 14%]
-shared_utils/dynamic_formatting/tests/test_config_support.py::TestDynamicFormatterConfigMethods::test_from_config_file PASSED [ 14%]
-shared_utils/dynamic_formatting/tests/test_config_support.py::TestDynamicFormatterConfigMethods::test_from_config_dict FAILED [ 15%]
-shared_utils/dynamic_formatting/tests/test_config_support.py::TestDynamicFormatterConfigMethods::test_from_config_formatter_config FAILED [ 15%]
-shared_utils/dynamic_formatting/tests/test_config_support.py::TestDynamicFormatterConfigMethods::test_from_config_file_path FAILED [ 16%]
-shared_utils/dynamic_formatting/tests/test_config_support.py::TestDynamicFormatterConfigMethods::test_from_config_invalid_type FAILED [ 16%]
-shared_utils/dynamic_formatting/tests/test_config_support.py::TestDynamicFormatterConfigMethods::test_from_environment PASSED [ 17%]
-shared_utils/dynamic_formatting/tests/test_config_support.py::TestConfigurationIntegration::test_deployment_scenario_development FAILED [ 17%]
-shared_utils/dynamic_formatting/tests/test_config_support.py::TestConfigurationIntegration::test_deployment_scenario_production FAILED [ 18%]
-shared_utils/dynamic_formatting/tests/test_config_support.py::TestConfigurationIntegration::test_deployment_scenario_file_output FAILED [ 18%]
-shared_utils/dynamic_formatting/tests/test_config_support.py::TestConfigurationIntegration::test_configuration_roundtrip PASSED [ 19%]
-shared_utils/dynamic_formatting/tests/test_config_support.py::test_configuration_examples PASSED [ 19%]
-shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestBasicFormatting::test_simple_keyword_formatting PASSED [ 20%]
-shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestBasicFormatting::test_multiple_fields PASSED [ 20%]
-shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestBasicFormatting::test_empty_template PASSED [ 21%]
-shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestBasicFormatting::test_literal_text_only PASSED [ 21%]
+shared_utils/dynamic_formatting/tests/test_config_support.py::TestFormatterConfigEnvironment::test_from_environment_empty PASSED [ 15%]
+shared_utils/dynamic_formatting/tests/test_config_support.py::TestDynamicFormatterConfigMethods::test_from_config_file PASSED [ 15%]
+shared_utils/dynamic_formatting/tests/test_config_support.py::TestDynamicFormatterConfigMethods::test_from_config_dict PASSED [ 16%]
+shared_utils/dynamic_formatting/tests/test_config_support.py::TestDynamicFormatterConfigMethods::test_from_config_formatter_config FAILED [ 16%]
+shared_utils/dynamic_formatting/tests/test_config_support.py::TestDynamicFormatterConfigMethods::test_from_config_file_path PASSED [ 17%]
+shared_utils/dynamic_formatting/tests/test_config_support.py::TestDynamicFormatterConfigMethods::test_from_config_invalid_type PASSED [ 17%]
+shared_utils/dynamic_formatting/tests/test_config_support.py::TestDynamicFormatterConfigMethods::test_from_environment PASSED [ 18%]
+shared_utils/dynamic_formatting/tests/test_config_support.py::TestConfigurationIntegration::test_deployment_scenario_development FAILED [ 18%]
+shared_utils/dynamic_formatting/tests/test_config_support.py::TestConfigurationIntegration::test_deployment_scenario_production FAILED [ 19%]
+shared_utils/dynamic_formatting/tests/test_config_support.py::TestConfigurationIntegration::test_deployment_scenario_file_output FAILED [ 19%]
+shared_utils/dynamic_formatting/tests/test_config_support.py::TestConfigurationIntegration::test_configuration_roundtrip PASSED [ 20%]
+shared_utils/dynamic_formatting/tests/test_config_support.py::test_configuration_examples PASSED [ 20%]
+shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestBasicFormatting::test_simple_keyword_formatting PASSED [ 21%]
+shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestBasicFormatting::test_multiple_fields PASSED [ 21%]
+shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestBasicFormatting::test_empty_template PASSED [ 22%]
+shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestBasicFormatting::test_literal_text_only PASSED [ 22%]
 shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestMissingDataHandling::test_single_missing_field PASSED [ 22%]
-shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestMissingDataHandling::test_partial_missing_fields PASSED [ 22%]
+shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestMissingDataHandling::test_partial_missing_fields PASSED [ 23%]
 shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestMissingDataHandling::test_all_fields_missing PASSED [ 23%]
-shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestMissingDataHandling::test_complex_missing_data_scenario PASSED [ 23%]
+shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestMissingDataHandling::test_complex_missing_data_scenario PASSED [ 24%]
 shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestColorFormatting::test_basic_ansi_colors FAILED [ 24%]
-shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestColorFormatting::test_hex_colors FAILED [ 24%]
+shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestColorFormatting::test_hex_colors FAILED [ 25%]
 shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestColorFormatting::test_color_override_behavior FAILED [ 25%]
-shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestColorFormatting::test_file_mode_strips_colors FAILED [ 25%]
+shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestColorFormatting::test_file_mode_strips_colors FAILED [ 26%]
 shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestTextFormatting::test_individual_text_styles FAILED [ 26%]
-shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestTextFormatting::test_combined_text_styles FAILED [ 26%]
+shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestTextFormatting::test_combined_text_styles FAILED [ 27%]
 shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestTextFormatting::test_text_style_reset FAILED [ 27%]
-shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestConditionalFormatting::test_section_level_conditionals FAILED [ 27%]
+shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestConditionalFormatting::test_section_level_conditionals FAILED [ 28%]
 shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestConditionalFormatting::test_inline_conditionals FAILED [ 28%]
-shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestConditionalFormatting::test_missing_conditional_function FAILED [ 28%]
-shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestRequiredFields::test_required_field_present FAILED [ 28%]
-shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestRequiredFields::test_required_field_missing PASSED [ 29%]
-shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestEscapeSequences::test_escaped_braces PASSED [ 29%]
-shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestEscapeSequences::test_escaped_delimiters PASSED [ 30%]
-shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestEscapeSequences::test_mixed_escaping PASSED [ 30%]
-shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestCustomDelimiters::test_pipe_delimiter FAILED [ 31%]
-shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestCustomDelimiters::test_double_colon_delimiter FAILED [ 31%]
-shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestComplexCombinations::test_all_features_combined FAILED [ 32%]
-shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestComplexCombinations::test_nested_function_dependencies FAILED [ 32%]
+shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestConditionalFormatting::test_missing_conditional_function FAILED [ 29%]
+shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestRequiredFields::test_required_field_present FAILED [ 29%]
+shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestRequiredFields::test_required_field_missing PASSED [ 30%]
+shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestEscapeSequences::test_escaped_braces PASSED [ 30%]
+shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestEscapeSequences::test_escaped_delimiters PASSED [ 31%]
+shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestEscapeSequences::test_mixed_escaping PASSED [ 31%]
+shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestCustomDelimiters::test_pipe_delimiter FAILED [ 32%]
+shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestCustomDelimiters::test_double_colon_delimiter FAILED [ 32%]
+shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestComplexCombinations::test_all_features_combined FAILED [ 33%]
+shared_utils/dynamic_formatting/tests/test_core_formatting.py::TestComplexCombinations::test_nested_function_dependencies FAILED [ 33%]
 shared_utils/dynamic_formatting/tests/test_error_handling.py::TestParsingErrors::test_unclosed_template_section PASSED [ 33%]
-shared_utils/dynamic_formatting/tests/test_error_handling.py::TestParsingErrors::test_empty_template_sections FAILED [ 33%]
+shared_utils/dynamic_formatting/tests/test_error_handling.py::TestParsingErrors::test_empty_template_sections FAILED [ 34%]
 shared_utils/dynamic_formatting/tests/test_error_handling.py::TestRequiredFieldErrors::test_required_field_missing_keyword PASSED [ 34%]
-shared_utils/dynamic_formatting/tests/test_error_handling.py::TestRequiredFieldErrors::test_required_field_missing_positional PASSED [ 34%]
+shared_utils/dynamic_formatting/tests/test_error_handling.py::TestRequiredFieldErrors::test_required_field_missing_positional PASSED [ 35%]
 shared_utils/dynamic_formatting/tests/test_error_handling.py::TestRequiredFieldErrors::test_required_field_with_none_value PASSED [ 35%]
-shared_utils/dynamic_formatting/tests/test_error_handling.py::TestFormatterErrors::test_invalid_color_token FAILED [ 35%]
+shared_utils/dynamic_formatting/tests/test_error_handling.py::TestFormatterErrors::test_invalid_color_token FAILED [ 36%]
 shared_utils/dynamic_formatting/tests/test_error_handling.py::TestFormatterErrors::test_invalid_text_style_token FAILED [ 36%]
-shared_utils/dynamic_formatting/tests/test_error_handling.py::TestFormatterErrors::test_malformed_hex_color FAILED [ 36%]
+shared_utils/dynamic_formatting/tests/test_error_handling.py::TestFormatterErrors::test_malformed_hex_color FAILED [ 37%]
 shared_utils/dynamic_formatting/tests/test_error_handling.py::TestFunctionErrors::test_missing_function FAILED [ 37%]
-shared_utils/dynamic_formatting/tests/test_error_handling.py::TestFunctionErrors::test_function_execution_failure FAILED [ 37%]
+shared_utils/dynamic_formatting/tests/test_error_handling.py::TestFunctionErrors::test_function_execution_failure FAILED [ 38%]
 shared_utils/dynamic_formatting/tests/test_error_handling.py::TestFunctionErrors::test_function_wrong_return_type FAILED [ 38%]
-shared_utils/dynamic_formatting/tests/test_error_handling.py::TestFunctionErrors::test_conditional_function_not_found FAILED [ 38%]
+shared_utils/dynamic_formatting/tests/test_error_handling.py::TestFunctionErrors::test_conditional_function_not_found FAILED [ 39%]
 shared_utils/dynamic_formatting/tests/test_error_handling.py::TestArgumentErrors::test_mixed_positional_keyword_args PASSED [ 39%]
-shared_utils/dynamic_formatting/tests/test_error_handling.py::TestArgumentErrors::test_too_many_positional_args PASSED [ 39%]
+shared_utils/dynamic_formatting/tests/test_error_handling.py::TestArgumentErrors::test_too_many_positional_args PASSED [ 40%]
 shared_utils/dynamic_formatting/tests/test_error_handling.py::TestEdgeCases::test_empty_string_formatting PASSED [ 40%]
-shared_utils/dynamic_formatting/tests/test_error_handling.py::TestEdgeCases::test_none_value_handling PASSED [ 40%]
+shared_utils/dynamic_formatting/tests/test_error_handling.py::TestEdgeCases::test_none_value_handling PASSED [ 41%]
 shared_utils/dynamic_formatting/tests/test_error_handling.py::TestEdgeCases::test_numeric_field_values PASSED [ 41%]
-shared_utils/dynamic_formatting/tests/test_error_handling.py::TestEdgeCases::test_boolean_field_values PASSED [ 41%]
+shared_utils/dynamic_formatting/tests/test_error_handling.py::TestEdgeCases::test_boolean_field_values PASSED [ 42%]
 shared_utils/dynamic_formatting/tests/test_error_handling.py::TestEdgeCases::test_unicode_and_special_characters PASSED [ 42%]
-shared_utils/dynamic_formatting/tests/test_error_handling.py::TestOutputModeEdgeCases::test_output_mode_switching FAILED [ 42%]
-shared_utils/dynamic_formatting/tests/test_error_handling.py::TestLoggingFormatterErrors::test_logging_formatter_with_malformed_template FAILED [ 42%]
-shared_utils/dynamic_formatting/tests/test_error_handling.py::TestLoggingFormatterErrors::test_logging_formatter_with_missing_functions FAILED [ 43%]
-shared_utils/dynamic_formatting/tests/test_error_handling.py::TestGracefulDegradation::test_partial_template_success FAILED [ 43%]
+shared_utils/dynamic_formatting/tests/test_error_handling.py::TestOutputModeEdgeCases::test_output_mode_switching FAILED [ 43%]
+shared_utils/dynamic_formatting/tests/test_error_handling.py::TestLoggingFormatterErrors::test_logging_formatter_with_malformed_template FAILED [ 43%]
+shared_utils/dynamic_formatting/tests/test_error_handling.py::TestLoggingFormatterErrors::test_logging_formatter_with_missing_functions FAILED [ 44%]
+shared_utils/dynamic_formatting/tests/test_error_handling.py::TestGracefulDegradation::test_partial_template_success FAILED [ 44%]
 shared_utils/dynamic_formatting/tests/test_error_handling.py::TestGracefulDegradation::test_function_fallback_chain_failure FAILED [ 44%]
-shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestColorFunctionFallback::test_basic_color_function FAILED [ 44%]
+shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestColorFunctionFallback::test_basic_color_function FAILED [ 45%]
 shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestColorFunctionFallback::test_color_function_with_field_value FAILED [ 45%]
-shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestColorFunctionFallback::test_color_function_returns_hex FAILED [ 45%]
+shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestColorFunctionFallback::test_color_function_returns_hex FAILED [ 46%]
 shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestColorFunctionFallback::test_color_function_returns_ansi_name FAILED [ 46%]
-shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestTextFunctionFallback::test_basic_text_function FAILED [ 46%]
+shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestTextFunctionFallback::test_basic_text_function FAILED [ 47%]
 shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestTextFunctionFallback::test_text_function_with_field_content FAILED [ 47%]
-shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestConditionalFunctionFallback::test_basic_conditional_function FAILED [ 47%]
+shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestConditionalFunctionFallback::test_basic_conditional_function FAILED [ 48%]
 shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestConditionalFunctionFallback::test_conditional_function_with_complex_logic FAILED [ 48%]
-shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestConditionalFunctionFallback::test_conditional_receives_field_value FAILED [ 48%]
+shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestConditionalFunctionFallback::test_conditional_receives_field_value FAILED [ 49%]
 shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestCombinedFunctionFallback::test_color_and_text_functions_combined FAILED [ 49%]
-shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestCombinedFunctionFallback::test_all_function_types_combined FAILED [ 49%]
+shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestCombinedFunctionFallback::test_all_function_types_combined FAILED [ 50%]
 shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestFunctionParameterHandling::test_function_receives_field_value FAILED [ 50%]
-shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestFunctionParameterHandling::test_function_with_no_parameters FAILED [ 50%]
+shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestFunctionParameterHandling::test_function_with_no_parameters FAILED [ 51%]
 shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestFunctionParameterHandling::test_function_parameter_type_handling FAILED [ 51%]
-shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestFunctionErrorHandling::test_function_not_found_error FAILED [ 51%]
+shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestFunctionErrorHandling::test_function_not_found_error FAILED [ 52%]
 shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestFunctionErrorHandling::test_function_execution_error FAILED [ 52%]
-shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestFunctionErrorHandling::test_function_returns_invalid_type FAILED [ 52%]
+shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestFunctionErrorHandling::test_function_returns_invalid_type FAILED [ 53%]
 shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestFunctionErrorHandling::test_conditional_function_not_found FAILED [ 53%]
-shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestRecursiveFunctionFallback::test_function_returns_another_token FAILED [ 53%]
+shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestRecursiveFunctionFallback::test_function_returns_another_token FAILED [ 54%]
 shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestRecursiveFunctionFallback::test_function_returns_hex_color FAILED [ 54%]
-shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestComplexFunctionScenarios::test_log_level_formatting FAILED [ 54%]
+shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestComplexFunctionScenarios::test_log_level_formatting FAILED [ 55%]
 shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestComplexFunctionScenarios::test_performance_monitoring_scenario FAILED [ 55%]
 shared_utils/dynamic_formatting/tests/test_performance.py::TestBasicPerformance::test_template_compilation_speed PASSED [ 55%]
 shared_utils/dynamic_formatting/tests/test_performance.py::TestBasicPerformance::test_formatting_speed_simple PASSED [ 56%]
 shared_utils/dynamic_formatting/tests/test_performance.py::TestBasicPerformance::test_formatting_speed_complex PASSED [ 56%]
 shared_utils/dynamic_formatting/tests/test_performance.py::TestScalabilityTests::test_many_template_sections FAILED [ 57%]
 shared_utils/dynamic_formatting/tests/test_performance.py::TestScalabilityTests::test_large_field_values PASSED [ 57%]
-shared_utils/dynamic_formatting/tests/test_performance.py::TestScalabilityTests::test_many_positional_arguments PASSED [ 57%]
+shared_utils/dynamic_formatting/tests/test_performance.py::TestScalabilityTests::test_many_positional_arguments PASSED [ 58%]
 shared_utils/dynamic_formatting/tests/test_performance.py::TestMemoryUsage::test_memory_usage_template_compilation PASSED [ 58%]
-shared_utils/dynamic_formatting/tests/test_performance.py::TestMemoryUsage::test_memory_usage_formatting_operations PASSED [ 58%]
+shared_utils/dynamic_formatting/tests/test_performance.py::TestMemoryUsage::test_memory_usage_formatting_operations PASSED [ 59%]
 shared_utils/dynamic_formatting/tests/test_performance.py::TestMemoryUsage::test_formatter_reuse_memory_efficiency FAILED [ 59%]
-shared_utils/dynamic_formatting/tests/test_performance.py::TestFunctionPerformance::test_function_call_overhead FAILED [ 59%]
+shared_utils/dynamic_formatting/tests/test_performance.py::TestFunctionPerformance::test_function_call_overhead PASSED [ 60%]
 shared_utils/dynamic_formatting/tests/test_performance.py::TestFunctionPerformance::test_complex_function_performance PASSED [ 60%]
-shared_utils/dynamic_formatting/tests/test_performance.py::TestFunctionPerformance::test_function_registry_lookup_performance PASSED [ 60%]
+shared_utils/dynamic_formatting/tests/test_performance.py::TestFunctionPerformance::test_function_registry_lookup_performance PASSED [ 61%]
 shared_utils/dynamic_formatting/tests/test_performance.py::TestConcurrencyPerformance::test_formatter_concurrent_reuse PASSED [ 61%]
-shared_utils/dynamic_formatting/tests/test_performance.py::TestRegressionPerformance::test_simple_template_baseline PASSED [ 61%]
+shared_utils/dynamic_formatting/tests/test_performance.py::TestRegressionPerformance::test_simple_template_baseline PASSED [ 62%]
 shared_utils/dynamic_formatting/tests/test_performance.py::TestRegressionPerformance::test_complex_template_baseline PASSED [ 62%]
-shared_utils/dynamic_formatting/tests/test_performance.py::TestRegressionPerformance::test_positional_args_performance_parity FAILED [ 62%]
+shared_utils/dynamic_formatting/tests/test_performance.py::TestRegressionPerformance::test_positional_args_performance_parity PASSED [ 63%]
 shared_utils/dynamic_formatting/tests/test_performance.py::TestMemoryLeakDetection::test_formatter_creation_leak PASSED [ 63%]
-shared_utils/dynamic_formatting/tests/test_performance.py::TestMemoryLeakDetection::test_function_registry_leak PASSED [ 63%]
+shared_utils/dynamic_formatting/tests/test_performance.py::TestMemoryLeakDetection::test_function_registry_leak PASSED [ 64%]
 shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceMetrics::test_metrics_creation FAILED [ 64%]
-shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceMetrics::test_metrics_serialization FAILED [ 64%]
+shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceMetrics::test_metrics_serialization FAILED [ 65%]
 shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceStats::test_stats_aggregation FAILED [ 65%]
-shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceStats::test_stats_serialization FAILED [ 65%]
+shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceStats::test_stats_serialization FAILED [ 66%]
 shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceMonitor::test_monitor_disabled PASSED [ 66%]
-shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceMonitor::test_basic_tracking PASSED [ 66%]
-shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceMonitor::test_multiple_operations PASSED [ 67%]
-shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceMonitor::test_threshold_logging PASSED [ 67%]
-shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceMonitor::test_regression_detection PASSED [ 68%]
+shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceMonitor::test_basic_tracking FAILED [ 66%]
+shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceMonitor::test_multiple_operations FAILED [ 67%]
+shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceMonitor::test_threshold_logging FAILED [ 67%]
+shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceMonitor::test_regression_detection FAILED [ 68%]
 shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceMonitor::test_stats_export FAILED [ 68%]
-shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceMonitor::test_thread_safety PASSED [ 69%]
+shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceMonitor::test_thread_safety FAILED [ 69%]
 shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestDynamicFormatterIntegration::test_formatter_without_monitor PASSED [ 69%]
-shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestDynamicFormatterIntegration::test_formatter_with_monitor PASSED [ 70%]
+shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestDynamicFormatterIntegration::test_formatter_with_monitor FAILED [ 70%]
 shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestDynamicFormatterIntegration::test_detailed_tracking FAILED [ 70%]
 shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestDynamicFormatterIntegration::test_production_formatter_creation FAILED [ 71%]
-shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestDynamicFormatterIntegration::test_development_formatter_creation PASSED [ 71%]
-shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestProductionScenarios::test_high_volume_operations FAILED [ 71%]
-shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestProductionScenarios::test_memory_monitoring_accuracy PASSED [ 72%]
-shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestProductionScenarios::test_alerting_integration PASSED [ 72%]
-shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestEdgeCases::test_monitor_with_exceptions PASSED [ 73%]
-shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestEdgeCases::test_concurrent_access PASSED [ 73%]
-shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestEdgeCases::test_very_fast_operations PASSED [ 74%]
-shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestEdgeCases::test_memory_monitoring_failure FAILED [ 74%]
+shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestDynamicFormatterIntegration::test_development_formatter_creation FAILED [ 71%]
+shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestProductionScenarios::test_high_volume_operations FAILED [ 72%]
+shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestProductionScenarios::test_memory_monitoring_accuracy FAILED [ 72%]
+shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestProductionScenarios::test_alerting_integration FAILED [ 73%]
+shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestEdgeCases::test_monitor_with_exceptions FAILED [ 73%]
+shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestEdgeCases::test_concurrent_access FAILED [ 74%]
+shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestEdgeCases::test_very_fast_operations FAILED [ 74%]
+shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestEdgeCases::test_memory_monitoring_failure FAILED [ 75%]
 shared_utils/dynamic_formatting/tests/test_positional_args.py::TestBasicPositionalArgs::test_single_positional_field PASSED [ 75%]
-shared_utils/dynamic_formatting/tests/test_positional_args.py::TestBasicPositionalArgs::test_multiple_positional_fields PASSED [ 75%]
+shared_utils/dynamic_formatting/tests/test_positional_args.py::TestBasicPositionalArgs::test_multiple_positional_fields PASSED [ 76%]
 shared_utils/dynamic_formatting/tests/test_positional_args.py::TestBasicPositionalArgs::test_positional_with_prefix PASSED [ 76%]
-shared_utils/dynamic_formatting/tests/test_positional_args.py::TestBasicPositionalArgs::test_positional_with_suffix PASSED [ 76%]
+shared_utils/dynamic_formatting/tests/test_positional_args.py::TestBasicPositionalArgs::test_positional_with_suffix PASSED [ 77%]
 shared_utils/dynamic_formatting/tests/test_positional_args.py::TestBasicPositionalArgs::test_positional_with_prefix_and_suffix PASSED [ 77%]
 shared_utils/dynamic_formatting/tests/test_positional_args.py::TestPositionalMissingData::test_fewer_args_than_sections PASSED [ 77%]
 shared_utils/dynamic_formatting/tests/test_positional_args.py::TestPositionalMissingData::test_no_arguments_provided FAILED [ 78%]
@@ -182,11 +184,11 @@ shared_utils/dynamic_formatting/tests/test_positional_args.py::TestPositionalWit
 shared_utils/dynamic_formatting/tests/test_positional_args.py::TestPositionalErrorConditions::test_mixed_positional_and_keyword_args PASSED [ 84%]
 shared_utils/dynamic_formatting/tests/test_positional_args.py::TestPositionalErrorConditions::test_too_many_positional_arguments PASSED [ 85%]
 shared_utils/dynamic_formatting/tests/test_positional_args.py::TestPositionalErrorConditions::test_required_positional_field_missing FAILED [ 85%]
-shared_utils/dynamic_formatting/tests/test_positional_args.py::TestPositionalErrorConditions::test_missing_conditional_function_positional FAILED [ 85%]
+shared_utils/dynamic_formatting/tests/test_positional_args.py::TestPositionalErrorConditions::test_missing_conditional_function_positional FAILED [ 86%]
 shared_utils/dynamic_formatting/tests/test_positional_args.py::TestPositionalEdgeCases::test_empty_template_with_positional_args FAILED [ 86%]
-shared_utils/dynamic_formatting/tests/test_positional_args.py::TestPositionalEdgeCases::test_literal_only_template_with_positional_args FAILED [ 86%]
+shared_utils/dynamic_formatting/tests/test_positional_args.py::TestPositionalEdgeCases::test_literal_only_template_with_positional_args FAILED [ 87%]
 shared_utils/dynamic_formatting/tests/test_positional_args.py::TestPositionalEdgeCases::test_mixed_positional_and_named_sections PASSED [ 87%]
-shared_utils/dynamic_formatting/tests/test_positional_args.py::TestPositionalEdgeCases::test_zero_positional_sections_with_args FAILED [ 87%]
+shared_utils/dynamic_formatting/tests/test_positional_args.py::TestPositionalEdgeCases::test_zero_positional_sections_with_args PASSED [ 88%]
 shared_utils/dynamic_formatting/tests/test_positional_args.py::TestPositionalSyntaxPatterns::test_all_positional_syntax_variations FAILED [ 88%]
 shared_utils/dynamic_formatting/tests/test_positional_args.py::TestPositionalSyntaxPatterns::test_complex_positional_combinations FAILED [ 88%]
 shared_utils/dynamic_formatting/tests/test_positional_args.py::TestBackwardCompatibility::test_keyword_args_still_work PASSED [ 89%]
@@ -207,435 +209,17 @@ shared_utils/dynamic_formatting/tests/test_positional_regression.py::test_error_
 shared_utils/dynamic_formatting/tests/test_positional_regression.py::test_error_conditions_required_fields PASSED [ 96%]
 shared_utils/dynamic_formatting/tests/test_positional_regression.py::test_error_conditions_missing_functions FAILED [ 97%]
 shared_utils/dynamic_formatting/tests/test_positional_regression.py::test_edge_cases_empty_arguments PASSED [ 97%]
-shared_utils/dynamic_formatting/tests/test_positional_regression.py::test_edge_cases_zero_positional_sections FAILED [ 98%]
+shared_utils/dynamic_formatting/tests/test_positional_regression.py::test_edge_cases_zero_positional_sections PASSED [ 98%]
 shared_utils/dynamic_formatting/tests/test_positional_regression.py::test_edge_cases_mixed_template PASSED [ 98%]
 shared_utils/dynamic_formatting/tests/test_positional_regression.py::test_logging_formatter_compatibility FAILED [ 99%]
 shared_utils/dynamic_formatting/tests/test_positional_regression.py::test_performance_large_positional PASSED [ 99%]
 shared_utils/dynamic_formatting/tests/test_positional_regression.py::test_all_syntax_patterns FAILED [100%]
 
 ================================== FAILURES ===================================
-______ TestActualConfigFiles.test_config_file_loads_with_formatterconfig ______
-
-self = <shared_utils.dynamic_formatting.tests.test_actual_config_files.TestActualConfigFiles object at 0x0000022C52CA25A0>
-
-    def test_config_file_loads_with_formatterconfig(self):
-        """Test that each config file can be loaded by FormatterConfig."""
-        if not self.config_files:
-            pytest.skip("No config files found")
-    
-        for config_file in self.config_files:
-            try:
->               config = FormatterConfig.from_config_file(config_file)
-                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-shared_utils\dynamic_formatting\tests\test_actual_config_files.py:62: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-cls = <class 'shared_utils.dynamic_formatting.config.FormatterConfig'>
-config_path = WindowsPath('C:/Users/krjar/OneDrive/work/training/scripting_engineer/shared_utils/dynamic_formatting/configs/assisted_development.json')
-
-    @classmethod
-    def from_config_file(cls, config_path: Union[str, Path]) -> 'FormatterConfig':
-        """
-        Load configuration from JSON file
-    
-        Args:
-            config_path: Path to JSON configuration file
-    
-        Returns:
-            FormatterConfig instance
-    
-        Example:
-            config = FormatterConfig.from_config_file('configs/production.json')
-        """
-        config_path = Path(config_path)
-    
-        if not config_path.exists():
-            raise FileNotFoundError(f"Configuration file not found: {config_path}")
-    
-        try:
-            with open(config_path, 'r') as f:
-                config_data = json.load(f)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON in configuration file {config_path}: {e}")
-    
-        # Handle nested configuration structure
-        if 'formatting' in config_data:
-            # Flatten nested structure
-            flat_config = {}
-            for key, value in config_data.items():
-                if isinstance(value, dict):
-                    flat_config.update(value)
-                else:
-                    flat_config[key] = value
-            config_data = flat_config
-    
-        # Convert string enums back to enum instances
-        if 'validation_mode' in config_data:
-            config_data['validation_mode'] = ValidationMode(config_data['validation_mode'])
-        if 'validation_level' in config_data:
-            config_data['validation_level'] = ValidationLevel(config_data['validation_level'])
-    
-        # Functions can't be serialized, so they're not loaded from config files
-        config_data.pop('functions', None)
-    
->       return cls(**config_data)
-               ^^^^^^^^^^^^^^^^^^
-E       TypeError: FormatterConfig.__init__() got an unexpected keyword argument 'enable_performance_monitoring'
-
-shared_utils\dynamic_formatting\config.py:119: TypeError
-
-During handling of the above exception, another exception occurred:
-
-self = <shared_utils.dynamic_formatting.tests.test_actual_config_files.TestActualConfigFiles object at 0x0000022C52CA25A0>
-
-    def test_config_file_loads_with_formatterconfig(self):
-        """Test that each config file can be loaded by FormatterConfig."""
-        if not self.config_files:
-            pytest.skip("No config files found")
-    
-        for config_file in self.config_files:
-            try:
-                config = FormatterConfig.from_config_file(config_file)
-                assert isinstance(config, FormatterConfig), f"Should create FormatterConfig from {config_file.name}"
-    
-                # Test that basic attributes exist and are valid types
-                assert hasattr(config, 'validation_mode')
-                assert hasattr(config, 'output_mode')
-                assert hasattr(config, 'enable_validation')
-    
-                print(f"  \u2705 {config_file.name}: validation_mode={config.validation_mode.value}")
-    
-            except Exception as e:
->               pytest.fail(f"Failed to load {config_file.name} with FormatterConfig: {e}")
-E               Failed: Failed to load assisted_development.json with FormatterConfig: FormatterConfig.__init__() got an unexpected keyword argument 'enable_performance_monitoring'
-
-shared_utils\dynamic_formatting\tests\test_actual_config_files.py:73: Failed
-______ TestActualConfigFiles.test_config_file_creates_working_formatter _______
-
-self = <shared_utils.dynamic_formatting.tests.test_actual_config_files.TestActualConfigFiles object at 0x0000022C52CA27B0>
-
-    def test_config_file_creates_working_formatter(self):
-        """Test that each config file can create a working DynamicFormatter."""
-        if not self.config_files:
-            pytest.skip("No config files found")
-    
-        template = "{{#level_color;[;level;]}} {{message}} {{?duration;(;duration;s)}}"
-        test_data = {
-            "level": "INFO",
-            "message": "Test message",
-            "duration": 1.5
-        }
-    
-        for config_file in self.config_files:
-            try:
->               formatter = DynamicFormatter.from_config_file(template, config_file)
-                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-shared_utils\dynamic_formatting\tests\test_actual_config_files.py:89: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-shared_utils\dynamic_formatting\dynamic_formatting.py:165: in from_config_file
-    config = FormatterConfig.from_config_file(config_path)
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-cls = <class 'shared_utils.dynamic_formatting.config.FormatterConfig'>
-config_path = WindowsPath('C:/Users/krjar/OneDrive/work/training/scripting_engineer/shared_utils/dynamic_formatting/configs/assisted_development.json')
-
-    @classmethod
-    def from_config_file(cls, config_path: Union[str, Path]) -> 'FormatterConfig':
-        """
-        Load configuration from JSON file
-    
-        Args:
-            config_path: Path to JSON configuration file
-    
-        Returns:
-            FormatterConfig instance
-    
-        Example:
-            config = FormatterConfig.from_config_file('configs/production.json')
-        """
-        config_path = Path(config_path)
-    
-        if not config_path.exists():
-            raise FileNotFoundError(f"Configuration file not found: {config_path}")
-    
-        try:
-            with open(config_path, 'r') as f:
-                config_data = json.load(f)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON in configuration file {config_path}: {e}")
-    
-        # Handle nested configuration structure
-        if 'formatting' in config_data:
-            # Flatten nested structure
-            flat_config = {}
-            for key, value in config_data.items():
-                if isinstance(value, dict):
-                    flat_config.update(value)
-                else:
-                    flat_config[key] = value
-            config_data = flat_config
-    
-        # Convert string enums back to enum instances
-        if 'validation_mode' in config_data:
-            config_data['validation_mode'] = ValidationMode(config_data['validation_mode'])
-        if 'validation_level' in config_data:
-            config_data['validation_level'] = ValidationLevel(config_data['validation_level'])
-    
-        # Functions can't be serialized, so they're not loaded from config files
-        config_data.pop('functions', None)
-    
->       return cls(**config_data)
-               ^^^^^^^^^^^^^^^^^^
-E       TypeError: FormatterConfig.__init__() got an unexpected keyword argument 'enable_performance_monitoring'
-
-shared_utils\dynamic_formatting\config.py:119: TypeError
-
-During handling of the above exception, another exception occurred:
-
-self = <shared_utils.dynamic_formatting.tests.test_actual_config_files.TestActualConfigFiles object at 0x0000022C52CA27B0>
-
-    def test_config_file_creates_working_formatter(self):
-        """Test that each config file can create a working DynamicFormatter."""
-        if not self.config_files:
-            pytest.skip("No config files found")
-    
-        template = "{{#level_color;[;level;]}} {{message}} {{?duration;(;duration;s)}}"
-        test_data = {
-            "level": "INFO",
-            "message": "Test message",
-            "duration": 1.5
-        }
-    
-        for config_file in self.config_files:
-            try:
-                formatter = DynamicFormatter.from_config_file(template, config_file)
-                result = formatter.format(**test_data)
-    
-                assert isinstance(result, str), f"Formatter from {config_file.name} should return string"
-                assert len(result) > 0, f"Formatter from {config_file.name} should return non-empty result"
-                assert "Test message" in result, f"Result should contain test message"
-    
-                print(f"  \u2705 {config_file.name}: '{result}'")
-    
-            except Exception as e:
->               pytest.fail(f"Failed to create working formatter from {config_file.name}: {e}")
-E               Failed: Failed to create working formatter from assisted_development.json: FormatterConfig.__init__() got an unexpected keyword argument 'enable_performance_monitoring'
-
-shared_utils\dynamic_formatting\tests\test_actual_config_files.py:99: Failed
-__________ TestActualConfigFiles.test_all_configs_different_settings __________
-
-self = <shared_utils.dynamic_formatting.tests.test_actual_config_files.TestActualConfigFiles object at 0x0000022C52CA2F60>
-
-    def test_all_configs_different_settings(self):
-        """Test that different config files actually have different settings."""
-        if len(self.config_files) < 2:
-            pytest.skip("Need at least 2 config files to test differences")
-    
-        configs = []
-        for config_file in self.config_files:
->           config = FormatterConfig.from_config_file(config_file)
-                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-shared_utils\dynamic_formatting\tests\test_actual_config_files.py:128: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-cls = <class 'shared_utils.dynamic_formatting.config.FormatterConfig'>
-config_path = WindowsPath('C:/Users/krjar/OneDrive/work/training/scripting_engineer/shared_utils/dynamic_formatting/configs/assisted_development.json')
-
-    @classmethod
-    def from_config_file(cls, config_path: Union[str, Path]) -> 'FormatterConfig':
-        """
-        Load configuration from JSON file
-    
-        Args:
-            config_path: Path to JSON configuration file
-    
-        Returns:
-            FormatterConfig instance
-    
-        Example:
-            config = FormatterConfig.from_config_file('configs/production.json')
-        """
-        config_path = Path(config_path)
-    
-        if not config_path.exists():
-            raise FileNotFoundError(f"Configuration file not found: {config_path}")
-    
-        try:
-            with open(config_path, 'r') as f:
-                config_data = json.load(f)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON in configuration file {config_path}: {e}")
-    
-        # Handle nested configuration structure
-        if 'formatting' in config_data:
-            # Flatten nested structure
-            flat_config = {}
-            for key, value in config_data.items():
-                if isinstance(value, dict):
-                    flat_config.update(value)
-                else:
-                    flat_config[key] = value
-            config_data = flat_config
-    
-        # Convert string enums back to enum instances
-        if 'validation_mode' in config_data:
-            config_data['validation_mode'] = ValidationMode(config_data['validation_mode'])
-        if 'validation_level' in config_data:
-            config_data['validation_level'] = ValidationLevel(config_data['validation_level'])
-    
-        # Functions can't be serialized, so they're not loaded from config files
-        config_data.pop('functions', None)
-    
->       return cls(**config_data)
-               ^^^^^^^^^^^^^^^^^^
-E       TypeError: FormatterConfig.__init__() got an unexpected keyword argument 'enable_performance_monitoring'
-
-shared_utils\dynamic_formatting\config.py:119: TypeError
-________________ TestActualConfigFiles.test_config_round_trip _________________
-
-self = <shared_utils.dynamic_formatting.tests.test_actual_config_files.TestActualConfigFiles object at 0x0000022C52CA3110>
-
-    def test_config_round_trip(self):
-        """Test that configs can be loaded and saved without data loss."""
-        if not self.config_files:
-            pytest.skip("No config files found")
-    
-        # Test with first config file
-        config_file = self.config_files[0]
-    
-        # Load config
->       original_config = FormatterConfig.from_config_file(config_file)
-                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-shared_utils\dynamic_formatting\tests\test_actual_config_files.py:150: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-cls = <class 'shared_utils.dynamic_formatting.config.FormatterConfig'>
-config_path = WindowsPath('C:/Users/krjar/OneDrive/work/training/scripting_engineer/shared_utils/dynamic_formatting/configs/assisted_development.json')
-
-    @classmethod
-    def from_config_file(cls, config_path: Union[str, Path]) -> 'FormatterConfig':
-        """
-        Load configuration from JSON file
-    
-        Args:
-            config_path: Path to JSON configuration file
-    
-        Returns:
-            FormatterConfig instance
-    
-        Example:
-            config = FormatterConfig.from_config_file('configs/production.json')
-        """
-        config_path = Path(config_path)
-    
-        if not config_path.exists():
-            raise FileNotFoundError(f"Configuration file not found: {config_path}")
-    
-        try:
-            with open(config_path, 'r') as f:
-                config_data = json.load(f)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON in configuration file {config_path}: {e}")
-    
-        # Handle nested configuration structure
-        if 'formatting' in config_data:
-            # Flatten nested structure
-            flat_config = {}
-            for key, value in config_data.items():
-                if isinstance(value, dict):
-                    flat_config.update(value)
-                else:
-                    flat_config[key] = value
-            config_data = flat_config
-    
-        # Convert string enums back to enum instances
-        if 'validation_mode' in config_data:
-            config_data['validation_mode'] = ValidationMode(config_data['validation_mode'])
-        if 'validation_level' in config_data:
-            config_data['validation_level'] = ValidationLevel(config_data['validation_level'])
-    
-        # Functions can't be serialized, so they're not loaded from config files
-        config_data.pop('functions', None)
-    
->       return cls(**config_data)
-               ^^^^^^^^^^^^^^^^^^
-E       TypeError: FormatterConfig.__init__() got an unexpected keyword argument 'enable_performance_monitoring'
-
-shared_utils\dynamic_formatting\config.py:119: TypeError
-____________________________ test_discover_and_run ____________________________
-
-    def test_discover_and_run():
-        """Standalone function to discover and test config files."""
-        configs_dir = Path(__file__).parent.parent / "configs"
-    
-        print(f"\n{'='*60}")
-        print(f"TESTING ACTUAL CONFIG FILES")
-        print(f"{'='*60}")
-        print(f"Configs directory: {configs_dir}")
-        print(f"Directory exists: {configs_dir.exists()}")
-    
-        # Use assert statements instead of returning False
-        assert configs_dir.exists(), "configs/ directory should exist"
-    
-        config_files = list(configs_dir.glob("*.json"))
-        print(f"JSON files found: {len(config_files)}")
-        for f in config_files:
-            print(f"  - {f.name}")
-    
-        assert len(config_files) > 0, "Should find at least one JSON config file"
-    
-        # Test each file
-        template = "{{#level_color;[;level;]}} {{message}}"
-        test_data = {"level": "INFO", "message": "Configuration test"}
-    
-        success_count = 0
-        errors = []
-    
-        for config_file in config_files:
-            print(f"\nTesting {config_file.name}:")
-            try:
-                # Test 1: Valid JSON
-                with open(config_file, 'r') as f:
-                    json.load(f)
-                print(f"  \u2705 Valid JSON")
-    
-                # Test 2: FormatterConfig loading
-                config = FormatterConfig.from_config_file(config_file)
-                print(f"  \u2705 FormatterConfig loads (mode: {config.validation_mode.value})")
-    
-                # Test 3: DynamicFormatter creation and usage
-                formatter = DynamicFormatter.from_config_file(template, config_file)
-                result = formatter.format(**test_data)
-                print(f"  \u2705 DynamicFormatter works: '{result}'")
-    
-                success_count += 1
-    
-            except Exception as e:
-                print(f"  \u274c Error: {e}")
-                errors.append(f"{config_file.name}: {e}")
-    
-        print(f"\n{'='*60}")
-        print(f"RESULTS: {success_count}/{len(config_files)} config files working")
-        print(f"{'='*60}")
-    
-        # Assert that all config files work instead of returning boolean
->       assert success_count == len(config_files), f"Some config files failed: {errors}"
-E       AssertionError: Some config files failed: ["assisted_development.json: FormatterConfig.__init__() got an unexpected keyword argument 'enable_performance_monitoring'", "development.json: 'STRICT' is not a valid ValidationMode", "file_output.json: FormatterConfig.__init__() got an unexpected keyword argument 'enable_performance_monitoring'", "production.json: 'GRACEFUL' is not a valid ValidationMode", "staging.json: 'AUTO_CORRECT' is not a valid ValidationMode"]
-E       assert 1 == 6
-E        +  where 6 = len([WindowsPath('C:/Users/krjar/OneDrive/work/training/scripting_engineer/shared_utils/dynamic_formatting/configs/assisted_development.json'), WindowsPath('C:/Users/krjar/OneDrive/work/training/scripting_engineer/shared_utils/dynamic_formatting/configs/development.json'), WindowsPath('C:/Users/krjar/OneDrive/work/training/scripting_engineer/shared_utils/dynamic_formatting/configs/file_output.json'), WindowsPath('C:/Users/krjar/OneDrive/work/training/scripting_engineer/shared_utils/dynamic_formatting/configs/minimal.json'), WindowsPath('C:/Users/krjar/OneDrive/work/training/scripting_engineer/shared_utils/dynamic_formatting/configs/production.json'), WindowsPath('C:/Users/krjar/OneDrive/work/training/scripting_engineer/shared_utils/dynamic_formatting/configs/staging.json')])
-
-shared_utils\dynamic_formatting\tests\test_actual_config_files.py:229: AssertionError
----------------------------- Captured stdout call -----------------------------
-\n============================================================\nTESTING ACTUAL CONFIG FILES\n============================================================\nConfigs directory: C:\\Users\\krjar\\OneDrive\\work\\training\\scripting_engineer\\shared_utils\\dynamic_formatting\\configs\nDirectory exists: True\nJSON files found: 6\n  - assisted_development.json\n  - development.json\n  - file_output.json\n  - minimal.json\n  - production.json\n  - staging.json\n\nTesting assisted_development.json:\n  \u2705 Valid JSON\n  \u274c Error: FormatterConfig.__init__() got an unexpected keyword argument 'enable_performance_monitoring'\n\nTesting development.json:\n  \u2705 Valid JSON\n  \u274c Error: 'STRICT' is not a valid ValidationMode\n\nTesting file_output.json:\n  \u2705 Valid JSON\n  \u274c Error: FormatterConfig.__init__() got an unexpected keyword argument 'enable_performance_monitoring'\n\nTesting minimal.json:\n  \u2705 Valid JSON\n  \u2705 FormatterConfig loads (mode: graceful)\n  \u2705 DynamicFormatter works: ' Configuration test'\n\nTesting production.json:\n  \u2705 Valid JSON\n  \u274c Error: 'GRACEFUL' is not a valid ValidationMode\n\nTesting staging.json:\n  \u2705 Valid JSON\n  \u274c Error: 'AUTO_CORRECT' is not a valid ValidationMode\n\n============================================================\nRESULTS: 1/6 config files working\n============================================================
 ______ TestFormatterConfigFileSupport.test_from_config_file_invalid_json ______
 
 cls = <class 'shared_utils.dynamic_formatting.config.FormatterConfig'>
-config_path = WindowsPath('C:/Users/krjar/AppData/Local/Temp/tmppew7hata.json')
+config_path = WindowsPath('C:/Users/krjar/AppData/Local/Temp/tmp4zybcwj3.json')
 
     @classmethod
     def from_config_file(cls, config_path: Union[str, Path]) -> 'FormatterConfig':
@@ -673,7 +257,7 @@ C:\Program Files\Python312\Lib\json\decoder.py:337: in decode
                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
-self = <json.decoder.JSONDecoder object at 0x0000022C31C13980>
+self = <json.decoder.JSONDecoder object at 0x000001A73C0F3980>
 s = '{"invalid": json syntax}', idx = 0
 
     def raw_decode(self, s, idx=0):
@@ -695,7 +279,7 @@ C:\Program Files\Python312\Lib\json\decoder.py:355: JSONDecodeError
 
 During handling of the above exception, another exception occurred:
 
-self = <shared_utils.dynamic_formatting.tests.test_config_support.TestFormatterConfigFileSupport object at 0x0000022C52CB9A30>
+self = <shared_utils.dynamic_formatting.tests.test_config_support.TestFormatterConfigFileSupport object at 0x000001A73E89DD30>
 
     def test_from_config_file_invalid_json(self):
         """Test JSONDecodeError for invalid JSON"""
@@ -711,7 +295,7 @@ shared_utils\dynamic_formatting\tests\test_config_support.py:97:
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
 cls = <class 'shared_utils.dynamic_formatting.config.FormatterConfig'>
-config_path = WindowsPath('C:/Users/krjar/AppData/Local/Temp/tmppew7hata.json')
+config_path = WindowsPath('C:/Users/krjar/AppData/Local/Temp/tmp4zybcwj3.json')
 
     @classmethod
     def from_config_file(cls, config_path: Union[str, Path]) -> 'FormatterConfig':
@@ -737,12 +321,12 @@ config_path = WindowsPath('C:/Users/krjar/AppData/Local/Temp/tmppew7hata.json')
                 config_data = json.load(f)
         except json.JSONDecodeError as e:
 >           raise ValueError(f"Invalid JSON in configuration file {config_path}: {e}")
-E           ValueError: Invalid JSON in configuration file C:\Users\krjar\AppData\Local\Temp\tmppew7hata.json: Expecting value: line 1 column 13 (char 12)
+E           ValueError: Invalid JSON in configuration file C:\Users\krjar\AppData\Local\Temp\tmp4zybcwj3.json: Expecting value: line 1 column 13 (char 12)
 
 shared_utils\dynamic_formatting\config.py:97: ValueError
 __________ TestFormatterConfigFileSupport.test_to_config_file_nested __________
 
-self = <shared_utils.dynamic_formatting.tests.test_config_support.TestFormatterConfigFileSupport object at 0x0000022C52CB9BB0>
+self = <shared_utils.dynamic_formatting.tests.test_config_support.TestFormatterConfigFileSupport object at 0x000001A73E89DEB0>
 
     def test_to_config_file_nested(self):
         """Test saving configuration to file with nested structure"""
@@ -770,34 +354,9 @@ self = <shared_utils.dynamic_formatting.tests.test_config_support.TestFormatterC
 E           KeyError: 'validation_mode'
 
 shared_utils\dynamic_formatting\tests\test_config_support.py:125: KeyError
-_________ TestFormatterConfigEnvironment.test_from_environment_basic __________
-
-self = <shared_utils.dynamic_formatting.tests.test_config_support.TestFormatterConfigEnvironment object at 0x0000022C52CBA420>
-
-    def test_from_environment_basic(self):
-        """Test loading configuration from environment variables"""
-        env_vars = {
-            'FORMATTER_VALIDATION_MODE': 'graceful',
-            'FORMATTER_OUTPUT_MODE': 'file',
-            'FORMATTER_ENABLE_COLORS': 'false',
-            'FORMATTER_ENABLE_VALIDATION': 'true',
-            'FORMATTER_MAX_TEMPLATE_SECTIONS': '300'
-        }
-    
-        with patch.dict(os.environ, env_vars):
-            config = FormatterConfig.from_environment()
-    
-            assert config.validation_mode == ValidationMode.GRACEFUL
->           assert config.output_mode == 'file'
-E           AssertionError: assert 'console' == 'file'
-E             
-E             - file
-E             + console
-
-shared_utils\dynamic_formatting\tests\test_config_support.py:176: AssertionError
 _____ TestFormatterConfigEnvironment.test_from_environment_custom_prefix ______
 
-self = <shared_utils.dynamic_formatting.tests.test_config_support.TestFormatterConfigEnvironment object at 0x0000022C52CBA5A0>
+self = <shared_utils.dynamic_formatting.tests.test_config_support.TestFormatterConfigEnvironment object at 0x000001A73E89E870>
 
     def test_from_environment_custom_prefix(self):
         """Test loading with custom environment variable prefix"""
@@ -811,98 +370,72 @@ self = <shared_utils.dynamic_formatting.tests.test_config_support.TestFormatterC
     
 >           assert config.validation_mode == ValidationMode.STRICT
 E           AssertionError: assert <ValidationMode.GRACEFUL: 'graceful'> == <ValidationMode.STRICT: 'strict'>
-E            +  where <ValidationMode.GRACEFUL: 'graceful'> = FormatterConfig(delimiter=';', output_mode='console', enable_colors=True, validation_mode=<ValidationMode.GRACEFUL: 'graceful'>, validation_level=<ValidationLevel.WARNING: 'warning'>, enable_validation=True, strict_argument_validation=True, cache_parsed_templates=True, max_template_sections=100, functions={}, auto_correct_suggestions=True, enable_function_fallback=True).validation_mode
+E            +  where <ValidationMode.GRACEFUL: 'graceful'> = FormatterConfig(delimiter=';', output_mode='console', enable_colors=True, validation_mode=<ValidationMode.GRACEFUL: 'graceful'>, validation_level=<ValidationLevel.WARNING: 'warning'>, enable_validation=True, strict_argument_validation=True, cache_parsed_templates=True, max_template_sections=100, enable_performance_monitoring=False, functions={}, auto_correct_suggestions=True, enable_function_fallback=True).validation_mode
 E            +  and   <ValidationMode.STRICT: 'strict'> = ValidationMode.STRICT
 
 shared_utils\dynamic_formatting\tests\test_config_support.py:191: AssertionError
-___________ TestDynamicFormatterConfigMethods.test_from_config_dict ___________
-
-self = <shared_utils.dynamic_formatting.tests.test_config_support.TestDynamicFormatterConfigMethods object at 0x0000022C52CB9820>
-
-    def test_from_config_dict(self):
-        """Test DynamicFormatter.from_config() with dictionary"""
-        template = "{{Status: ;status}}"
-        config_dict = {
-            "validation_mode": "auto_correct",
-            "output_mode": "file",
-            "enable_colors": False
-        }
-    
->       formatter = DynamicFormatter.from_config(template, config_dict)
-                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-E       AttributeError: type object 'DynamicFormatter' has no attribute 'from_config'. Did you mean: 'from_config_file'?
-
-shared_utils\dynamic_formatting\tests\test_config_support.py:244: AttributeError
 _____ TestDynamicFormatterConfigMethods.test_from_config_formatter_config _____
 
-self = <shared_utils.dynamic_formatting.tests.test_config_support.TestDynamicFormatterConfigMethods object at 0x0000022C52CB9490>
+self = <shared_utils.dynamic_formatting.tests.test_config_support.TestDynamicFormatterConfigMethods object at 0x000001A73E89E360>
 
     def test_from_config_formatter_config(self):
         """Test DynamicFormatter.from_config() with FormatterConfig instance"""
         template = "{{Message: ;msg}}"
->       config = FormatterConfig.production()
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
-E       AttributeError: type object 'FormatterConfig' has no attribute 'production'
-
-shared_utils\dynamic_formatting\tests\test_config_support.py:254: AttributeError
-________ TestDynamicFormatterConfigMethods.test_from_config_file_path _________
-
-self = <shared_utils.dynamic_formatting.tests.test_config_support.TestDynamicFormatterConfigMethods object at 0x0000022C52CBA7E0>
-
-    def test_from_config_file_path(self):
-        """Test DynamicFormatter.from_config() with file path"""
-        config_data = {"validation_mode": "strict"}
+        config = FormatterConfig.production()
     
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            json.dump(config_data, f)
-            config_path = f.name
+        formatter = DynamicFormatter.from_config(template, config)
     
-        try:
-            template = "{{Data: ;data}}"
->           formatter = DynamicFormatter.from_config(template, config_path)
-                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-E           AttributeError: type object 'DynamicFormatter' has no attribute 'from_config'. Did you mean: 'from_config_file'?
+        assert formatter.format_string == template
+        assert formatter.config.validation_mode == ValidationMode.GRACEFUL
+>       assert formatter.config.enable_validation == False  # Production default
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: assert True == False
+E        +  where True = FormatterConfig(delimiter=';', output_mode='console', enable_colors=True, validation_mode=<ValidationMode.GRACEFUL: 'graceful'>, validation_level=<ValidationLevel.ERROR: 'error'>, enable_validation=True, strict_argument_validation=False, cache_parsed_templates=True, max_template_sections=100, enable_performance_monitoring=False, functions={}, auto_correct_suggestions=False, enable_function_fallback=True).enable_validation
+E        +    where FormatterConfig(delimiter=';', output_mode='console', enable_colors=True, validation_mode=<ValidationMode.GRACEFUL: 'graceful'>, validation_level=<ValidationLevel.ERROR: 'error'>, enable_validation=True, strict_argument_validation=False, cache_parsed_templates=True, max_template_sections=100, enable_performance_monitoring=False, functions={}, auto_correct_suggestions=False, enable_function_fallback=True) = <shared_utils.dynamic_formatting.dynamic_formatting.DynamicFormatter object at 0x000001A73E9A06B0>.config
 
-shared_utils\dynamic_formatting\tests\test_config_support.py:272: AttributeError
-_______ TestDynamicFormatterConfigMethods.test_from_config_invalid_type _______
-
-self = <shared_utils.dynamic_formatting.tests.test_config_support.TestDynamicFormatterConfigMethods object at 0x0000022C52CBA990>
-
-    def test_from_config_invalid_type(self):
-        """Test DynamicFormatter.from_config() with invalid config type"""
-        template = "{{Test: ;test}}"
-    
-        try:
->           DynamicFormatter.from_config(template, 12345)  # Invalid type
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-E           AttributeError: type object 'DynamicFormatter' has no attribute 'from_config'. Did you mean: 'from_config_file'?
-
-shared_utils\dynamic_formatting\tests\test_config_support.py:284: AttributeError
+shared_utils\dynamic_formatting\tests\test_config_support.py:260: AssertionError
 ______ TestConfigurationIntegration.test_deployment_scenario_development ______
 
-self = <shared_utils.dynamic_formatting.tests.test_config_support.TestConfigurationIntegration object at 0x0000022C52CBACF0>
+self = <shared_utils.dynamic_formatting.tests.test_config_support.TestConfigurationIntegration object at 0x000001A73E89F020>
 
     def test_deployment_scenario_development(self):
         """Test development deployment scenario"""
->       config = FormatterConfig.development()
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-E       AttributeError: type object 'FormatterConfig' has no attribute 'development'
+        config = FormatterConfig.development()
+        template = "{{#red;Error: ;message}} {{Code: ;code}}"
+        formatter = DynamicFormatter(template, config=config)
+    
+        # Should have strict validation and full monitoring
+        assert config.validation_mode == ValidationMode.STRICT
+        assert config.enable_validation == True
+        assert config.enable_performance_monitoring == True
+        assert config.auto_correct_suggestions == True
+    
+        # Test formatting works
+        result = formatter.format(message="Test error", code=500)
+>       assert "Error: Test error" in result
+E       AssertionError: assert 'Error: Test error' in ' Code: 500'
 
-shared_utils\dynamic_formatting\tests\test_config_support.py:309: AttributeError
+shared_utils\dynamic_formatting\tests\test_config_support.py:321: AssertionError
 ______ TestConfigurationIntegration.test_deployment_scenario_production _______
 
-self = <shared_utils.dynamic_formatting.tests.test_config_support.TestConfigurationIntegration object at 0x0000022C52CBAE70>
+self = <shared_utils.dynamic_formatting.tests.test_config_support.TestConfigurationIntegration object at 0x000001A73E89F1A0>
 
     def test_deployment_scenario_production(self):
         """Test production deployment scenario"""
->       config = FormatterConfig.production()
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
-E       AttributeError: type object 'FormatterConfig' has no attribute 'production'
+        config = FormatterConfig.production()
+        template = "{{#green;Success: ;message}} {{Time: ;timestamp}}"
+        formatter = DynamicFormatter(template, config=config)
+    
+        # Should have graceful handling and minimal validation
+        assert config.validation_mode == ValidationMode.GRACEFUL
+>       assert config.enable_validation == False
+E       AssertionError: assert True == False
+E        +  where True = FormatterConfig(delimiter=';', output_mode='console', enable_colors=True, validation_mode=<ValidationMode.GRACEFUL: 'graceful'>, validation_level=<ValidationLevel.ERROR: 'error'>, enable_validation=True, strict_argument_validation=False, cache_parsed_templates=True, max_template_sections=100, enable_performance_monitoring=False, functions={}, auto_correct_suggestions=False, enable_function_fallback=True).enable_validation
 
-shared_utils\dynamic_formatting\tests\test_config_support.py:326: AttributeError
+shared_utils\dynamic_formatting\tests\test_config_support.py:332: AssertionError
 ______ TestConfigurationIntegration.test_deployment_scenario_file_output ______
 
-self = <shared_utils.dynamic_formatting.tests.test_config_support.TestConfigurationIntegration object at 0x0000022C52CBAFF0>
+self = <shared_utils.dynamic_formatting.tests.test_config_support.TestConfigurationIntegration object at 0x000001A73E89F320>
 
     def test_deployment_scenario_file_output(self):
         """Test file output deployment scenario"""
@@ -925,7 +458,7 @@ E       AssertionError: assert 'Alert: System warning' in ''
 shared_utils\dynamic_formatting\tests\test_config_support.py:355: AssertionError
 _________________ TestColorFormatting.test_basic_ansi_colors __________________
 
-self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestColorFormatting object at 0x0000022C52CDD7F0>
+self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestColorFormatting object at 0x000001A73E8C1A00>
 
     @pytest.mark.core
     def test_basic_ansi_colors(self):
@@ -938,7 +471,7 @@ E       AssertionError: assert 'Error: Failed' in ''
 shared_utils\dynamic_formatting\tests\test_core_formatting.py:97: AssertionError
 _____________________ TestColorFormatting.test_hex_colors _____________________
 
-self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestColorFormatting object at 0x0000022C52CDD970>
+self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestColorFormatting object at 0x000001A73E8C1BB0>
 
     @pytest.mark.core
     def test_hex_colors(self):
@@ -951,7 +484,7 @@ E       AssertionError: assert 'Alert: Warning' in ''
 shared_utils\dynamic_formatting\tests\test_core_formatting.py:105: AssertionError
 ______________ TestColorFormatting.test_color_override_behavior _______________
 
-self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestColorFormatting object at 0x0000022C52CDDAF0>
+self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestColorFormatting object at 0x000001A73E8C1D30>
 
     @pytest.mark.core
     def test_color_override_behavior(self):
@@ -965,7 +498,7 @@ E       AssertionError: assert 'Multi-color: test' in ''
 shared_utils\dynamic_formatting\tests\test_core_formatting.py:113: AssertionError
 ______________ TestColorFormatting.test_file_mode_strips_colors _______________
 
-self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestColorFormatting object at 0x0000022C52CDDC70>
+self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestColorFormatting object at 0x000001A73E8C1EB0>
 
     @pytest.mark.core
     def test_file_mode_strips_colors(self):
@@ -983,7 +516,7 @@ E         - Error: Failed
 shared_utils\dynamic_formatting\tests\test_core_formatting.py:125: AssertionError
 _______________ TestTextFormatting.test_individual_text_styles ________________
 
-self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestTextFormatting object at 0x0000022C52CDDE20>
+self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestTextFormatting object at 0x000001A73E8C20C0>
 
     @pytest.mark.core
     def test_individual_text_styles(self):
@@ -999,7 +532,7 @@ E           AssertionError: assert 'Styled: content' in '{@bold;Styled: ;text}'
 shared_utils\dynamic_formatting\tests\test_core_formatting.py:140: AssertionError
 ________________ TestTextFormatting.test_combined_text_styles _________________
 
-self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestTextFormatting object at 0x0000022C52CDDFA0>
+self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestTextFormatting object at 0x000001A73E8C2240>
 
     @pytest.mark.core
     def test_combined_text_styles(self):
@@ -1012,7 +545,7 @@ E       AssertionError: assert 'Emphasized: important' in ''
 shared_utils\dynamic_formatting\tests\test_core_formatting.py:147: AssertionError
 __________________ TestTextFormatting.test_text_style_reset ___________________
 
-self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestTextFormatting object at 0x0000022C52CDE120>
+self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestTextFormatting object at 0x000001A73E8C23F0>
 
     @pytest.mark.core
     def test_text_style_reset(self):
@@ -1025,7 +558,7 @@ E       AssertionError: assert 'Normal: content' in ''
 shared_utils\dynamic_formatting\tests\test_core_formatting.py:154: AssertionError
 __________ TestConditionalFormatting.test_section_level_conditionals __________
 
-self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestConditionalFormatting object at 0x0000022C52CDE330>
+self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestConditionalFormatting object at 0x000001A73E8C2570>
 
     @pytest.mark.core
     def test_section_level_conditionals(self):
@@ -1051,7 +584,7 @@ E         + ' '
 shared_utils\dynamic_formatting\tests\test_core_formatting.py:174: AssertionError
 _____________ TestConditionalFormatting.test_inline_conditionals ______________
 
-self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestConditionalFormatting object at 0x0000022C52CDE4E0>
+self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestConditionalFormatting object at 0x000001A73E8C2720>
 
     @pytest.mark.core
     def test_inline_conditionals(self):
@@ -1073,7 +606,7 @@ E       AssertionError: assert 'Task - URGENT: deploy' in 'Task{?is_urgent} - UR
 shared_utils\dynamic_formatting\tests\test_core_formatting.py:194: AssertionError
 _________ TestConditionalFormatting.test_missing_conditional_function _________
 
-self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestConditionalFormatting object at 0x0000022C52CDE660>
+self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestConditionalFormatting object at 0x000001A73E8C28A0>
 
     @pytest.mark.core
     def test_missing_conditional_function(self):
@@ -1086,7 +619,7 @@ E       Failed: DID NOT RAISE <class 'shared_utils.dynamic_formatting.dynamic_fo
 shared_utils\dynamic_formatting\tests\test_core_formatting.py:205: Failed
 _______________ TestRequiredFields.test_required_field_present ________________
 
-self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestRequiredFields object at 0x0000022C52CDE840>
+self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestRequiredFields object at 0x000001A73E8C2AB0>
 
     @pytest.mark.core
     def test_required_field_present(self):
@@ -1097,15 +630,15 @@ self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestRequiredF
 
 shared_utils\dynamic_formatting\tests\test_core_formatting.py:218: 
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-shared_utils\dynamic_formatting\enhanced_formatter.py:81: in format
+shared_utils\dynamic_formatting\enhanced_formatter.py:54: in format
     return super().format(*args, **kwargs)
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-shared_utils\dynamic_formatting\dynamic_formatting.py:249: in format
+shared_utils\dynamic_formatting\dynamic_formatting.py:241: in format
     result += self._render_section(section, data)
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
-self = <shared_utils.dynamic_formatting.enhanced_formatter.DynamicFormatter object at 0x0000022C53D98200>
+self = <shared_utils.dynamic_formatting.enhanced_formatter.DynamicFormatter object at 0x000001A73E9A9880>
 section = FormatSection(field_name='Critical: ', prefix='', suffix='message', is_required=True, function_name=None, whole_section_formatting_tokens={}, spans=[])
 data = {'message': 'System down'}
 
@@ -1116,7 +649,10 @@ data = {'message': 'System down'}
         Core Feature Implementation: Returns empty string when the required field
         is missing from the data dictionary, causing the entire section to disappear.
         """
-        # Handle required fields
+        # Get field value
+        field_value = data.get(section.field_name)
+    
+        # Handle required fields - only check if field is actually missing
         if section.is_required and section.field_name not in data:
 >           raise RequiredFieldError(
                 f"Required field '{section.field_name}' is missing",
@@ -1127,10 +663,10 @@ E           shared_utils.dynamic_formatting.dynamic_formatting.RequiredFieldErro
 E           Context: Required field 'Critical: ' was marked as mandatory with '!' but no value was provided
 E           Template: '{{!;Critical: ;message}}'
 
-shared_utils\dynamic_formatting\dynamic_formatting.py:284: RequiredFieldError
+shared_utils\dynamic_formatting\dynamic_formatting.py:279: RequiredFieldError
 __________________ TestCustomDelimiters.test_pipe_delimiter ___________________
 
-self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestCustomDelimiters object at 0x0000022C52CDF0E0>
+self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestCustomDelimiters object at 0x000001A73E8C3260>
 
     @pytest.mark.core
     def test_pipe_delimiter(self):
@@ -1144,7 +680,7 @@ E       AssertionError: assert 'Error: Failed' in ''
 shared_utils\dynamic_formatting\tests\test_core_formatting.py:267: AssertionError
 ______________ TestCustomDelimiters.test_double_colon_delimiter _______________
 
-self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestCustomDelimiters object at 0x0000022C52CDF260>
+self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestCustomDelimiters object at 0x000001A73E8C3410>
 
     @pytest.mark.core
     def test_double_colon_delimiter(self):
@@ -1158,7 +694,7 @@ E       AssertionError: assert 'Status: Running' in ''
 shared_utils\dynamic_formatting\tests\test_core_formatting.py:275: AssertionError
 _____________ TestComplexCombinations.test_all_features_combined ______________
 
-self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestComplexCombinations object at 0x0000022C52CDF110>
+self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestComplexCombinations object at 0x000001A73E89DE50>
 
     @pytest.mark.core
     def test_all_features_combined(self):
@@ -1186,7 +722,7 @@ E       AssertionError: assert '[ERROR]' in ' Failed '
 shared_utils\dynamic_formatting\tests\test_core_formatting.py:301: AssertionError
 __________ TestComplexCombinations.test_nested_function_dependencies __________
 
-self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestComplexCombinations object at 0x0000022C52CDEE40>
+self = <shared_utils.dynamic_formatting.tests.test_core_formatting.TestComplexCombinations object at 0x000001A73E8C31D0>
 
     @pytest.mark.core
     def test_nested_function_dependencies(self):
@@ -1213,7 +749,7 @@ E       AssertionError: assert 'Status: Error: Connection failed' in ''
 shared_utils\dynamic_formatting\tests\test_core_formatting.py:330: AssertionError
 _______________ TestParsingErrors.test_empty_template_sections ________________
 
-self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestParsingErrors object at 0x0000022C52CE0740>
+self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestParsingErrors object at 0x000001A73E8C4890>
 
     @pytest.mark.error
     def test_empty_template_sections(self):
@@ -1224,12 +760,12 @@ self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestParsingErr
 
 shared_utils\dynamic_formatting\tests\test_error_handling.py:44: 
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-shared_utils\dynamic_formatting\enhanced_formatter.py:81: in format
+shared_utils\dynamic_formatting\enhanced_formatter.py:54: in format
     return super().format(*args, **kwargs)
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
-self = <shared_utils.dynamic_formatting.enhanced_formatter.DynamicFormatter object at 0x0000022C53D95940>
+self = <shared_utils.dynamic_formatting.enhanced_formatter.DynamicFormatter object at 0x000001A73E9A9D00>
 args = ('positional',), kwargs = {'field': 'named'}
 
     def format(self, *args, **kwargs) -> str:
@@ -1259,10 +795,10 @@ args = ('positional',), kwargs = {'field': 'named'}
                 )
 E               shared_utils.dynamic_formatting.dynamic_formatting.DynamicFormattingError: Cannot mix positional and keyword arguments. Use either positional args format(a, b, c) or keyword args format(key=value)
 
-shared_utils\dynamic_formatting\dynamic_formatting.py:204: DynamicFormattingError
+shared_utils\dynamic_formatting\dynamic_formatting.py:193: DynamicFormattingError
 ________________ TestFormatterErrors.test_invalid_color_token _________________
 
-self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestFormatterErrors object at 0x0000022C52CE0D70>
+self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestFormatterErrors object at 0x000001A73E8C4F80>
 
     @pytest.mark.error
     def test_invalid_color_token(self):
@@ -1275,7 +811,7 @@ E       Failed: DID NOT RAISE <class 'shared_utils.dynamic_formatting.formatters
 shared_utils\dynamic_formatting\tests\test_error_handling.py:92: Failed
 ______________ TestFormatterErrors.test_invalid_text_style_token ______________
 
-self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestFormatterErrors object at 0x0000022C52CE0EF0>
+self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestFormatterErrors object at 0x000001A73E8C5100>
 
     @pytest.mark.error
     def test_invalid_text_style_token(self):
@@ -1288,7 +824,7 @@ E       Failed: DID NOT RAISE <class 'shared_utils.dynamic_formatting.formatters
 shared_utils\dynamic_formatting\tests\test_error_handling.py:102: Failed
 ________________ TestFormatterErrors.test_malformed_hex_color _________________
 
-self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestFormatterErrors object at 0x0000022C52CE10A0>
+self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestFormatterErrors object at 0x000001A73E8C5280>
 
     @pytest.mark.error
     def test_malformed_hex_color(self):
@@ -1301,7 +837,7 @@ E       Failed: DID NOT RAISE <class 'shared_utils.dynamic_formatting.formatters
 shared_utils\dynamic_formatting\tests\test_error_handling.py:112: Failed
 __________________ TestFunctionErrors.test_missing_function ___________________
 
-self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestFunctionErrors object at 0x0000022C52CE12B0>
+self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestFunctionErrors object at 0x000001A73E8C5430>
 
     @pytest.mark.error
     def test_missing_function(self):
@@ -1314,7 +850,7 @@ E       Failed: DID NOT RAISE <class 'shared_utils.dynamic_formatting.formatters
 shared_utils\dynamic_formatting\tests\test_error_handling.py:126: Failed
 _____________ TestFunctionErrors.test_function_execution_failure ______________
 
-self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestFunctionErrors object at 0x0000022C52CE1430>
+self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestFunctionErrors object at 0x000001A73E8C55E0>
 
     @pytest.mark.error
     def test_function_execution_failure(self):
@@ -1334,7 +870,7 @@ E       Failed: DID NOT RAISE <class 'shared_utils.dynamic_formatting.formatters
 shared_utils\dynamic_formatting\tests\test_error_handling.py:143: Failed
 _____________ TestFunctionErrors.test_function_wrong_return_type ______________
 
-self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestFunctionErrors object at 0x0000022C52CE15B0>
+self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestFunctionErrors object at 0x000001A73E8C5790>
 
     @pytest.mark.error
     def test_function_wrong_return_type(self):
@@ -1354,7 +890,7 @@ E       Failed: DID NOT RAISE <class 'shared_utils.dynamic_formatting.formatters
 shared_utils\dynamic_formatting\tests\test_error_handling.py:160: Failed
 ___________ TestFunctionErrors.test_conditional_function_not_found ____________
 
-self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestFunctionErrors object at 0x0000022C52CBAC60>
+self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestFunctionErrors object at 0x000001A73E89D940>
 
     @pytest.mark.error
     def test_conditional_function_not_found(self):
@@ -1367,7 +903,7 @@ E       Failed: DID NOT RAISE <class 'shared_utils.dynamic_formatting.dynamic_fo
 shared_utils\dynamic_formatting\tests\test_error_handling.py:170: Failed
 _____________ TestOutputModeEdgeCases.test_output_mode_switching ______________
 
-self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestOutputModeEdgeCases object at 0x0000022C52CE1D30>
+self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestOutputModeEdgeCases object at 0x000001A73E8C5C70>
 
     @pytest.mark.error
     def test_output_mode_switching(self):
@@ -1390,7 +926,7 @@ E       AssertionError: assert '\x1b[' in ''
 shared_utils\dynamic_formatting\tests\test_error_handling.py:267: AssertionError
 __ TestLoggingFormatterErrors.test_logging_formatter_with_malformed_template __
 
-self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestLoggingFormatterErrors object at 0x0000022C52CE1F10>
+self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestLoggingFormatterErrors object at 0x000001A73E8C5E50>
 
     @pytest.mark.error
     def test_logging_formatter_with_malformed_template(self):
@@ -1403,15 +939,15 @@ self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestLoggingFor
 
 shared_utils\dynamic_formatting\tests\test_error_handling.py:283: 
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-shared_utils\dynamic_formatting\dynamic_formatting.py:424: in __init__
+shared_utils\dynamic_formatting\dynamic_formatting.py:380: in __init__
     self.formatter = DynamicFormatter(format_string, config=config)
                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-shared_utils\dynamic_formatting\dynamic_formatting.py:151: in __init__
+shared_utils\dynamic_formatting\dynamic_formatting.py:118: in __init__
     self.sections = parser.parse_format_string(format_string)
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
-self = <shared_utils.dynamic_formatting.template_parser.TemplateParser object at 0x0000022C53D946B0>
+self = <shared_utils.dynamic_formatting.template_parser.TemplateParser object at 0x000001A73E9AFD10>
 format_string = '{{unclosed template'
 
     def parse_format_string(self, format_string: str) -> List[Union[str, FormatSection]]:
@@ -1471,7 +1007,7 @@ E                   shared_utils.dynamic_formatting.template_parser.ParseError: 
 shared_utils\dynamic_formatting\template_parser.py:94: ParseError
 __ TestLoggingFormatterErrors.test_logging_formatter_with_missing_functions ___
 
-self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestLoggingFormatterErrors object at 0x0000022C52CE2090>
+self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestLoggingFormatterErrors object at 0x000001A73E8C5FD0>
 
     @pytest.mark.error
     def test_logging_formatter_with_missing_functions(self):
@@ -1495,7 +1031,7 @@ E       AssertionError: assert '[FORMATTING ERROR' in ' Test message'
 shared_utils\dynamic_formatting\tests\test_error_handling.py:312: AssertionError
 ____________ TestGracefulDegradation.test_partial_template_success ____________
 
-self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestGracefulDegradation object at 0x0000022C52CE2240>
+self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestGracefulDegradation object at 0x000001A73E8C6180>
 
     @pytest.mark.error
     def test_partial_template_success(self):
@@ -1524,7 +1060,7 @@ E       AssertionError: assert 'Good: test1' in ' '
 shared_utils\dynamic_formatting\tests\test_error_handling.py:338: AssertionError
 ________ TestGracefulDegradation.test_function_fallback_chain_failure _________
 
-self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestGracefulDegradation object at 0x0000022C52CE23C0>
+self = <shared_utils.dynamic_formatting.tests.test_error_handling.TestGracefulDegradation object at 0x000001A73E8C6300>
 
     @pytest.mark.error
     def test_function_fallback_chain_failure(self):
@@ -1550,7 +1086,7 @@ E       AssertionError: assert ('Text: test' in '' or 'test' in '')
 shared_utils\dynamic_formatting\tests\test_error_handling.py:359: AssertionError
 _____________ TestColorFunctionFallback.test_basic_color_function _____________
 
-self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestColorFunctionFallback object at 0x0000022C52CE1A60>
+self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestColorFunctionFallback object at 0x000001A73E8C5A30>
 
     @pytest.mark.fallback
     def test_basic_color_function(self):
@@ -1570,7 +1106,7 @@ E       AssertionError: assert 'Status: ERROR' in ''
 shared_utils\dynamic_formatting\tests\test_function_fallback.py:32: AssertionError
 _______ TestColorFunctionFallback.test_color_function_with_field_value ________
 
-self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestColorFunctionFallback object at 0x0000022C52CE05F0>
+self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestColorFunctionFallback object at 0x000001A73E8C5220>
 
     @pytest.mark.fallback
     def test_color_function_with_field_value(self):
@@ -1596,7 +1132,7 @@ E       AssertionError: assert 'Message: Error occurred' in ''
 shared_utils\dynamic_formatting\tests\test_function_fallback.py:52: AssertionError
 __________ TestColorFunctionFallback.test_color_function_returns_hex __________
 
-self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestColorFunctionFallback object at 0x0000022C52CE1550>
+self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestColorFunctionFallback object at 0x000001A73E8C58E0>
 
     @pytest.mark.fallback
     def test_color_function_returns_hex(self):
@@ -1621,7 +1157,7 @@ E       AssertionError: assert 'Priority 9: Critical' in ''
 shared_utils\dynamic_formatting\tests\test_function_fallback.py:79: AssertionError
 _______ TestColorFunctionFallback.test_color_function_returns_ansi_name _______
 
-self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestColorFunctionFallback object at 0x0000022C52CE4500>
+self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestColorFunctionFallback object at 0x000001A73E8C84D0>
 
     @pytest.mark.fallback
     def test_color_function_returns_ansi_name(self):
@@ -1647,7 +1183,7 @@ E       AssertionError: assert '[HIGH] Alert' in ''
 shared_utils\dynamic_formatting\tests\test_function_fallback.py:99: AssertionError
 ______________ TestTextFunctionFallback.test_basic_text_function ______________
 
-self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestTextFunctionFallback object at 0x0000022C52CE4710>
+self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestTextFunctionFallback object at 0x000001A73E8C86E0>
 
     @pytest.mark.fallback
     def test_basic_text_function(self):
@@ -1672,7 +1208,7 @@ E       AssertionError: assert 'Priority 9: Critical' in ''
 shared_utils\dynamic_formatting\tests\test_function_fallback.py:122: AssertionError
 _______ TestTextFunctionFallback.test_text_function_with_field_content ________
 
-self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestTextFunctionFallback object at 0x0000022C52CE4890>
+self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestTextFunctionFallback object at 0x000001A73E8C8860>
 
     @pytest.mark.fallback
     def test_text_function_with_field_content(self):
@@ -1698,7 +1234,7 @@ E       AssertionError: assert 'Message: URGENT' in ''
 shared_utils\dynamic_formatting\tests\test_function_fallback.py:142: AssertionError
 _______ TestConditionalFunctionFallback.test_basic_conditional_function _______
 
-self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestConditionalFunctionFallback object at 0x0000022C52CE49E0>
+self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestConditionalFunctionFallback object at 0x000001A73E8C89B0>
 
     @pytest.mark.fallback
     def test_basic_conditional_function(self):
@@ -1723,7 +1259,7 @@ E         + ' '
 shared_utils\dynamic_formatting\tests\test_function_fallback.py:169: AssertionError
 _ TestConditionalFunctionFallback.test_conditional_function_with_complex_logic _
 
-self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestConditionalFunctionFallback object at 0x0000022C52CE4B60>
+self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestConditionalFunctionFallback object at 0x000001A73E8C8B30>
 
     @pytest.mark.fallback
     def test_conditional_function_with_complex_logic(self):
@@ -1746,7 +1282,7 @@ E       AssertionError: assert 'Status: error ALERT: Review required' in 'Status
 shared_utils\dynamic_formatting\tests\test_function_fallback.py:190: AssertionError
 ____ TestConditionalFunctionFallback.test_conditional_receives_field_value ____
 
-self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestConditionalFunctionFallback object at 0x0000022C52CE4D10>
+self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestConditionalFunctionFallback object at 0x000001A73E8C8CB0>
 
     @pytest.mark.fallback
     def test_conditional_receives_field_value(self):
@@ -1770,7 +1306,7 @@ E         - \U0001f6a8 URGENT: Critical system failure detected
 shared_utils\dynamic_formatting\tests\test_function_fallback.py:214: AssertionError
 _____ TestCombinedFunctionFallback.test_color_and_text_functions_combined _____
 
-self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestCombinedFunctionFallback object at 0x0000022C52CE4F20>
+self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestCombinedFunctionFallback object at 0x000001A73E8C8E60>
 
     @pytest.mark.fallback
     def test_color_and_text_functions_combined(self):
@@ -1793,7 +1329,7 @@ E       AssertionError: assert '[error] System down' in ''
 shared_utils\dynamic_formatting\tests\test_function_fallback.py:239: AssertionError
 ________ TestCombinedFunctionFallback.test_all_function_types_combined ________
 
-self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestCombinedFunctionFallback object at 0x0000022C52CE50A0>
+self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestCombinedFunctionFallback object at 0x000001A73E8C8FE0>
 
     @pytest.mark.fallback
     def test_all_function_types_combined(self):
@@ -1829,7 +1365,7 @@ E       AssertionError: assert 'Task: Deploy' in ' '
 shared_utils\dynamic_formatting\tests\test_function_fallback.py:269: AssertionError
 ______ TestFunctionParameterHandling.test_function_receives_field_value _______
 
-self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestFunctionParameterHandling object at 0x0000022C52CE5250>
+self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestFunctionParameterHandling object at 0x000001A73E8C9160>
 
     @pytest.mark.fallback
     def test_function_receives_field_value(self):
@@ -1850,7 +1386,7 @@ E       AssertionError: assert 'First: alpha' in ' '
 shared_utils\dynamic_formatting\tests\test_function_fallback.py:294: AssertionError
 _______ TestFunctionParameterHandling.test_function_with_no_parameters ________
 
-self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestFunctionParameterHandling object at 0x0000022C52CE53D0>
+self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestFunctionParameterHandling object at 0x000001A73E8C92E0>
 
     @pytest.mark.fallback
     def test_function_with_no_parameters(self):
@@ -1870,7 +1406,7 @@ E       AssertionError: assert 'Generated: report' in ''
 shared_utils\dynamic_formatting\tests\test_function_fallback.py:309: AssertionError
 _____ TestFunctionParameterHandling.test_function_parameter_type_handling _____
 
-self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestFunctionParameterHandling object at 0x0000022C52CE5550>
+self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestFunctionParameterHandling object at 0x000001A73E8C9460>
 
     @pytest.mark.fallback
     def test_function_parameter_type_handling(self):
@@ -1894,7 +1430,7 @@ E       AssertionError: assert 'Value: 75' in ''
 shared_utils\dynamic_formatting\tests\test_function_fallback.py:327: AssertionError
 ___________ TestFunctionErrorHandling.test_function_not_found_error ___________
 
-self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestFunctionErrorHandling object at 0x0000022C52CE5730>
+self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestFunctionErrorHandling object at 0x000001A73E8C95B0>
 
     @pytest.mark.fallback
     @pytest.mark.error
@@ -1908,7 +1444,7 @@ E       Failed: DID NOT RAISE <class 'shared_utils.dynamic_formatting.formatters
 shared_utils\dynamic_formatting\tests\test_function_fallback.py:347: Failed
 ___________ TestFunctionErrorHandling.test_function_execution_error ___________
 
-self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestFunctionErrorHandling object at 0x0000022C52CE58B0>
+self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestFunctionErrorHandling object at 0x000001A73E8C9730>
 
     @pytest.mark.fallback
     @pytest.mark.error
@@ -1928,7 +1464,7 @@ E       Failed: DID NOT RAISE <class 'shared_utils.dynamic_formatting.formatters
 shared_utils\dynamic_formatting\tests\test_function_fallback.py:364: Failed
 ________ TestFunctionErrorHandling.test_function_returns_invalid_type _________
 
-self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestFunctionErrorHandling object at 0x0000022C52CE5A30>
+self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestFunctionErrorHandling object at 0x000001A73E8C98B0>
 
     @pytest.mark.fallback
     @pytest.mark.error
@@ -1948,7 +1484,7 @@ E       Failed: DID NOT RAISE <class 'shared_utils.dynamic_formatting.formatters
 shared_utils\dynamic_formatting\tests\test_function_fallback.py:382: Failed
 ________ TestFunctionErrorHandling.test_conditional_function_not_found ________
 
-self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestFunctionErrorHandling object at 0x0000022C52CE5BB0>
+self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestFunctionErrorHandling object at 0x000001A73E8C9A30>
 
     @pytest.mark.fallback
     @pytest.mark.error
@@ -1962,7 +1498,7 @@ E       Failed: DID NOT RAISE <class 'shared_utils.dynamic_formatting.formatters
 shared_utils\dynamic_formatting\tests\test_function_fallback.py:393: Failed
 ______ TestRecursiveFunctionFallback.test_function_returns_another_token ______
 
-self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestRecursiveFunctionFallback object at 0x0000022C52CE5DC0>
+self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestRecursiveFunctionFallback object at 0x000001A73E8C9C70>
 
     @pytest.mark.fallback
     def test_function_returns_another_token(self):
@@ -1983,7 +1519,7 @@ E       AssertionError: assert 'Alert: System issue' in ''
 shared_utils\dynamic_formatting\tests\test_function_fallback.py:415: AssertionError
 ________ TestRecursiveFunctionFallback.test_function_returns_hex_color ________
 
-self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestRecursiveFunctionFallback object at 0x0000022C52CE5F40>
+self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestRecursiveFunctionFallback object at 0x000001A73E8C9DF0>
 
     @pytest.mark.fallback
     def test_function_returns_hex_color(self):
@@ -2009,7 +1545,7 @@ E       AssertionError: assert 'Intensity 95%: Critical' in ''
 shared_utils\dynamic_formatting\tests\test_function_fallback.py:435: AssertionError
 ___________ TestComplexFunctionScenarios.test_log_level_formatting ____________
 
-self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestComplexFunctionScenarios object at 0x0000022C52CE1760>
+self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestComplexFunctionScenarios object at 0x000001A73E8C44D0>
 
     @pytest.mark.fallback
     def test_log_level_formatting(self):
@@ -2051,7 +1587,7 @@ E       AssertionError: assert '[ERROR]' in ' Connection failed '
 shared_utils\dynamic_formatting\tests\test_function_fallback.py:475: AssertionError
 ______ TestComplexFunctionScenarios.test_performance_monitoring_scenario ______
 
-self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestComplexFunctionScenarios object at 0x0000022C52CE60C0>
+self = <shared_utils.dynamic_formatting.tests.test_function_fallback.TestComplexFunctionScenarios object at 0x000001A73E8C9B50>
 
     @pytest.mark.fallback
     def test_performance_monitoring_scenario(self):
@@ -2095,7 +1631,7 @@ E       AssertionError: assert 'took 0.05s' in 'Operation: database_query   '
 shared_utils\dynamic_formatting\tests\test_function_fallback.py:525: AssertionError
 ______________ TestScalabilityTests.test_many_template_sections _______________
 
-self = <shared_utils.dynamic_formatting.tests.test_performance.TestScalabilityTests object at 0x0000022C52CE73E0>
+self = <shared_utils.dynamic_formatting.tests.test_performance.TestScalabilityTests object at 0x000001A73E8CB1D0>
 
     @pytest.mark.performance
     def test_many_template_sections(self):
@@ -2123,7 +1659,7 @@ E            +  where 929 = len('Section0: value0 Section1: value1 Section2: val
 shared_utils\dynamic_formatting\tests\test_performance.py:105: AssertionError
 ___________ TestMemoryUsage.test_formatter_reuse_memory_efficiency ____________
 
-self = <shared_utils.dynamic_formatting.tests.test_performance.TestMemoryUsage object at 0x0000022C52CE7BC0>
+self = <shared_utils.dynamic_formatting.tests.test_performance.TestMemoryUsage object at 0x000001A73E8CBA10>
 
     @pytest.mark.performance
     def test_formatter_reuse_memory_efficiency(self):
@@ -2158,74 +1694,9 @@ E       AssertionError: Formatter reuse not efficient enough: reuse=0.00MB, recr
 E       assert 0.0 < (0.0 / 2)
 
 shared_utils\dynamic_formatting\tests\test_performance.py:223: AssertionError
-_____________ TestFunctionPerformance.test_function_call_overhead _____________
-
-self = <shared_utils.dynamic_formatting.tests.test_performance.TestFunctionPerformance object at 0x0000022C52CE7D70>
-
-    @pytest.mark.performance
-    def test_function_call_overhead(self):
-        """Test overhead of function calls vs direct tokens"""
-        # Direct color token
-        direct_formatter = DynamicFormatter("{{#red;Direct: ;message}}")
-    
-        # Function-based color
-        def get_red(value):
-            return "red"
-    
-        function_formatter = DynamicFormatter(
-            "{{#get_red;Function: ;message}}",
-            functions={"get_red": get_red}
-        )
-    
-        # Benchmark direct tokens
-        start_time = time.time()
-        for i in range(1000):
-            result = direct_formatter.format(message=f"test{i}")
-        direct_time = time.time() - start_time
-    
-        # Benchmark function tokens
-        start_time = time.time()
-        for i in range(1000):
-            result = function_formatter.format(message=f"test{i}")
-        function_time = time.time() - start_time
-    
-        # Function overhead should be reasonable (less than 3x slower)
->       overhead_ratio = function_time / direct_time
-                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-E       ZeroDivisionError: float division by zero
-
-shared_utils\dynamic_formatting\tests\test_performance.py:273: ZeroDivisionError
-______ TestRegressionPerformance.test_positional_args_performance_parity ______
-
-self = <shared_utils.dynamic_formatting.tests.test_performance.TestRegressionPerformance object at 0x0000022C52CE6E10>
-
-    @pytest.mark.performance
-    def test_positional_args_performance_parity(self):
-        """Test that positional args perform similarly to keyword args"""
-        keyword_formatter = DynamicFormatter("{{Error: ;message}} {{Code: ;code}}")
-        positional_formatter = DynamicFormatter("{{Error: ;}} {{Code: ;}}")
-    
-        # Test keyword performance
-        start_time = time.time()
-        for i in range(5000):
-            result = keyword_formatter.format(message=f"Error {i}", code=i)
-        keyword_time = time.time() - start_time
-    
-        # Test positional performance
-        start_time = time.time()
-        for i in range(5000):
-            result = positional_formatter.format(f"Error {i}", i)
-        positional_time = time.time() - start_time
-    
-        # Positional should not be significantly slower than keyword
->       performance_ratio = positional_time / keyword_time
-                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-E       ZeroDivisionError: float division by zero
-
-shared_utils\dynamic_formatting\tests\test_performance.py:438: ZeroDivisionError
 ________________ TestPerformanceMetrics.test_metrics_creation _________________
 
-self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestPerformanceMetrics object at 0x0000022C53CF9910>
+self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestPerformanceMetrics object at 0x000001A73E9116A0>
 
     def test_metrics_creation(self):
         """Test creating performance metrics."""
@@ -2238,12 +1709,12 @@ self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestPerfo
             memory_after=105.0,
             memory_peak=110.0
         )
-E       TypeError: PerformanceMetrics.__init__() got an unexpected keyword argument 'start_time'
+E       TypeError: PerformanceMetrics.__init__() got an unexpected keyword argument 'duration'
 
 shared_utils\dynamic_formatting\tests\test_performance_monitor.py:39: TypeError
 ______________ TestPerformanceMetrics.test_metrics_serialization ______________
 
-self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestPerformanceMetrics object at 0x0000022C53CF9A90>
+self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestPerformanceMetrics object at 0x000001A73E911850>
 
     def test_metrics_serialization(self):
         """Test metrics to dictionary conversion."""
@@ -2256,12 +1727,12 @@ self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestPerfo
             memory_after=55.0,
             memory_peak=60.0
         )
-E       TypeError: PerformanceMetrics.__init__() got an unexpected keyword argument 'start_time'
+E       TypeError: PerformanceMetrics.__init__() got an unexpected keyword argument 'duration'
 
 shared_utils\dynamic_formatting\tests\test_performance_monitor.py:56: TypeError
 _________________ TestPerformanceStats.test_stats_aggregation _________________
 
-self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestPerformanceStats object at 0x0000022C53CF9C40>
+self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestPerformanceStats object at 0x000001A73E911A00>
 
     def test_stats_aggregation(self):
         """Test adding metrics to stats."""
@@ -2277,12 +1748,12 @@ self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestPerfo
             memory_after=105.0,
             memory_peak=110.0
         )
-E       TypeError: PerformanceMetrics.__init__() got an unexpected keyword argument 'start_time'
+E       TypeError: PerformanceMetrics.__init__() got an unexpected keyword argument 'duration'
 
 shared_utils\dynamic_formatting\tests\test_performance_monitor.py:84: TypeError
 ________________ TestPerformanceStats.test_stats_serialization ________________
 
-self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestPerformanceStats object at 0x0000022C53CF9DF0>
+self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestPerformanceStats object at 0x000001A73E911B80>
 
     def test_stats_serialization(self):
         """Test stats to dictionary conversion."""
@@ -2297,12 +1768,110 @@ self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestPerfo
             memory_after=103.0,
             memory_peak=105.0
         )
-E       TypeError: PerformanceMetrics.__init__() got an unexpected keyword argument 'start_time'
+E       TypeError: PerformanceMetrics.__init__() got an unexpected keyword argument 'duration'
 
 shared_utils\dynamic_formatting\tests\test_performance_monitor.py:124: TypeError
+_________________ TestPerformanceMonitor.test_basic_tracking __________________
+
+self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestPerformanceMonitor object at 0x000001A73E911E80>
+
+    def test_basic_tracking(self):
+        """Test basic operation tracking."""
+        monitor = PerformanceMonitor(enabled=True, auto_log_stats=False)
+    
+        with monitor.track("basic_test"):
+            time.sleep(0.01)  # 10ms delay
+    
+        stats = monitor.get_stats("basic_test")
+>       assert stats['operation_name'] == "basic_test"
+               ^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'operation_name'
+
+shared_utils\dynamic_formatting\tests\test_performance_monitor.py:164: KeyError
+_______________ TestPerformanceMonitor.test_multiple_operations _______________
+
+self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestPerformanceMonitor object at 0x000001A73E912000>
+
+    def test_multiple_operations(self):
+        """Test tracking multiple different operations."""
+        monitor = PerformanceMonitor(enabled=True, auto_log_stats=False)
+    
+        # Track different operations
+        with monitor.track("operation_a"):
+            time.sleep(0.005)
+    
+        with monitor.track("operation_b"):
+            time.sleep(0.002)
+    
+        with monitor.track("operation_a"):
+            time.sleep(0.003)
+    
+        all_stats = monitor.get_stats()
+>       assert len(all_stats) == 2
+E       assert 0 == 2
+E        +  where 0 = len([])
+
+shared_utils\dynamic_formatting\tests\test_performance_monitor.py:183: AssertionError
+________________ TestPerformanceMonitor.test_threshold_logging ________________
+
+self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestPerformanceMonitor object at 0x000001A73E912180>
+caplog = <_pytest.logging.LogCaptureFixture object at 0x000001A73EA4E1E0>
+
+    def test_threshold_logging(self, caplog):
+        """Test that slow operations are logged."""
+        monitor = PerformanceMonitor(
+            enabled=True,
+            log_threshold_ms=5.0,  # 5ms threshold
+            auto_log_stats=False
+        )
+    
+        # Fast operation - shouldn't log
+        with monitor.track("fast_operation"):
+            pass
+    
+        # Slow operation - should log
+        with monitor.track("slow_operation"):
+            time.sleep(0.01)  # 10ms - above threshold
+    
+        # Check that warning was logged for slow operation
+>       assert any("Slow operation detected" in record.message for record in caplog.records)
+E       assert False
+E        +  where False = any(<generator object TestPerformanceMonitor.test_threshold_logging.<locals>.<genexpr> at 0x000001A73EB71F20>)
+
+shared_utils\dynamic_formatting\tests\test_performance_monitor.py:208: AssertionError
+______________ TestPerformanceMonitor.test_regression_detection _______________
+
+self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestPerformanceMonitor object at 0x000001A73E912300>
+caplog = <_pytest.logging.LogCaptureFixture object at 0x000001A73EA4F5C0>
+
+    def test_regression_detection(self, caplog):
+        """Test performance regression detection."""
+        monitor = PerformanceMonitor(
+            enabled=True,
+            regression_threshold=2.0,  # Alert if 2x slower
+            auto_log_stats=False
+        )
+    
+        # Set baseline
+        monitor.set_baseline("regression_test", 0.001)  # 1ms baseline
+    
+        # Operation within baseline - shouldn't alert
+        with monitor.track("regression_test"):
+            time.sleep(0.001)
+    
+        # Operation that exceeds regression threshold - should alert
+        with monitor.track("regression_test"):
+            time.sleep(0.003)  # 3ms - 3x baseline
+    
+        # Check that regression was detected
+>       assert any("Performance regression detected" in record.message for record in caplog.records)
+E       assert False
+E        +  where False = any(<generator object TestPerformanceMonitor.test_regression_detection.<locals>.<genexpr> at 0x000001A73EB73ED0>)
+
+shared_utils\dynamic_formatting\tests\test_performance_monitor.py:231: AssertionError
 __________________ TestPerformanceMonitor.test_stats_export ___________________
 
-self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestPerformanceMonitor object at 0x0000022C52CE7500>
+self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestPerformanceMonitor object at 0x000001A73E8CB170>
 
     def test_stats_export(self):
         """Test exporting stats to file."""
@@ -2326,72 +1895,153 @@ self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestPerfo
             assert 'timestamp' in data
             assert 'total_operations' in data
 >           assert 'operations' in data
-E           AssertionError: assert 'operations' in {'statistics': [{'avg_duration_ms': 1.5087999636307359, 'avg_memory_usage_mb': 0.0, 'max_duration_ms': 1.5087999636307359, 'max_memory_usage_mb': 0.0, ...}], 'timestamp': 1755702480.0008438, 'total_operations': 0}
+E           AssertionError: assert 'operations' in {'statistics': [], 'timestamp': 1755706384.6633782, 'total_operations': 0}
 
 shared_utils\dynamic_formatting\tests\test_performance_monitor.py:254: AssertionError
+__________________ TestPerformanceMonitor.test_thread_safety __________________
+
+self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestPerformanceMonitor object at 0x000001A73E9115B0>
+
+    def test_thread_safety(self):
+        """Test that monitor works correctly with multiple threads."""
+        monitor = PerformanceMonitor(enabled=True, auto_log_stats=False)
+        results = []
+    
+        def worker(worker_id):
+            for i in range(10):
+                with monitor.track(f"worker_{worker_id}"):
+                    time.sleep(0.001)
+            results.append(worker_id)
+    
+        # Run multiple threads
+        threads = []
+        for i in range(3):
+            thread = threading.Thread(target=worker, args=(i,))
+            threads.append(thread)
+            thread.start()
+    
+        for thread in threads:
+            thread.join()
+    
+        # Verify all workers completed
+        assert sorted(results) == [0, 1, 2]
+    
+        # Verify stats were collected correctly
+        all_stats = monitor.get_stats()
+>       assert len(all_stats) == 3  # One stat per worker
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert 0 == 3
+E        +  where 0 = len([])
+
+shared_utils\dynamic_formatting\tests\test_performance_monitor.py:287: AssertionError
+_________ TestDynamicFormatterIntegration.test_formatter_with_monitor _________
+
+self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestDynamicFormatterIntegration object at 0x000001A73E911DF0>
+
+    def test_formatter_with_monitor(self):
+        """Test formatter with performance monitoring enabled."""
+        monitor = PerformanceMonitor(enabled=True, auto_log_stats=False)
+        formatter = DynamicFormatter("{{Hello ;name}}", performance_monitor=monitor)
+    
+        result = formatter.format(name="World")
+        assert result == "Hello World"
+    
+        # Verify monitoring occurred
+        stats = monitor.get_stats("format_operation")
+>       assert stats['total_calls'] == 1
+               ^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'total_calls'
+
+shared_utils\dynamic_formatting\tests\test_performance_monitor.py:314: KeyError
 ___________ TestDynamicFormatterIntegration.test_detailed_tracking ____________
 
-self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestDynamicFormatterIntegration object at 0x0000022C53CF98B0>
+self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestDynamicFormatterIntegration object at 0x000001A73E9119A0>
 
     def test_detailed_tracking(self):
         """Test detailed performance tracking."""
         monitor = PerformanceMonitor(enabled=True, auto_log_stats=False)
         formatter = DynamicFormatter("{{Processing ;item}}", performance_monitor=monitor)
     
->       result, metrics = formatter.format_with_detailed_tracking(item="test_data")
-                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-shared_utils\dynamic_formatting\tests\test_performance_monitor.py:321: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-self = <shared_utils.dynamic_formatting.enhanced_formatter.DynamicFormatter object at 0x0000022C53E21BE0>
-args = (), kwargs = {'item': 'test_data'}, tracker = None
-result = 'Processing test_data'
-
-    def format_with_detailed_tracking(self, *args, **kwargs) -> tuple[str, Optional[Dict[str, Any]]]:
-        """
-        Format template and return both result and performance metrics.
+        result, metrics = formatter.format_with_detailed_tracking(item="test_data")
     
-        Useful for debugging performance issues or detailed monitoring.
-    
-        Returns:
-            Tuple of (formatted_result, performance_metrics)
-        """
-        if self.performance_monitor:
-            with self.performance_monitor.track('format_operation_detailed') as tracker:
-                result = super().format(*args, **kwargs)
->               return result, tracker.get_metrics()
-                               ^^^^^^^^^^^^^^^^^^^
-E               AttributeError: 'NoneType' object has no attribute 'get_metrics'
+        assert result == "Processing test_data"
+>       assert metrics is not None
+E       assert None is not None
 
-shared_utils\dynamic_formatting\enhanced_formatter.py:95: AttributeError
+shared_utils\dynamic_formatting\tests\test_performance_monitor.py:324: AssertionError
 _____ TestDynamicFormatterIntegration.test_production_formatter_creation ______
 
-self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestDynamicFormatterIntegration object at 0x0000022C53CFA780>
+self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestDynamicFormatterIntegration object at 0x000001A73E910110>
 
     def test_production_formatter_creation(self):
         """Test creating production formatter with monitoring."""
-        formatter = create_production_formatter(
+>       formatter = create_production_formatter(
             template="{{app}}: {{message}}",
             monitor_slow_operations=True,
             monitor_memory_usage=True
         )
-    
-        assert formatter.performance_monitor is not None
-        assert formatter.performance_monitor.enabled is True
-    
-        result = formatter.format(app="test-app", message="test message")
-        assert result == "test-app: test message"
-    
-        # Should have tracked the operation
->       stats = formatter.get_performance_stats()
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-E       AttributeError: 'DynamicFormatter' object has no attribute 'get_performance_stats'
 
-shared_utils\dynamic_formatting\tests\test_performance_monitor.py:343: AttributeError
+shared_utils\dynamic_formatting\tests\test_performance_monitor.py:330: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+shared_utils\dynamic_formatting\enhanced_formatter.py:108: in create_production_formatter
+    config = FormatterConfig.production(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+cls = <class 'shared_utils.dynamic_formatting.config.FormatterConfig'>
+overrides = {'enable_performance_monitoring': True, 'functions': {}}
+
+    @classmethod
+    def production(cls, **overrides) -> 'FormatterConfig':
+        """Create configuration optimized for production"""
+>       return cls(
+            validation_mode=ValidationMode.GRACEFUL,
+            validation_level=ValidationLevel.ERROR,
+            enable_validation=True,
+            auto_correct_suggestions=False,
+            cache_parsed_templates=True,
+            strict_argument_validation=False,  # More lenient in production
+            enable_performance_monitoring=False,  # Can be enabled if needed
+            **overrides
+        )
+E       TypeError: shared_utils.dynamic_formatting.config.FormatterConfig() got multiple values for keyword argument 'enable_performance_monitoring'
+
+shared_utils\dynamic_formatting\config.py:233: TypeError
+_____ TestDynamicFormatterIntegration.test_development_formatter_creation _____
+
+self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestDynamicFormatterIntegration object at 0x000001A73E9125A0>
+
+    def test_development_formatter_creation(self):
+        """Test creating development formatter with monitoring."""
+>       formatter = create_development_formatter("{{Debug: ;value}}")
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+shared_utils\dynamic_formatting\tests\test_performance_monitor.py:348: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+shared_utils\dynamic_formatting\enhanced_formatter.py:149: in create_development_formatter
+    config = FormatterConfig.development(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+cls = <class 'shared_utils.dynamic_formatting.config.FormatterConfig'>
+overrides = {'enable_performance_monitoring': True, 'functions': {}}
+
+    @classmethod
+    def development(cls, **overrides) -> 'FormatterConfig':
+        """Create configuration optimized for development"""
+>       return cls(
+            validation_mode=ValidationMode.STRICT,
+            validation_level=ValidationLevel.INFO,
+            enable_validation=True,
+            auto_correct_suggestions=True,
+            cache_parsed_templates=False,  # Disable caching for development
+            enable_performance_monitoring=True,
+            **overrides
+        )
+E       TypeError: shared_utils.dynamic_formatting.config.FormatterConfig() got multiple values for keyword argument 'enable_performance_monitoring'
+
+shared_utils\dynamic_formatting\config.py:220: TypeError
 _____________ TestProductionScenarios.test_high_volume_operations _____________
 
-self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestProductionScenarios object at 0x0000022C53CFABD0>
+self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestProductionScenarios object at 0x000001A73E912780>
 
     def test_high_volume_operations(self):
         """Test monitoring under high operation volume."""
@@ -2413,16 +2063,148 @@ self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestProdu
             result = formatter.format(id=f"REQ-{i:04d}", status="PROCESSED")
     
         stats = monitor.get_stats("format_operation")
-        assert stats['total_calls'] == operation_count
->       assert stats['calls_per_second'] > 100  # Should be quite fast
-               ^^^^^^^^^^^^^^^^^^^^^^^^^
-E       KeyError: 'calls_per_second'
+>       assert stats['total_calls'] == operation_count
+               ^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'total_calls'
 
-shared_utils\dynamic_formatting\tests\test_performance_monitor.py:381: KeyError
+shared_utils\dynamic_formatting\tests\test_performance_monitor.py:380: KeyError
+___________ TestProductionScenarios.test_memory_monitoring_accuracy ___________
+
+self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestProductionScenarios object at 0x000001A73E912900>
+
+    def test_memory_monitoring_accuracy(self):
+        """Test that memory monitoring detects actual memory usage."""
+        monitor = PerformanceMonitor(
+            enabled=True,
+            memory_threshold_mb=0.1,  # Very low threshold
+            auto_log_stats=False
+        )
+    
+        # Create formatter that might use more memory
+        large_functions = {f"func_{i}": lambda x: "x" * 1000 for i in range(100)}
+        formatter = DynamicFormatter(
+            "{{data}}",
+            functions=large_functions,
+            performance_monitor=monitor
+        )
+    
+        # Format with large data
+        large_data = "x" * 10000  # 10KB string
+        result = formatter.format(data=large_data)
+    
+        stats = monitor.get_stats("format_operation")
+        # Memory usage should be detected (though exact values depend on Python internals)
+>       assert 'avg_memory_usage_mb' in stats
+E       AssertionError: assert 'avg_memory_usage_mb' in {}
+
+shared_utils\dynamic_formatting\tests\test_performance_monitor.py:405: AssertionError
+______________ TestProductionScenarios.test_alerting_integration ______________
+
+self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestProductionScenarios object at 0x000001A73E912A20>
+mock_logger = <MagicMock name='warning' id='1817819909200'>
+
+    @patch('logging.Logger.warning')
+    def test_alerting_integration(self, mock_logger):
+        """Test integration with alerting systems."""
+        monitor = PerformanceMonitor(
+            enabled=True,
+            log_threshold_ms=1.0,  # Very strict
+            memory_threshold_mb=0.1,
+            auto_log_stats=False
+        )
+    
+        formatter = DynamicFormatter("{{test}}", performance_monitor=monitor)
+    
+        # Trigger slow operation alert
+        with monitor.track("manual_slow_operation"):
+            time.sleep(0.005)  # 5ms - above 1ms threshold
+    
+        # Verify logging was called
+>       mock_logger.assert_called()
+
+shared_utils\dynamic_formatting\tests\test_performance_monitor.py:424: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <MagicMock name='warning' id='1817819909200'>
+
+    def assert_called(self):
+        """assert that the mock was called at least once
+        """
+        if self.call_count == 0:
+            msg = ("Expected '%s' to have been called." %
+                   (self._mock_name or 'mock'))
+>           raise AssertionError(msg)
+E           AssertionError: Expected 'warning' to have been called.
+
+C:\Program Files\Python312\Lib\unittest\mock.py:913: AssertionError
+_________________ TestEdgeCases.test_monitor_with_exceptions __________________
+
+self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestEdgeCases object at 0x000001A73E912C60>
+
+    def test_monitor_with_exceptions(self):
+        """Test that monitor handles exceptions in tracked code."""
+        monitor = PerformanceMonitor(enabled=True, auto_log_stats=False)
+    
+        with pytest.raises(ValueError):
+            with monitor.track("exception_test"):
+                raise ValueError("Test exception")
+    
+        # Should still record metrics even when exception occurs
+        stats = monitor.get_stats("exception_test")
+>       assert stats['total_calls'] == 1
+               ^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'total_calls'
+
+shared_utils\dynamic_formatting\tests\test_performance_monitor.py:442: KeyError
+____________________ TestEdgeCases.test_concurrent_access _____________________
+
+self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestEdgeCases object at 0x000001A73E912E40>
+
+    def test_concurrent_access(self):
+        """Test concurrent access to monitor doesn't cause issues."""
+        monitor = PerformanceMonitor(enabled=True, auto_log_stats=False)
+    
+        def concurrent_worker():
+            for _ in range(100):
+                with monitor.track("concurrent_test"):
+                    pass
+    
+        # Run multiple threads concurrently
+        threads = [threading.Thread(target=concurrent_worker) for _ in range(5)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+    
+        stats = monitor.get_stats("concurrent_test")
+>       assert stats['total_calls'] == 500  # 5 threads * 100 operations each
+               ^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'total_calls'
+
+shared_utils\dynamic_formatting\tests\test_performance_monitor.py:461: KeyError
+___________________ TestEdgeCases.test_very_fast_operations ___________________
+
+self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestEdgeCases object at 0x000001A73E912FC0>
+
+    def test_very_fast_operations(self):
+        """Test monitoring of very fast operations."""
+        monitor = PerformanceMonitor(enabled=True, auto_log_stats=False)
+    
+        # Very fast operations
+        for _ in range(1000):
+            with monitor.track("fast_op"):
+                pass  # Essentially instantaneous
+    
+        stats = monitor.get_stats("fast_op")
+>       assert stats['total_calls'] == 1000
+               ^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'total_calls'
+
+shared_utils\dynamic_formatting\tests\test_performance_monitor.py:473: KeyError
 ________________ TestEdgeCases.test_memory_monitoring_failure _________________
 
-self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestEdgeCases object at 0x0000022C53CFB500>
-mock_process = <MagicMock name='Process' id='2389390625776'>
+self = <shared_utils.dynamic_formatting.tests.test_performance_monitor.TestEdgeCases object at 0x000001A73E9131A0>
+mock_process = <MagicMock name='Process' id='1817822160384'>
 
     @patch('psutil.Process')
     def test_memory_monitoring_failure(self, mock_process):
@@ -2433,44 +2215,18 @@ mock_process = <MagicMock name='Process' id='2389390625776'>
         monitor = PerformanceMonitor(enabled=True, auto_log_stats=False)
     
         # Should not raise exception, should gracefully handle failure
->       with monitor.track("memory_fail_test"):
-
-shared_utils\dynamic_formatting\tests\test_performance_monitor.py:485: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-C:\Program Files\Python312\Lib\contextlib.py:137: in __enter__
-    return next(self.gen)
-           ^^^^^^^^^^^^^^
-shared_utils\dynamic_formatting\performance_monitor.py:128: in track
-    start_memory = self._get_memory_usage()
-                   ^^^^^^^^^^^^^^^^^^^^^^^^
-shared_utils\dynamic_formatting\performance_monitor.py:197: in _get_memory_usage
-    return process.memory_info().rss / 1024 / 1024  # Convert to MB
-           ^^^^^^^^^^^^^^^^^^^^^
-C:\Program Files\Python312\Lib\unittest\mock.py:1134: in __call__
-    return self._mock_call(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-C:\Program Files\Python312\Lib\unittest\mock.py:1138: in _mock_call
-    return self._execute_mock_call(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-self = <MagicMock name='Process().memory_info' id='2389408586192'>, args = ()
-kwargs = {}, effect = Exception('Memory access failed')
-
-    def _execute_mock_call(self, /, *args, **kwargs):
-        # separate from _increment_mock_call so that awaited functions are
-        # executed separately from their call, also AsyncMock overrides this method
+        with monitor.track("memory_fail_test"):
+            pass
     
-        effect = self.side_effect
-        if effect is not None:
-            if _is_exception(effect):
->               raise effect
-E               Exception: Memory access failed
+        stats = monitor.get_stats("memory_fail_test")
+>       assert stats['total_calls'] == 1
+               ^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'total_calls'
 
-C:\Program Files\Python312\Lib\unittest\mock.py:1193: Exception
+shared_utils\dynamic_formatting\tests\test_performance_monitor.py:489: KeyError
 ____________ TestPositionalMissingData.test_no_arguments_provided _____________
 
-self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositionalMissingData object at 0x0000022C53CFE630>
+self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositionalMissingData object at 0x000001A73E916300>
 
     @pytest.mark.positional
     def test_no_arguments_provided(self):
@@ -2489,7 +2245,7 @@ E         + ' '
 shared_utils\dynamic_formatting\tests\test_positional_args.py:82: AssertionError
 _______ TestPositionalWithFormatting.test_complex_positional_formatting _______
 
-self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositionalWithFormatting object at 0x0000022C53CFEF90>
+self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositionalWithFormatting object at 0x000001A73E916C60>
 
     @pytest.mark.positional
     def test_complex_positional_formatting(self):
@@ -2497,12 +2253,12 @@ self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositiona
         formatter = DynamicFormatter("{{#red@bold;Warning: ;;!}}")
         result = formatter.format("Low disk space")
 >       assert "Warning: Low disk space!" in result
-E       AssertionError: assert 'Warning: Low disk space!' in ''
+E       AssertionError: assert 'Warning: Low disk space!' in '\x1b[1m\x1b[31mLow disk space;!\x1b[0m\x1b[0m'
 
 shared_utils\dynamic_formatting\tests\test_positional_args.py:137: AssertionError
 __ TestPositionalWithConditionals.test_positional_section_level_conditional ___
 
-self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositionalWithConditionals object at 0x0000022C53CFF1D0>
+self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositionalWithConditionals object at 0x000001A73E916EA0>
 
     @pytest.mark.positional
     def test_positional_section_level_conditional(self):
@@ -2525,7 +2281,7 @@ E         - Found: test
 shared_utils\dynamic_formatting\tests\test_positional_args.py:156: AssertionError
 ______ TestPositionalWithConditionals.test_positional_inline_conditional ______
 
-self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositionalWithConditionals object at 0x0000022C53CFF350>
+self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositionalWithConditionals object at 0x000001A73E917020>
 
     @pytest.mark.positional
     def test_positional_inline_conditional(self):
@@ -2544,12 +2300,12 @@ self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositiona
 
 shared_utils\dynamic_formatting\tests\test_positional_args.py:178: 
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-shared_utils\dynamic_formatting\enhanced_formatter.py:81: in format
+shared_utils\dynamic_formatting\enhanced_formatter.py:54: in format
     return super().format(*args, **kwargs)
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
-self = <shared_utils.dynamic_formatting.enhanced_formatter.DynamicFormatter object at 0x0000022C53D953A0>
+self = <shared_utils.dynamic_formatting.enhanced_formatter.DynamicFormatter object at 0x000001A73EA4BA70>
 args = ('deploy',), kwargs = {'priority': 9}
 
     def format(self, *args, **kwargs) -> str:
@@ -2579,10 +2335,10 @@ args = ('deploy',), kwargs = {'priority': 9}
                 )
 E               shared_utils.dynamic_formatting.dynamic_formatting.DynamicFormattingError: Cannot mix positional and keyword arguments. Use either positional args format(a, b, c) or keyword args format(key=value)
 
-shared_utils\dynamic_formatting\dynamic_formatting.py:204: DynamicFormattingError
+shared_utils\dynamic_formatting\dynamic_formatting.py:193: DynamicFormattingError
 ____ TestPositionalWithConditionals.test_multiple_positional_conditionals _____
 
-self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositionalWithConditionals object at 0x0000022C53CFF4D0>
+self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositionalWithConditionals object at 0x000001A73E9171A0>
 
     @pytest.mark.positional
     def test_multiple_positional_conditionals(self):
@@ -2610,7 +2366,7 @@ E         + ' '
 shared_utils\dynamic_formatting\tests\test_positional_args.py:201: AssertionError
 _______ TestPositionalWithFunctionFallback.test_chained_function_calls ________
 
-self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositionalWithFunctionFallback object at 0x0000022C53CFE930>
+self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositionalWithFunctionFallback object at 0x000001A73E9165D0>
 
     @pytest.mark.positional
     @pytest.mark.fallback
@@ -2643,7 +2399,7 @@ E       AssertionError: assert 'becomes CRITICAL' in 'Priority 9 becomes \x1b[31
 shared_utils\dynamic_formatting\tests\test_positional_args.py:283: AssertionError
 ____ TestPositionalErrorConditions.test_required_positional_field_missing _____
 
-self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositionalErrorConditions object at 0x0000022C53CFF500>
+self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositionalErrorConditions object at 0x000001A73E916D80>
 
     @pytest.mark.positional
     @pytest.mark.error
@@ -2661,7 +2417,7 @@ E       assert 'Required field missing' in "Required field '__pos_0__' is missin
 shared_utils\dynamic_formatting\tests\test_positional_args.py:323: AssertionError
 _ TestPositionalErrorConditions.test_missing_conditional_function_positional __
 
-self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositionalErrorConditions object at 0x0000022C53CFF770>
+self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositionalErrorConditions object at 0x000001A73E917380>
 
     @pytest.mark.positional
     @pytest.mark.error
@@ -2675,7 +2431,7 @@ E       Failed: DID NOT RAISE <class 'shared_utils.dynamic_formatting.dynamic_fo
 shared_utils\dynamic_formatting\tests\test_positional_args.py:332: Failed
 ______ TestPositionalEdgeCases.test_empty_template_with_positional_args _______
 
-self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositionalEdgeCases object at 0x0000022C53CFF950>
+self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositionalEdgeCases object at 0x000001A73E917560>
 
     @pytest.mark.positional
     @pytest.mark.error
@@ -2687,12 +2443,12 @@ self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositiona
 
 shared_utils\dynamic_formatting\tests\test_positional_args.py:346: 
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-shared_utils\dynamic_formatting\enhanced_formatter.py:81: in format
+shared_utils\dynamic_formatting\enhanced_formatter.py:54: in format
     return super().format(*args, **kwargs)
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
-self = <shared_utils.dynamic_formatting.enhanced_formatter.DynamicFormatter object at 0x0000022C53E1DD30>
+self = <shared_utils.dynamic_formatting.enhanced_formatter.DynamicFormatter object at 0x000001A73EA4A420>
 args = ('ignored',), kwargs = {}, field_sections = [], expected = 0, got = 1
 
     def format(self, *args, **kwargs) -> str:
@@ -2739,10 +2495,10 @@ args = ('ignored',), kwargs = {}, field_sections = [], expected = 0, got = 1
                     )
 E                   shared_utils.dynamic_formatting.dynamic_formatting.DynamicFormattingError: Too many positional arguments: expected 0, got 1. Template has 0 field sections but 1 arguments were provided
 
-shared_utils\dynamic_formatting\dynamic_formatting.py:221: DynamicFormattingError
+shared_utils\dynamic_formatting\dynamic_formatting.py:210: DynamicFormattingError
 ___ TestPositionalEdgeCases.test_literal_only_template_with_positional_args ___
 
-self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositionalEdgeCases object at 0x0000022C53CFFAD0>
+self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositionalEdgeCases object at 0x000001A73E9176E0>
 
     @pytest.mark.positional
     def test_literal_only_template_with_positional_args(self):
@@ -2753,12 +2509,12 @@ self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositiona
 
 shared_utils\dynamic_formatting\tests\test_positional_args.py:353: 
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-shared_utils\dynamic_formatting\enhanced_formatter.py:81: in format
+shared_utils\dynamic_formatting\enhanced_formatter.py:54: in format
     return super().format(*args, **kwargs)
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
-self = <shared_utils.dynamic_formatting.enhanced_formatter.DynamicFormatter object at 0x0000022C53E3AD20>
+self = <shared_utils.dynamic_formatting.enhanced_formatter.DynamicFormatter object at 0x000001A73EA4ACF0>
 args = ('ignored',), kwargs = {}, field_sections = [], expected = 0, got = 1
 
     def format(self, *args, **kwargs) -> str:
@@ -2805,27 +2561,10 @@ args = ('ignored',), kwargs = {}, field_sections = [], expected = 0, got = 1
                     )
 E                   shared_utils.dynamic_formatting.dynamic_formatting.DynamicFormattingError: Too many positional arguments: expected 0, got 1. Template has 0 field sections but 1 arguments were provided
 
-shared_utils\dynamic_formatting\dynamic_formatting.py:221: DynamicFormattingError
-_______ TestPositionalEdgeCases.test_zero_positional_sections_with_args _______
-
-self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositionalEdgeCases object at 0x0000022C53CFFDD0>
-
-    @pytest.mark.positional
-    def test_zero_positional_sections_with_args(self):
-        """Test template with no positional sections but positional args provided"""
-        formatter = DynamicFormatter("{{named_field}}")
-    
-        # Should work - positional args are mapped to field sections in order
-        result = formatter.format("test")
->       assert result == "test"
-E       AssertionError: assert '' == 'test'
-E         
-E         - test
-
-shared_utils\dynamic_formatting\tests\test_positional_args.py:376: AssertionError
+shared_utils\dynamic_formatting\dynamic_formatting.py:210: DynamicFormattingError
 _____ TestPositionalSyntaxPatterns.test_all_positional_syntax_variations ______
 
-self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositionalSyntaxPatterns object at 0x0000022C53D00050>
+self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositionalSyntaxPatterns object at 0x000001A73E917C20>
 
     @pytest.mark.positional
     @pytest.mark.regression
@@ -2850,13 +2589,13 @@ self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositiona
     
             # For formatted text, just check that the expected content is present
 >           assert expected_content in result, f"Template '{template}' with args {args} failed. Expected '{expected_content}' in result '{result}'"
-E           AssertionError: Template '{{prefix;suffix}}' with args ['test'] failed. Expected 'prefixtestsuffix' in result ''
-E           assert 'prefixtestsuffix' in ''
+E           AssertionError: Template '{{prefix;suffix}}' with args ['test'] failed. Expected 'prefixtestsuffix' in result 'prefixtest'
+E           assert 'prefixtestsuffix' in 'prefixtest'
 
 shared_utils\dynamic_formatting\tests\test_positional_args.py:404: AssertionError
 ______ TestPositionalSyntaxPatterns.test_complex_positional_combinations ______
 
-self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositionalSyntaxPatterns object at 0x0000022C53D001A0>
+self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositionalSyntaxPatterns object at 0x000001A73E917DA0>
 
     @pytest.mark.positional
     def test_complex_positional_combinations(self):
@@ -2875,12 +2614,12 @@ self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestPositiona
         # All arguments provided
         result = formatter.format("SUCCESS", 150, 2.5)
 >       assert "Status: SUCCESS" in result
-E       AssertionError: assert 'Status: SUCCESS' in '  '
+E       AssertionError: assert 'Status: SUCCESS' in '\x1b[1m\x1b[32mSUCCESS\x1b[0m\x1b[0m  Duration: 2.5'
 
 shared_utils\dynamic_formatting\tests\test_positional_args.py:422: AssertionError
 _____ TestBackwardCompatibility.test_complex_keyword_formatting_unchanged _____
 
-self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestBackwardCompatibility object at 0x0000022C53D004D0>
+self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestBackwardCompatibility object at 0x000001A73E90C110>
 
     @pytest.mark.positional
     @pytest.mark.regression
@@ -2901,7 +2640,7 @@ E       AssertionError: assert '[ERROR]' in ' test'
 shared_utils\dynamic_formatting\tests\test_positional_args.py:463: AssertionError
 ________ TestBackwardCompatibility.test_keyword_conditionals_unchanged ________
 
-self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestBackwardCompatibility object at 0x0000022C53D00650>
+self = <shared_utils.dynamic_formatting.tests.test_positional_args.TestBackwardCompatibility object at 0x000001A73E90C290>
 
     @pytest.mark.positional
     @pytest.mark.regression
@@ -2999,7 +2738,7 @@ _______________________ test_positional_complex_syntax ________________________
         formatter = DynamicFormatter("{{#red@bold;Warning: ;;!}}")
         result = formatter.format("Low disk space")
 >       assert "Warning: Low disk space!" in result
-E       AssertionError: assert 'Warning: Low disk space!' in ''
+E       AssertionError: assert 'Warning: Low disk space!' in '\x1b[1m\x1b[31mLow disk space;!\x1b[0m\x1b[0m'
 
 shared_utils\dynamic_formatting\tests\test_positional_regression.py:185: AssertionError
 ___________________ test_error_conditions_missing_functions ___________________
@@ -3015,26 +2754,6 @@ E           AssertionError: Should have raised FunctionNotFoundError
 E           assert False
 
 shared_utils\dynamic_formatting\tests\test_positional_regression.py:264: AssertionError
-__________________ test_edge_cases_zero_positional_sections ___________________
-
-    def test_edge_cases_zero_positional_sections():
-        """Test edge case: no positional sections in template"""
-        formatter = DynamicFormatter("{{named_field}}")
-    
-        # Should work fine with keyword args
-        result = formatter.format(named_field="test")
-        assert result == "test"
-    
-        # Should fail with positional args - there are field sections, but using positional args should work
-        # Actually, this should work because we map positional args to field sections in order
-        result = formatter.format("test")
->       assert result == "test", f"Expected 'test', got '{result}'"
-E       AssertionError: Expected 'test', got ''
-E       assert '' == 'test'
-E         
-E         - test
-
-shared_utils\dynamic_formatting\tests\test_positional_regression.py:293: AssertionError
 ____________________ test_logging_formatter_compatibility _____________________
 
     def test_logging_formatter_compatibility():
@@ -3085,7 +2804,7 @@ __________________________ test_all_syntax_patterns ___________________________
                 continue  # Pass
             else:
 >               raise AssertionError(f"Pattern '{pattern}' with args {args} failed. Expected base '{expected_base}' in result '{result}'")
-E               AssertionError: Pattern '{{my_field}}' with args ['test'] failed. Expected base 'test' in result ''
+E               AssertionError: Pattern '{{#red@bold;prefix;my_field}}' with args ['test'] failed. Expected base 'prefixtest' in result '[1m[31mtestmy_field[0m[0m'
 
 shared_utils\dynamic_formatting\tests\test_positional_regression.py:366: AssertionError
 ============================== warnings summary ===============================
@@ -3655,14 +3374,20 @@ shared_utils/dynamic_formatting/test_fixes.py::test_basic_formatting
   See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
     warnings.warn(
 
-shared_utils/dynamic_formatting/test_fixes.py::test_missing_data_handling
-  C:\Users\krjar\AppData\Roaming\Python\Python312\site-packages\_pytest\python.py:161: PytestReturnNotNoneWarning: Test functions should return None, but shared_utils/dynamic_formatting/test_fixes.py::test_missing_data_handling returned <class 'bool'>.
+shared_utils/dynamic_formatting/test_fixes.py::test_configuration
+  C:\Users\krjar\AppData\Roaming\Python\Python312\site-packages\_pytest\python.py:161: PytestReturnNotNoneWarning: Test functions should return None, but shared_utils/dynamic_formatting/test_fixes.py::test_configuration returned <class 'bool'>.
   Did you mean to use `assert` instead of `return`?
   See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
     warnings.warn(
 
-shared_utils/dynamic_formatting/test_fixes.py::test_none_value_handling
-  C:\Users\krjar\AppData\Roaming\Python\Python312\site-packages\_pytest\python.py:161: PytestReturnNotNoneWarning: Test functions should return None, but shared_utils/dynamic_formatting/test_fixes.py::test_none_value_handling returned <class 'bool'>.
+shared_utils/dynamic_formatting/test_fixes.py::test_performance_monitoring
+  C:\Users\krjar\AppData\Roaming\Python\Python312\site-packages\_pytest\python.py:161: PytestReturnNotNoneWarning: Test functions should return None, but shared_utils/dynamic_formatting/test_fixes.py::test_performance_monitoring returned <class 'bool'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+shared_utils/dynamic_formatting/test_fixes.py::test_color_formatting
+  C:\Users\krjar\AppData\Roaming\Python\Python312\site-packages\_pytest\python.py:161: PytestReturnNotNoneWarning: Test functions should return None, but shared_utils/dynamic_formatting/test_fixes.py::test_color_formatting returned <class 'bool'>.
   Did you mean to use `assert` instead of `return`?
   See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
     warnings.warn(
@@ -3697,21 +3422,18 @@ shared_utils/dynamic_formatting/test_fixes.py::test_escape_sequences
   See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
     warnings.warn(
 
+shared_utils/dynamic_formatting/test_fixes.py::test_required_fields
+  C:\Users\krjar\AppData\Roaming\Python\Python312\site-packages\_pytest\python.py:161: PytestReturnNotNoneWarning: Test functions should return None, but shared_utils/dynamic_formatting/test_fixes.py::test_required_fields returned <class 'bool'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
 =========================== short test summary info ===========================
-FAILED shared_utils/dynamic_formatting/tests/test_actual_config_files.py::TestActualConfigFiles::test_config_file_loads_with_formatterconfig
-FAILED shared_utils/dynamic_formatting/tests/test_actual_config_files.py::TestActualConfigFiles::test_config_file_creates_working_formatter
-FAILED shared_utils/dynamic_formatting/tests/test_actual_config_files.py::TestActualConfigFiles::test_all_configs_different_settings
-FAILED shared_utils/dynamic_formatting/tests/test_actual_config_files.py::TestActualConfigFiles::test_config_round_trip
-FAILED shared_utils/dynamic_formatting/tests/test_actual_config_files.py::test_discover_and_run
 FAILED shared_utils/dynamic_formatting/tests/test_config_support.py::TestFormatterConfigFileSupport::test_from_config_file_invalid_json
 FAILED shared_utils/dynamic_formatting/tests/test_config_support.py::TestFormatterConfigFileSupport::test_to_config_file_nested
-FAILED shared_utils/dynamic_formatting/tests/test_config_support.py::TestFormatterConfigEnvironment::test_from_environment_basic
 FAILED shared_utils/dynamic_formatting/tests/test_config_support.py::TestFormatterConfigEnvironment::test_from_environment_custom_prefix
-FAILED shared_utils/dynamic_formatting/tests/test_config_support.py::TestDynamicFormatterConfigMethods::test_from_config_dict
 FAILED shared_utils/dynamic_formatting/tests/test_config_support.py::TestDynamicFormatterConfigMethods::test_from_config_formatter_config
-FAILED shared_utils/dynamic_formatting/tests/test_config_support.py::TestDynamicFormatterConfigMethods::test_from_config_file_path
-FAILED shared_utils/dynamic_formatting/tests/test_config_support.py::TestDynamicFormatterConfigMethods::test_from_config_invalid_type
 FAILED shared_utils/dynamic_formatting/tests/test_config_support.py::TestConfigurationIntegration::test_deployment_scenario_development
 FAILED shared_utils/dynamic_formatting/tests/test_config_support.py::TestConfigurationIntegration::test_deployment_scenario_production
 FAILED shared_utils/dynamic_formatting/tests/test_config_support.py::TestConfigurationIntegration::test_deployment_scenario_file_output
@@ -3767,16 +3489,26 @@ FAILED shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestComp
 FAILED shared_utils/dynamic_formatting/tests/test_function_fallback.py::TestComplexFunctionScenarios::test_performance_monitoring_scenario
 FAILED shared_utils/dynamic_formatting/tests/test_performance.py::TestScalabilityTests::test_many_template_sections
 FAILED shared_utils/dynamic_formatting/tests/test_performance.py::TestMemoryUsage::test_formatter_reuse_memory_efficiency
-FAILED shared_utils/dynamic_formatting/tests/test_performance.py::TestFunctionPerformance::test_function_call_overhead
-FAILED shared_utils/dynamic_formatting/tests/test_performance.py::TestRegressionPerformance::test_positional_args_performance_parity
 FAILED shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceMetrics::test_metrics_creation
 FAILED shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceMetrics::test_metrics_serialization
 FAILED shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceStats::test_stats_aggregation
 FAILED shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceStats::test_stats_serialization
+FAILED shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceMonitor::test_basic_tracking
+FAILED shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceMonitor::test_multiple_operations
+FAILED shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceMonitor::test_threshold_logging
+FAILED shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceMonitor::test_regression_detection
 FAILED shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceMonitor::test_stats_export
+FAILED shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestPerformanceMonitor::test_thread_safety
+FAILED shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestDynamicFormatterIntegration::test_formatter_with_monitor
 FAILED shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestDynamicFormatterIntegration::test_detailed_tracking
 FAILED shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestDynamicFormatterIntegration::test_production_formatter_creation
+FAILED shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestDynamicFormatterIntegration::test_development_formatter_creation
 FAILED shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestProductionScenarios::test_high_volume_operations
+FAILED shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestProductionScenarios::test_memory_monitoring_accuracy
+FAILED shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestProductionScenarios::test_alerting_integration
+FAILED shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestEdgeCases::test_monitor_with_exceptions
+FAILED shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestEdgeCases::test_concurrent_access
+FAILED shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestEdgeCases::test_very_fast_operations
 FAILED shared_utils/dynamic_formatting/tests/test_performance_monitor.py::TestEdgeCases::test_memory_monitoring_failure
 FAILED shared_utils/dynamic_formatting/tests/test_positional_args.py::TestPositionalMissingData::test_no_arguments_provided
 FAILED shared_utils/dynamic_formatting/tests/test_positional_args.py::TestPositionalWithFormatting::test_complex_positional_formatting
@@ -3788,7 +3520,6 @@ FAILED shared_utils/dynamic_formatting/tests/test_positional_args.py::TestPositi
 FAILED shared_utils/dynamic_formatting/tests/test_positional_args.py::TestPositionalErrorConditions::test_missing_conditional_function_positional
 FAILED shared_utils/dynamic_formatting/tests/test_positional_args.py::TestPositionalEdgeCases::test_empty_template_with_positional_args
 FAILED shared_utils/dynamic_formatting/tests/test_positional_args.py::TestPositionalEdgeCases::test_literal_only_template_with_positional_args
-FAILED shared_utils/dynamic_formatting/tests/test_positional_args.py::TestPositionalEdgeCases::test_zero_positional_sections_with_args
 FAILED shared_utils/dynamic_formatting/tests/test_positional_args.py::TestPositionalSyntaxPatterns::test_all_positional_syntax_variations
 FAILED shared_utils/dynamic_formatting/tests/test_positional_args.py::TestPositionalSyntaxPatterns::test_complex_positional_combinations
 FAILED shared_utils/dynamic_formatting/tests/test_positional_args.py::TestBackwardCompatibility::test_complex_keyword_formatting_unchanged
@@ -3799,7 +3530,6 @@ FAILED shared_utils/dynamic_formatting/tests/test_positional_regression.py::test
 FAILED shared_utils/dynamic_formatting/tests/test_positional_regression.py::test_positional_with_conditionals
 FAILED shared_utils/dynamic_formatting/tests/test_positional_regression.py::test_positional_complex_syntax
 FAILED shared_utils/dynamic_formatting/tests/test_positional_regression.py::test_error_conditions_missing_functions
-FAILED shared_utils/dynamic_formatting/tests/test_positional_regression.py::test_edge_cases_zero_positional_sections
 FAILED shared_utils/dynamic_formatting/tests/test_positional_regression.py::test_logging_formatter_compatibility
 FAILED shared_utils/dynamic_formatting/tests/test_positional_regression.py::test_all_syntax_patterns
-================ 103 failed, 104 passed, 148 warnings in 1.49s ================
+================ 102 failed, 107 passed, 150 warnings in 1.29s ================

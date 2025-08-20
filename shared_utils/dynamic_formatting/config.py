@@ -36,7 +36,6 @@ class FormatterConfig:
     Supports different deployment scenarios with appropriate defaults for
     development, testing, and production environments.
     """
-    
     # Core formatting options
     delimiter: str = ';'
     output_mode: str = 'console'  # 'console' or 'file'
@@ -51,6 +50,7 @@ class FormatterConfig:
     # Performance options
     cache_parsed_templates: bool = True
     max_template_sections: int = 100
+    enable_performance_monitoring: bool = False
     
     # Function registry
     functions: Dict[str, Callable] = field(default_factory=dict)
@@ -116,24 +116,26 @@ class FormatterConfig:
         # Functions can't be serialized, so they're not loaded from config files
         config_data.pop('functions', None)
         
-        return cls(**config_data)
+        # Handle unknown fields gracefully by filtering them out
+        valid_fields = {f.name for f in cls.__dataclass_fields__.values()}
+        filtered_config = {k: v for k, v in config_data.items() if k in valid_fields}
+        
+        return cls(**filtered_config)
     
     def to_config_file(self, config_path: Union[str, Path], nested: bool = False) -> None:
         """
         Save configuration to JSON file
         
         Args:
-            config_path: Path where to save configuration
-            nested: Whether to use nested structure for organization
-            
-        Example:
-            config.to_config_file('configs/production.json', nested=True)
+            config_path: Path to write JSON configuration file
+            nested: Whether to use nested structure
         """
         config_path = Path(config_path)
-        config_path.parent.mkdir(parents=True, exist_ok=True)
         
-        # Convert to dict and handle enums
+        # Convert config to dictionary
         config_dict = asdict(self)
+        
+        # Convert enums to string values
         config_dict['validation_mode'] = self.validation_mode.value
         config_dict['validation_level'] = self.validation_level.value
         
@@ -141,51 +143,38 @@ class FormatterConfig:
         config_dict.pop('functions', None)
         
         if nested:
-            # Organize into logical groups
+            # Create nested structure
             nested_config = {
                 'formatting': {
                     'delimiter': config_dict.pop('delimiter'),
                     'output_mode': config_dict.pop('output_mode'),
                     'enable_colors': config_dict.pop('enable_colors'),
-                },
-                'validation': {
-                    'validation_mode': config_dict.pop('validation_mode'),
-                    'validation_level': config_dict.pop('validation_level'),
-                    'enable_validation': config_dict.pop('enable_validation'),
-                    'strict_argument_validation': config_dict.pop('strict_argument_validation'),
-                },
-                'performance': {
-                    'cache_parsed_templates': config_dict.pop('cache_parsed_templates'),
-                    'max_template_sections': config_dict.pop('max_template_sections'),
-                },
-                'advanced': {
-                    'auto_correct_suggestions': config_dict.pop('auto_correct_suggestions'),
-                    'enable_function_fallback': config_dict.pop('enable_function_fallback'),
                 }
             }
-            # Add any remaining keys
+            # Add remaining fields at top level
             nested_config.update(config_dict)
             config_dict = nested_config
         
+        # Write to file
         with open(config_path, 'w') as f:
             json.dump(config_dict, f, indent=2)
     
     @classmethod
-    def from_environment(cls, prefix: str = "DYNAMIC_FORMATTING") -> 'FormatterConfig':
+    def from_environment(cls, prefix: str = "FORMATTER") -> 'FormatterConfig':
         """
         Load configuration from environment variables
         
         Args:
-            prefix: Environment variable prefix
+            prefix: Environment variable prefix (default: FORMATTER)
             
         Returns:
-            FormatterConfig instance with values from environment
+            FormatterConfig instance
             
-        Example:
-            # With environment variables:
-            # DYNAMIC_FORMATTING_OUTPUT_MODE=file
-            # DYNAMIC_FORMATTING_ENABLE_COLORS=false
-            config = FormatterConfig.from_environment()
+        Environment variables:
+            {PREFIX}_VALIDATION_MODE: strict, graceful, auto_correct
+            {PREFIX}_OUTPUT_MODE: console, file
+            {PREFIX}_ENABLE_COLORS: true, false
+            etc.
         """
         config_dict = {}
         
@@ -202,6 +191,7 @@ class FormatterConfig:
             f"{prefix}_MAX_TEMPLATE_SECTIONS": 'max_template_sections',
             f"{prefix}_AUTO_CORRECT_SUGGESTIONS": 'auto_correct_suggestions',
             f"{prefix}_ENABLE_FUNCTION_FALLBACK": 'enable_function_fallback',
+            f"{prefix}_ENABLE_PERFORMANCE_MONITORING": 'enable_performance_monitoring',
         }
         
         for env_var, config_key in env_mappings.items():
@@ -210,7 +200,8 @@ class FormatterConfig:
                 
                 # Type conversion
                 if config_key in ['enable_colors', 'enable_validation', 'strict_argument_validation',
-                                'cache_parsed_templates', 'auto_correct_suggestions', 'enable_function_fallback']:
+                                'cache_parsed_templates', 'auto_correct_suggestions', 'enable_function_fallback',
+                                'enable_performance_monitoring']:
                     config_dict[config_key] = value.lower() in ('true', '1', 'yes', 'on')
                 elif config_key == 'max_template_sections':
                     config_dict[config_key] = int(value)
@@ -222,6 +213,46 @@ class FormatterConfig:
                     config_dict[config_key] = value
         
         return cls(**config_dict)
+    
+    @classmethod
+    def development(cls, **overrides) -> 'FormatterConfig':
+        """Create configuration optimized for development"""
+        return cls(
+            validation_mode=ValidationMode.STRICT,
+            validation_level=ValidationLevel.INFO,
+            enable_validation=True,
+            auto_correct_suggestions=True,
+            cache_parsed_templates=False,  # Disable caching for development
+            enable_performance_monitoring=True,
+            **overrides
+        )
+    
+    @classmethod
+    def production(cls, **overrides) -> 'FormatterConfig':
+        """Create configuration optimized for production"""
+        return cls(
+            validation_mode=ValidationMode.GRACEFUL,
+            validation_level=ValidationLevel.ERROR,
+            enable_validation=True,
+            auto_correct_suggestions=False,
+            cache_parsed_templates=True,
+            strict_argument_validation=False,  # More lenient in production
+            enable_performance_monitoring=False,  # Can be enabled if needed
+            **overrides
+        )
+    
+    @classmethod
+    def testing(cls, **overrides) -> 'FormatterConfig':
+        """Create configuration optimized for testing"""
+        return cls(
+            validation_mode=ValidationMode.STRICT,
+            validation_level=ValidationLevel.WARNING,
+            enable_validation=True,
+            auto_correct_suggestions=False,
+            cache_parsed_templates=False,
+            enable_performance_monitoring=False,
+            **overrides
+        )
     
     def is_strict_mode(self) -> bool:
         """Check if running in strict validation mode"""
@@ -249,36 +280,14 @@ class FormatterConfig:
 # Predefined configuration templates for common scenarios
 def create_development_config(**overrides) -> FormatterConfig:
     """Create configuration optimized for development"""
-    return FormatterConfig(
-        validation_mode=ValidationMode.STRICT,
-        validation_level=ValidationLevel.INFO,
-        enable_validation=True,
-        auto_correct_suggestions=True,
-        cache_parsed_templates=False,  # Disable caching for development
-        **overrides
-    )
+    return FormatterConfig.development(**overrides)
 
 
 def create_production_config(**overrides) -> FormatterConfig:
     """Create configuration optimized for production"""
-    return FormatterConfig(
-        validation_mode=ValidationMode.GRACEFUL,
-        validation_level=ValidationLevel.ERROR,
-        enable_validation=True,
-        auto_correct_suggestions=False,
-        cache_parsed_templates=True,
-        strict_argument_validation=False,  # More lenient in production
-        **overrides
-    )
+    return FormatterConfig.production(**overrides)
 
 
 def create_testing_config(**overrides) -> FormatterConfig:
     """Create configuration optimized for testing"""
-    return FormatterConfig(
-        validation_mode=ValidationMode.STRICT,
-        validation_level=ValidationLevel.WARNING,
-        enable_validation=True,
-        auto_correct_suggestions=False,
-        cache_parsed_templates=False,
-        **overrides
-    )
+    return FormatterConfig.testing(**overrides)

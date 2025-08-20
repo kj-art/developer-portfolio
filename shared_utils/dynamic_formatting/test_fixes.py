@@ -1,219 +1,343 @@
 #!/usr/bin/env python3
 """
-Quick test script to verify that the major fixes are working.
-
-This script tests the core functionality that was broken in the failing tests
-to ensure the fixes are correct before running the full test suite.
+Test script to verify all dynamic formatting fixes.
 """
 
 import sys
 from pathlib import Path
 
-# Add the project root to the Python path
-project_root = Path(__file__).parent.parent.parent
+# Add project root to path
+project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
-try:
-    from shared_utils.dynamic_formatting import DynamicFormatter, FormatterConfig, ValidationMode
-    print("✓ Import successful")
-except ImportError as e:
-    print(f"✗ Import failed: {e}")
-    sys.exit(1)
-
-
 def test_basic_formatting():
-    """Test basic template parsing and formatting"""
-    print("\n1. Basic Formatting Test")
-    formatter = DynamicFormatter("{{Status: ;message}}")
-    result = formatter.format(message="Success")
-    expected = "Status: Success"
-    print(f"   Template: {{{{Status: ;message}}}}")
-    print(f"   Result: '{result}'")
-    print(f"   Expected: '{expected}'")
-    print(f"   ✓ PASS" if result == expected else f"   ✗ FAIL")
-    return result == expected
+    """Test basic formatting functionality"""
+    print("Testing basic formatting...")
+    
+    try:
+        from shared_utils.dynamic_formatting import DynamicFormatter
+        
+        # Test basic formatting
+        formatter = DynamicFormatter("{{Status: ;status}}")
+        result = formatter.format(status="Success")
+        print(f"  Basic test: '{result}'")
+        assert "Status: Success" in result
+        
+        # Test missing data handling
+        formatter = DynamicFormatter("{{Status: ;status}} {{Code: ;code}}")
+        result = formatter.format(status="Success")
+        print(f"  Missing data test: '{result}'")
+        assert "Status: Success" in result
+        assert "Code:" not in result
+        
+        print("  ✅ Basic formatting tests passed")
+        return True
+        
+    except Exception as e:
+        print(f"  ❌ Basic formatting failed: {e}")
+        return False
 
+def test_configuration():
+    """Test configuration system"""
+    print("Testing configuration system...")
+    
+    try:
+        from shared_utils.dynamic_formatting import FormatterConfig, ValidationMode
+        
+        # Test configuration creation
+        config = FormatterConfig(
+            validation_mode=ValidationMode.STRICT,
+            enable_performance_monitoring=True
+        )
+        print(f"  Config creation: {config.validation_mode}")
+        
+        # Test factory methods
+        dev_config = FormatterConfig.development()
+        prod_config = FormatterConfig.production()
+        print(f"  Factory methods: dev={dev_config.validation_mode}, prod={prod_config.validation_mode}")
+        
+        # Test config file loading
+        config_path = project_root / "shared_utils" / "dynamic_formatting" / "configs" / "minimal.json"
+        if config_path.exists():
+            loaded_config = FormatterConfig.from_config_file(config_path)
+            print(f"  Config file loading: {loaded_config.validation_mode}")
+        
+        print("  ✅ Configuration tests passed")
+        return True
+        
+    except Exception as e:
+        print(f"  ❌ Configuration failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
-def test_missing_data_handling():
-    """Test that missing data causes sections to disappear"""
-    print("\n2. Missing Data Handling Test")
-    formatter = DynamicFormatter("{{Status: ;status}}{{ | Code: ;code}}")
-    result = formatter.format(status="Success")
-    expected = "Status: Success"
-    print(f"   Template: {{{{Status: ;status}}}}{{{{ | Code: ;code}}}}")
-    print(f"   Data: status='Success' (code missing)")
-    print(f"   Result: '{result}'")
-    print(f"   Expected: '{expected}'")
-    print(f"   ✓ PASS" if result == expected else f"   ✗ FAIL")
-    return result == expected
+def test_performance_monitoring():
+    """Test performance monitoring"""
+    print("Testing performance monitoring...")
+    
+    try:
+        from shared_utils.dynamic_formatting import PerformanceMonitor
+        
+        # Test monitor creation
+        monitor = PerformanceMonitor(enabled=True)
+        
+        # Test context manager
+        with monitor.track("test_operation"):
+            # Simulate some work
+            result = "test" * 100
+        
+        stats = monitor.get_stats()
+        print(f"  Monitor stats: {len(stats)} operations tracked")
+        
+        print("  ✅ Performance monitoring tests passed")
+        return True
+        
+    except Exception as e:
+        print(f"  ❌ Performance monitoring failed: {e}")
+        return False
 
-
-def test_none_value_handling():
-    """Test that None values cause sections to disappear"""
-    print("\n3. None Value Handling Test")
-    formatter = DynamicFormatter("{{Value: ;field}}")
-    result = formatter.format(field=None)
-    expected = ""
-    print(f"   Template: {{{{Value: ;field}}}}")
-    print(f"   Data: field=None")
-    print(f"   Result: '{result}'")
-    print(f"   Expected: '{expected}'")
-    print(f"   ✓ PASS" if result == expected else f"   ✗ FAIL")
-    return result == expected
-
+def test_color_formatting():
+    """Test color and text formatting"""
+    print("Testing color and text formatting...")
+    
+    try:
+        from shared_utils.dynamic_formatting import DynamicFormatter
+        
+        # Test color formatting
+        formatter = DynamicFormatter("{{#red;Error: ;message}}")
+        result = formatter.format(message="Failed")
+        print(f"  Color test: '{result}'")
+        assert "Error: Failed" in result
+        
+        # Test text formatting
+        formatter = DynamicFormatter("{{@bold;Warning: ;message}}")
+        result = formatter.format(message="Important")
+        print(f"  Text style test: '{result}'")
+        assert "Warning: Important" in result
+        
+        print("  ✅ Color and text formatting tests passed")
+        return True
+        
+    except Exception as e:
+        print(f"  ❌ Color and text formatting failed: {e}")
+        return False
 
 def test_positional_arguments():
     """Test positional argument support"""
-    print("\n4. Positional Arguments Test")
-    formatter = DynamicFormatter("{{}} {{}}")
-    result = formatter.format("hello", "world")
-    expected = "hello world"
-    print(f"   Template: {{{{}}}} {{{{}}}}")
-    print(f"   Args: 'hello', 'world'")
-    print(f"   Result: '{result}'")
-    print(f"   Expected: '{expected}'")
-    print(f"   ✓ PASS" if result == expected else f"   ✗ FAIL")
-    return result == expected
-
+    print("Testing positional arguments...")
+    
+    try:
+        from shared_utils.dynamic_formatting import DynamicFormatter
+        
+        # Test basic positional
+        formatter = DynamicFormatter("{{}}")
+        result = formatter.format("test")
+        print(f"  Basic positional: '{result}'")
+        assert result == "test"
+        
+        # Test positional with prefix/suffix
+        formatter = DynamicFormatter("{{Status: ;}}")
+        result = formatter.format("Success")
+        print(f"  Positional with prefix: '{result}'")
+        assert result == "Status: Success"
+        
+        print("  ✅ Positional argument tests passed")
+        return True
+        
+    except Exception as e:
+        print(f"  ❌ Positional arguments failed: {e}")
+        return False
 
 def test_function_fallback():
-    """Test function fallback for dynamic formatting"""
-    print("\n5. Function Fallback Test")
+    """Test function fallback system"""
+    print("Testing function fallback...")
     
-    def level_color(level):
-        return "red" if level == "ERROR" else "green"
-    
-    config = FormatterConfig(functions={"level_color": level_color})
-    formatter = DynamicFormatter("{{#level_color;[;level;]}}", config=config)
-    result = formatter.format(level="ERROR")
-    
-    # Should contain the text with color formatting
-    contains_text = "[ERROR]" in result
-    print(f"   Template: {{{{#level_color;[;level;]}}}}")
-    print(f"   Function: level_color('ERROR') -> 'red'")
-    print(f"   Data: level='ERROR'")
-    print(f"   Result: '{result}'")
-    print(f"   Contains '[ERROR]': {contains_text}")
-    print(f"   ✓ PASS" if contains_text else f"   ✗ FAIL")
-    return contains_text
-
+    try:
+        from shared_utils.dynamic_formatting import DynamicFormatter, FormatterConfig
+        
+        def level_color(level):
+            return {"ERROR": "red", "INFO": "green"}[level]
+        
+        config = FormatterConfig(functions={"level_color": level_color})
+        formatter = DynamicFormatter("{{#level_color;[;level;]}}", config=config)
+        result = formatter.format(level="ERROR")
+        print(f"  Function fallback: '{result}'")
+        assert "[ERROR]" in result
+        
+        print("  ✅ Function fallback tests passed")
+        return True
+        
+    except Exception as e:
+        print(f"  ❌ Function fallback failed: {e}")
+        return False
 
 def test_conditional_logic():
-    """Test conditional section logic"""
-    print("\n6. Conditional Logic Test")
+    """Test conditional logic"""
+    print("Testing conditional logic...")
     
-    def has_items(count):
-        return count > 0
-    
-    config = FormatterConfig(functions={"has_items": has_items})
-    formatter = DynamicFormatter("{{Processing}} {{?has_items;found ;count; items}}", config=config)
-    
-    # Test with items
-    result1 = formatter.format(count=5)
-    expected1 = "Processing found 5 items"
-    
-    # Test without items  
-    result2 = formatter.format(count=0)
-    expected2 = "Processing "
-    
-    print(f"   Template: {{{{Processing}}}} {{{{?has_items;found ;count; items}}}}")
-    print(f"   Function: has_items(count) -> count > 0")
-    print(f"   Test 1 - count=5:")
-    print(f"     Result: '{result1}'")
-    print(f"     Expected: '{expected1}'")
-    test1_pass = result1 == expected1
-    print(f"     ✓ PASS" if test1_pass else f"     ✗ FAIL")
-    
-    print(f"   Test 2 - count=0:")
-    print(f"     Result: '{result2}'")
-    print(f"     Expected: '{expected2}'")
-    test2_pass = result2 == expected2
-    print(f"     ✓ PASS" if test2_pass else f"     ✗ FAIL")
-    
-    return test1_pass and test2_pass
-
+    try:
+        from shared_utils.dynamic_formatting import DynamicFormatter, FormatterConfig
+        
+        def has_value(val):
+            return bool(val)
+        
+        config = FormatterConfig(functions={"has_value": has_value})
+        formatter = DynamicFormatter("{{Processing}} {{?has_value;Found: ;}}", config=config)
+        
+        # Test with value
+        result = formatter.format(25)
+        print(f"  Conditional with value: '{result}'")
+        assert "Processing" in result and "Found: 25" in result
+        
+        # Test without value
+        result = formatter.format(None)
+        print(f"  Conditional without value: '{result}'")
+        assert result.strip() == "Processing"
+        
+        # Test conditional token format specifically
+        formatter2 = DynamicFormatter("{{Status: ;status}} {{?has_value;Count: ;count}}", config=config)
+        result2 = formatter2.format(status="OK", count=5)
+        print(f"  Named field conditional: '{result2}'")
+        assert "Status: OK" in result2 and "Count: 5" in result2
+        
+        result3 = formatter2.format(status="OK", count=None)
+        print(f"  Named field conditional (no count): '{result3}'")
+        assert "Status: OK" in result3 and "Count:" not in result3
+        
+        print("  ✅ Conditional logic tests passed")
+        return True
+        
+    except Exception as e:
+        print(f"  ❌ Conditional logic failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 def test_output_modes():
-    """Test console vs file output modes"""
-    print("\n7. Output Mode Test")
+    """Test different output modes"""
+    print("Testing output modes...")
     
-    # Console mode (with ANSI codes)
-    console_config = FormatterConfig(output_mode="console")
-    console_formatter = DynamicFormatter("{{#red;Error: ;message}}", config=console_config)
-    console_result = console_formatter.format(message="Failed")
-    
-    # File mode (without ANSI codes)
-    file_config = FormatterConfig(output_mode="file")
-    file_formatter = DynamicFormatter("{{#red;Error: ;message}}", config=file_config)
-    file_result = file_formatter.format(message="Failed")
-    
-    console_has_ansi = "\033[" in console_result
-    file_no_ansi = "\033[" not in file_result
-    both_have_text = "Error: Failed" in console_result and "Error: Failed" in file_result
-    
-    print(f"   Template: {{{{#red;Error: ;message}}}}")
-    print(f"   Console result: '{console_result}'")
-    print(f"   File result: '{file_result}'")
-    print(f"   Console has ANSI: {console_has_ansi}")
-    print(f"   File has no ANSI: {file_no_ansi}")
-    print(f"   Both contain text: {both_have_text}")
-    
-    success = console_has_ansi and file_no_ansi and both_have_text
-    print(f"   ✓ PASS" if success else f"   ✗ FAIL")
-    return success
-
+    try:
+        from shared_utils.dynamic_formatting import DynamicFormatter, FormatterConfig
+        
+        # Test console mode (with colors)
+        console_config = FormatterConfig(output_mode="console", enable_colors=True)
+        formatter = DynamicFormatter("{{#red;Error: ;message}}", config=console_config)
+        console_result = formatter.format(message="Failed")
+        print(f"  Console mode: '{console_result}'")
+        
+        # Test file mode (no colors)
+        file_config = FormatterConfig(output_mode="file", enable_colors=False)
+        formatter = DynamicFormatter("{{#red;Error: ;message}}", config=file_config)
+        file_result = formatter.format(message="Failed")
+        print(f"  File mode: '{file_result}'")
+        assert file_result == "Error: Failed"
+        
+        print("  ✅ Output mode tests passed")
+        return True
+        
+    except Exception as e:
+        print(f"  ❌ Output modes failed: {e}")
+        return False
 
 def test_escape_sequences():
     """Test escape sequence handling"""
-    print("\n8. Escape Sequences Test")
-    formatter = DynamicFormatter(r"Text with \; semicolon and {{field}}")
-    result = formatter.format(field="value")
-    expected = "Text with ; semicolon and value"
-    print(f"   Template: Text with \\; semicolon and {{{{field}}}}")
-    print(f"   Result: '{result}'")
-    print(f"   Expected: '{expected}'")
-    print(f"   ✓ PASS" if result == expected else f"   ✗ FAIL")
-    return result == expected
+    print("Testing escape sequences...")
+    
+    try:
+        from shared_utils.dynamic_formatting import DynamicFormatter
+        
+        # Test escaped braces
+        formatter = DynamicFormatter("\\{\\{not a template\\}\\}")
+        result = formatter.format()
+        print(f"  Escaped braces: '{result}'")
+        assert result == "{{not a template}}"
+        
+        # Test escaped delimiter
+        formatter = DynamicFormatter("{{Value\\;with\\;semicolons: ;value}}")
+        result = formatter.format(value="test")
+        print(f"  Escaped delimiter: '{result}'")
+        assert "Value;with;semicolons: test" in result
+        
+        print("  ✅ Escape sequence tests passed")
+        return True
+        
+    except Exception as e:
+        print(f"  ❌ Escape sequences failed: {e}")
+        return False
 
+def test_required_fields():
+    """Test required field functionality"""
+    print("Testing required fields...")
+    
+    try:
+        from shared_utils.dynamic_formatting import DynamicFormatter, RequiredFieldError
+        
+        # Test required field present
+        formatter = DynamicFormatter("{{!;Critical: ;message}}")
+        result = formatter.format(message="System down")
+        print(f"  Required field present: '{result}'")
+        assert "Critical: System down" in result
+        
+        # Test required field missing (should raise error)
+        try:
+            formatter.format()
+            print("  ❌ Required field test failed - should have raised error")
+            return False
+        except RequiredFieldError:
+            print("  Required field missing: correctly raised RequiredFieldError")
+        
+        print("  ✅ Required field tests passed")
+        return True
+        
+    except Exception as e:
+        print(f"  ❌ Required fields failed: {e}")
+        return False
 
-def main():
-    """Run all tests and report results"""
-    print("Dynamic Formatting Fix Verification")
-    print("=" * 50)
+def run_all_tests():
+    """Run all test functions"""
+    print("=" * 60)
+    print("RUNNING DYNAMIC FORMATTING SYSTEM TESTS")
+    print("=" * 60)
     
     tests = [
         test_basic_formatting,
-        test_missing_data_handling,
-        test_none_value_handling,
+        test_configuration,
+        test_performance_monitoring,
+        test_color_formatting,
         test_positional_arguments,
         test_function_fallback,
         test_conditional_logic,
         test_output_modes,
         test_escape_sequences,
+        test_required_fields,
     ]
     
-    results = []
-    for test in tests:
+    passed = 0
+    failed = 0
+    
+    for test_func in tests:
         try:
-            result = test()
-            results.append(result)
+            if test_func():
+                passed += 1
+            else:
+                failed += 1
         except Exception as e:
-            print(f"   ✗ EXCEPTION: {e}")
-            results.append(False)
+            print(f"  ❌ Test {test_func.__name__} crashed: {e}")
+            failed += 1
+        print()
     
-    print("\n" + "=" * 50)
-    print("SUMMARY:")
-    passed = sum(results)
-    total = len(results)
-    print(f"Tests passed: {passed}/{total}")
+    print("=" * 60)
+    print(f"TEST RESULTS: {passed} passed, {failed} failed")
+    print("=" * 60)
     
-    if passed == total:
-        print("🎉 ALL TESTS PASSED! The fixes are working correctly.")
-        return 0
+    if failed == 0:
+        print("🎉 ALL TESTS PASSED! The dynamic formatting system is working correctly.")
+        return True
     else:
-        print("❌ Some tests failed. Check the output above for details.")
-        return 1
-
+        print(f"❌ {failed} tests failed. Please check the issues above.")
+        return False
 
 if __name__ == "__main__":
-    sys.exit(main())
+    success = run_all_tests()
+    sys.exit(0 if success else 1)

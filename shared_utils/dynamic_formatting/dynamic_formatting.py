@@ -1,126 +1,93 @@
 """
-Dynamic Formatting Package Main Module
+Core dynamic formatting system with automatic missing data handling.
 
-Core implementation of the dynamic formatting system with graceful missing data handling,
-configurable validation modes, enhanced error context, and positional argument support.
+This module provides the main DynamicFormatter class and related functionality
+for professional string formatting with graceful degradation.
 """
 
 import logging
-from typing import Dict, Any, List, Optional, Callable, Union
+from typing import Dict, Any, Optional, Union, List
 from pathlib import Path
 
-from .config import FormatterConfig, ValidationLevel, ValidationMode
-from .template_parser import TemplateParser
-from .span_structures import FormatSection, FormattedSpan
+from .config import FormatterConfig, ValidationMode, ValidationLevel
+from .template_parser import TemplateParser, FormatSection
 from .formatters import TOKEN_FORMATTERS, FormatterError, FunctionExecutionError
 
 
 class DynamicFormattingError(Exception):
-    """
-    Base exception for dynamic formatting with enhanced error context
+    """Base exception for dynamic formatting errors"""
     
-    Provides detailed context about where errors occurred in templates,
-    making debugging much easier during development.
-    """
-    def __init__(self, message: str, template: Optional[str] = None, 
-                 position: Optional[int] = None, context: Optional[str] = None):
+    def __init__(self, message: str, template: Optional[str] = None, **kwargs):
+        super().__init__(message)
         self.template = template
-        self.position = position
-        self.context = context
-        
-        # Build comprehensive error message
-        full_message = message
-        if context:
-            full_message += f"\nContext: {context}"
-        if template:
-            full_message += f"\nTemplate: '{template}'"
-        if position is not None:
-            full_message += f"\nPosition: {position}"
-            
-        super().__init__(full_message)
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
 
 class RequiredFieldError(DynamicFormattingError):
-    """Raised when a required field (marked with !) is missing"""
-    def __init__(self, message: str, field_name: Optional[str] = None,
-                 template: Optional[str] = None, position: Optional[int] = None):
+    """Exception raised when a required field is missing"""
+    
+    def __init__(self, message: str, field_name: str, template: str):
+        super().__init__(message, template=template)
         self.field_name = field_name
+    
+    def __str__(self):
+        base_msg = super().__str__()
+        if self.field_name.startswith('__pos_'):
+            # This is a positional field
+            pos_num = self.field_name.replace('__pos_', '').replace('__', '')
+            context = f"Required field at position {int(pos_num) + 1} was marked as mandatory with '!' but no argument was provided"
+        else:
+            context = f"Required field '{self.field_name}' was marked as mandatory with '!' but no value was provided"
         
-        # Create user-friendly context message
-        context = (
-            f"Required field '{field_name}' was marked as mandatory with '!' "
-            f"but no value was provided"
-        )
-        
-        # For positional fields, provide friendlier error messages
-        if field_name and field_name.startswith('__pos_') and field_name.endswith('__'):
-            try:
-                pos_num = int(field_name[6:-2]) + 1  # Convert __pos_0__ to position 1
-                context = f"Required field at position {pos_num} was marked as mandatory with '!' but no argument was provided"
-            except (ValueError, IndexError):
-                pass  # Use default context if parsing fails
-        
-        super().__init__(message, template, position, context)
+        return f"{base_msg}\nContext: {context}\nTemplate: '{self.template}'"
 
 
 class FunctionNotFoundError(DynamicFormattingError):
-    """Raised when a conditional or formatting function is not found with enhanced context"""
-    def __init__(self, message: str, function_name: Optional[str] = None,
-                 template: Optional[str] = None, position: Optional[int] = None,
-                 available_functions: Optional[List[str]] = None):
+    """Exception raised when a function is not found"""
+    
+    def __init__(self, message: str, function_name: str, template: str, available_functions: Optional[List[str]] = None):
+        super().__init__(message, template=template)
         self.function_name = function_name
         self.available_functions = available_functions or []
-        
-        context = f"Function '{function_name}' not found in function registry"
-        if self.available_functions:
-            context += f". Available functions: {', '.join(sorted(self.available_functions))}"
-        else:
-            context += ". No functions are registered."
-        
-        super().__init__(message, template, position, context)
 
 
 class DynamicFormatter:
     """
-    Main dynamic formatting class with enterprise-grade features
+    Advanced string formatter with automatic missing data handling.
     
-    Core Feature: Automatic section removal for missing data
-    When template fields don't have corresponding data, their entire sections
-    disappear automatically, eliminating manual null checking and conditional
-    string building.
-    
-    Professional Features:
-    - Configurable validation modes (strict/graceful/auto-correct)
-    - Function fallback for dynamic formatting
+    Core Features:
+    - Automatic section removal for missing data (eliminates manual null checking)
+    - Function fallback for dynamic formatting logic
     - Positional and keyword argument support
-    - Enhanced error context for debugging
-    - Production-ready configuration management
+    - Configurable validation modes (strict/graceful/auto-correct)
+    - Professional error context for debugging
     """
     
     def __init__(
-        self, 
+        self,
         format_string: str,
-        functions: Optional[Dict[str, Callable]] = None,
         config: Optional[FormatterConfig] = None,
-        # Backward compatibility parameters
+        # Legacy parameters for backward compatibility
         delimiter: Optional[str] = None,
         output_mode: Optional[str] = None,
+        functions: Optional[Dict[str, Any]] = None,
         validate: Optional[bool] = None,
         validation_level: Optional[str] = None
     ):
         """
-        Initialize DynamicFormatter with comprehensive configuration
+        Initialize DynamicFormatter
         
         Args:
             format_string: Template string with {{field}} placeholders
-            functions: Optional function registry for fallback and conditionals
-            config: Complete configuration object (recommended)
-            delimiter: Field separator (backward compatibility)
-            output_mode: 'console' or 'file' (backward compatibility)
-            validate: Enable validation (backward compatibility)
-            validation_level: Validation strictness (backward compatibility)
+            config: FormatterConfig instance (preferred)
+            delimiter: Field delimiter (legacy, use config instead)
+            output_mode: Output mode (legacy, use config instead) 
+            functions: Function registry (legacy, use config instead)
+            validate: Enable validation (legacy, use config instead)
+            validation_level: Validation level (legacy, use config instead)
         """
-        # Handle configuration - new config system takes precedence
+        # Configuration takes precedence
         if config is not None:
             self.config = config
         else:
@@ -166,7 +133,29 @@ class DynamicFormatter:
         return cls(format_string, config=config)
     
     @classmethod
-    def from_environment(cls, format_string: str, prefix: str = "DYNAMIC_FORMATTING") -> 'DynamicFormatter':
+    def from_config(cls, format_string: str, config: Union[FormatterConfig, Dict[str, Any], str, Path]) -> 'DynamicFormatter':
+        """
+        Create DynamicFormatter instance from various config sources
+        
+        Args:
+            format_string: Template string to format
+            config: Configuration as FormatterConfig, dict, or file path
+            
+        Returns:
+            DynamicFormatter instance
+        """
+        if isinstance(config, FormatterConfig):
+            return cls(format_string, config=config)
+        elif isinstance(config, dict):
+            formatter_config = FormatterConfig(**config)
+            return cls(format_string, config=formatter_config)
+        elif isinstance(config, (str, Path)):
+            return cls.from_config_file(format_string, config)
+        else:
+            raise ValueError(f"Unsupported config type: {type(config)}")
+    
+    @classmethod
+    def from_environment(cls, format_string: str, prefix: str = "FORMATTER") -> 'DynamicFormatter':
         """
         Create DynamicFormatter instance from environment variables
         
@@ -229,8 +218,11 @@ class DynamicFormatter:
             # Map positional arguments to field names
             data = {}
             for i, arg in enumerate(args):
-                field_name = f"__pos_{i}__"
-                data[field_name] = arg
+                if i < len(field_sections):
+                    section = field_sections[i]
+                    # Use the actual field name from the section
+                    field_name = section.field_name if section.field_name else f"__pos_{i}__"
+                    data[field_name] = arg
         else:
             # Use keyword arguments directly
             data = kwargs
@@ -279,7 +271,10 @@ class DynamicFormatter:
         Core Feature Implementation: Returns empty string when the required field
         is missing from the data dictionary, causing the entire section to disappear.
         """
-        # Handle required fields
+        # Get field value
+        field_value = data.get(section.field_name)
+        
+        # Handle required fields - only check if field is actually missing
         if section.is_required and section.field_name not in data:
             raise RequiredFieldError(
                 f"Required field '{section.field_name}' is missing",
@@ -287,55 +282,16 @@ class DynamicFormatter:
                 template=self.format_string
             )
         
-        # Check if field exists - if not, return empty string (graceful degradation)
-        if section.field_name not in data:
-            return ""
+        # Handle missing data gracefully
+        if field_value is None and not section.is_required:
+            return ""  # Core feature: missing data causes section to disappear
         
-        field_value = data[section.field_name]
-        
-        # Handle None values - they should cause section to disappear
-        if field_value is None:
-            return ""
-        
-        # Handle conditional sections first
-        if section.function_name:
-            func = self.config.functions.get(section.function_name)
-            if not func:
-                if self.config.is_strict_mode():
-                    raise FunctionNotFoundError(
-                        f"Conditional function not found: {section.function_name}",
-                        function_name=section.function_name,
-                        template=self.format_string,
-                        available_functions=list(self.config.functions.keys())
-                    )
-                else:
-                    # In graceful mode, hide the section if function is missing
-                    return ""
-            
-            try:
-                # Call conditional function
-                import inspect
-                sig = inspect.signature(func)
-                params = list(sig.parameters.keys())
-                
-                if len(params) == 0:
-                    show_section = func()
-                else:
-                    show_section = func(field_value)
-                
-                if not show_section:
-                    return ""  # Hide section if conditional returns False/falsy
-            except Exception as e:
-                if self.config.is_strict_mode():
-                    raise FunctionExecutionError(
-                        f"Conditional function '{section.function_name}' failed: {e}",
-                        function_name=section.function_name,
-                        original_error=e,
-                        template=self.format_string
-                    )
-                else:
-                    # In graceful mode, hide the section if conditional fails
-                    return ""
+        # Handle conditional sections through the formatter system
+        if '?' in section.whole_section_formatting_tokens:
+            # Apply conditional formatting first - this will return empty string if condition fails
+            conditional_result = self._apply_section_formatting("", {'?': section.whole_section_formatting_tokens['?']}, field_value)
+            if conditional_result == "":
+                return ""  # Condition failed, hide entire section
         
         # Handle simple vs complex sections differently for performance
         if section.is_simple_section():
@@ -408,40 +364,42 @@ class DynamicLoggingFormatter(logging.Formatter):
         Initialize logging formatter
         
         Args:
-            format_string: Dynamic formatting template for log records
-            config: Optional formatter configuration
+            format_string: Dynamic formatting template
+            config: FormatterConfig instance (defaults to graceful mode)
         """
         super().__init__()
         
-        # Use graceful config by default for logging
         if config is None:
+            # Use graceful configuration for logging to prevent crashes
             config = FormatterConfig(
                 validation_mode=ValidationMode.GRACEFUL,
-                output_mode='console',
-                enable_validation=False  # Don't validate at runtime for performance
+                validation_level=ValidationLevel.ERROR,
+                enable_validation=False  # Skip validation for logging
             )
         
         self.formatter = DynamicFormatter(format_string, config=config)
     
     def format(self, record: logging.LogRecord) -> str:
         """
-        Format log record using dynamic template
+        Format log record using dynamic formatting
         
         Args:
-            record: Log record to format
+            record: LogRecord to format
             
         Returns:
             Formatted log message
         """
         try:
-            # Convert log record to dict for formatting
-            record_dict = record.__dict__.copy()
+            # Convert log record to dictionary
+            record_dict = vars(record).copy()
             
-            # Add some standard fields that might be missing
-            if 'message' not in record_dict:
-                record_dict['message'] = record.getMessage()
+            # Add computed fields
+            record_dict['message'] = record.getMessage()
             
+            # Format using dynamic formatter
             return self.formatter.format(**record_dict)
+            
         except Exception as e:
-            # Fallback to basic formatting if dynamic formatting fails
-            return f"[FORMATTING ERROR: {e}] {record.getMessage()}"
+            # Fallback formatting if dynamic formatting fails
+            fallback_msg = f"[FORMATTING ERROR: {e}] {record.getMessage()}"
+            return fallback_msg

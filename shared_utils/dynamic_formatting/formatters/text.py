@@ -1,141 +1,106 @@
 """
-Text formatting implementation with configurable graceful degradation.
-
-Handles text style formatting tokens (@bold, @italic, etc.) with function fallback
-support. Supports ANSI text styles and dynamic style selection through function calls.
-
-Enhanced with configurable graceful degradation modes for professional deployment.
+Text style formatter for bold, italic, underline, etc.
 """
 
-from typing import Any, List, Dict, Optional, Union
-import re
-from .base import FormatterBase, FormatterError
+from typing import Any, Dict, List
+from .base import BaseFormatter, FormatterError, FunctionExecutionError
 
 
-class TextFormatter(FormatterBase):
-    """
-    Handles text style formatting tokens (@bold, @italic, etc.) with function fallback
-    and configurable graceful degradation
+class TextFormatter(BaseFormatter):
+    """Formatter for text style tokens (@bold, @italic, etc.)"""
     
-    Supports multiple text styles:
-    - Basic styles: bold, italic, underline, strikethrough
-    - Reset tokens: normal, default, reset
-    - Function fallback: Any function that returns a valid style
-    
-    Graceful Degradation Modes:
-    - STRICT: Invalid tokens raise FormatterError
-    - GRACEFUL: Invalid tokens return 'invalid' (no formatting applied)
-    - AUTO_CORRECT: Invalid tokens auto-correct to suggested alternatives
-    
-    Text style behavior:
-    - Multiple styles can be combined (bold + italic)
-    - Reset tokens clear all text formatting
-    - File output mode strips all formatting codes
-    """
-    
-    # ANSI text style code mappings
-    ANSI_STYLES: Dict[str, int] = {
-        'bold': 1,
-        'dim': 2,
-        'italic': 3,
-        'underline': 4,
-        'blink': 5,
-        'reverse': 7,
-        'strikethrough': 9,
-        'normal': 0  # Reset
+    # ANSI text formatting codes
+    TEXT_STYLES = {
+        'bold': '\033[1m',
+        'dim': '\033[2m',
+        'italic': '\033[3m',
+        'underline': '\033[4m',
+        'blink': '\033[5m',
+        'reverse': '\033[7m',
+        'strikethrough': '\033[9m',
+        'normal': '\033[22m',
+        'reset': '\033[0m',
     }
     
-    def get_family_name(self) -> str:
-        return 'text'
+    RESET_CODE = '\033[0m'
     
-    def _get_valid_tokens(self) -> List[str]:
-        """Get list of valid text style tokens for error messages"""
-        tokens = list(self.ANSI_STYLES.keys())
-        tokens.extend(['reset', 'default'])
-        if self.function_registry:
-            tokens.append(f"functions: {', '.join(sorted(self.function_registry.keys()))}")
-        return tokens
-    
-    def parse_token(self, token_value: str, field_value: Optional[Any] = None) -> str:
+    def parse_token(self, token: str, field_value: Any) -> Dict[str, Any]:
         """
-        Parse text style token with function fallback and configurable graceful degradation
-        
-        Parsing order:
-        1. Check for reset tokens (normal, default, reset)
-        2. Try direct ANSI style lookup
-        3. Try function fallback
-        4. Handle failure based on validation mode
-        """
-        token_value = token_value.lower().strip()
-        
-        # Handle reset tokens
-        if self.is_reset_token(token_value):
-            return 'reset'
-        
-        # Try direct ANSI style lookup
-        if token_value in self.ANSI_STYLES:
-            return token_value
-        
-        # Try function fallback
-        function_result = self._try_function_fallback(token_value, field_value)
-        if function_result is not None:
-            # Recursively parse the function result
-            return self.parse_token(function_result, field_value)
-        
-        # Handle failure based on validation mode
-        if self._is_graceful_mode():
-            return 'invalid'  # Special marker for no formatting
-        else:
-            self._raise_formatter_error(
-                f"Invalid text style token: '{token_value}'",
-                token=token_value
-            )
-    
-    def apply_formatting(self, text: str, parsed_tokens: List[Union[str, int, bool]], output_mode: str = 'console') -> str:
-        """
-        Apply text style formatting to text
+        Parse a text style token
         
         Args:
-            text: Text to format
-            parsed_tokens: List of parsed text style tokens
-            output_mode: 'console' for ANSI codes, 'file' for plain text
+            token: Style token (e.g., 'bold', 'italic', or function name)
+            field_value: Field value for function calls
             
         Returns:
-            Formatted text with ANSI style codes (console) or plain text (file)
+            Dictionary with style information
         """
-        if output_mode == 'file':
-            return text  # No style formatting for file output
+        # Check if it's a function call
+        if token in self.function_registry:
+            try:
+                func = self.function_registry[token]
+                result = func(field_value)
+                if isinstance(result, str):
+                    return self.parse_token(result, field_value)  # Recursive parse
+                else:
+                    raise FormatterError(f"Text style function '{token}' must return a string")
+            except Exception as e:
+                raise FunctionExecutionError(
+                    f"Text style function '{token}' failed: {e}",
+                    function_name=token,
+                    original_error=e
+                )
         
-        if not parsed_tokens:
+        # Check if it's a known style
+        if token.lower() in self.TEXT_STYLES:
+            return {
+                'type': 'style',
+                'value': token.lower(),
+                'ansi': self.TEXT_STYLES[token.lower()]
+            }
+        
+        # If we're in strict mode, this is an error
+        if self.config and self.config.is_strict_mode():
+            raise FormatterError(f"Unknown text style: '{token}'")
+        
+        # In graceful mode, just return a no-op
+        return {
+            'type': 'unknown',
+            'value': token,
+            'ansi': ''
+        }
+    
+    def apply_formatting(self, text: str, parsed_tokens: List[Dict[str, Any]], output_mode: str) -> str:
+        """
+        Apply text style formatting
+        
+        Args:
+            text: Text to style
+            parsed_tokens: List of parsed style tokens
+            output_mode: 'console' or 'file'
+            
+        Returns:
+            Formatted text with style codes (if console mode)
+        """
+        if output_mode == 'file' or not parsed_tokens:
             return text
         
-        # Collect all valid style tokens
-        valid_styles = []
+        # Apply all style tokens
+        prefix_codes = []
         has_reset = False
         
         for token in parsed_tokens:
-            if isinstance(token, str):
-                if token == 'reset':
+            ansi_code = token.get('ansi', '')
+            if ansi_code:
+                if token.get('value') == 'reset':
                     has_reset = True
-                elif token != 'invalid' and token in self.ANSI_STYLES:
-                    valid_styles.append(token)
+                    prefix_codes = [ansi_code]  # Reset clears all previous styles
+                else:
+                    prefix_codes.append(ansi_code)
         
-        # Handle reset
-        if has_reset:
-            return f"\033[0m{text}"
-        
-        if not valid_styles:
+        if prefix_codes:
+            prefix = ''.join(prefix_codes)
+            suffix = self.RESET_CODE if not has_reset else ''
+            return f"{prefix}{text}{suffix}"
+        else:
             return text
-        
-        # Build ANSI escape sequence for combined styles
-        style_codes = [str(self.ANSI_STYLES[style]) for style in valid_styles]
-        if style_codes:
-            return f"\033[{';'.join(style_codes)}m{text}\033[0m"
-        
-        return text
-    
-    def strip_formatting(self, formatted_text: str) -> str:
-        """Remove ANSI text style codes from text"""
-        # Remove ANSI escape sequences
-        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-        return ansi_escape.sub('', formatted_text)

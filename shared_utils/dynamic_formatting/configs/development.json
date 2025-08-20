@@ -1,23 +1,13 @@
 {
-  "validation_mode": "STRICT",
-  "validation_level": "ERROR",
+  "validation_mode": "strict",
+  "validation_level": "info",
   "enable_validation": true,
-  "output_mode": "console",
   "enable_colors": true,
-  "performance_monitoring": {
-    "enabled": true,
-    "memory_tracking": true,
-    "regression_detection": true,
-    "baseline_duration_ms": 1.0,
-    "baseline_memory_mb": 5.0,
-    "regression_threshold": 2.0,
-    "sample_interval": 100
-  },
-  "functions": {
-    "level_color": "lambda level: {'ERROR': 'red', 'WARNING': 'yellow', 'INFO': 'blue', 'DEBUG': 'green'}.get(level.upper(), 'white')",
-    "status_color": "lambda status: 'green' if 200 <= status < 300 else 'red' if status >= 400 else 'yellow'",
-    "is_critical": "lambda level: level.upper() in ['ERROR', 'CRITICAL', 'FATAL']",
-    "is_warning": "lambda level: level.upper() in ['WARNING', 'WARN']"
-  },
-  "description": "Development environment configuration with strict validation, detailed error reporting, comprehensive monitoring, and helpful debugging functions for enhanced development experience."
+  "output_mode": "console",
+  "auto_correct_suggestions": true,
+  "cache_parsed_templates": false,
+  "enable_performance_monitoring": true,
+  "strict_argument_validation": true,
+  "max_template_sections": 50,
+  "enable_function_fallback": true
 }
