@@ -157,13 +157,13 @@ class FormatterConfig:
     def from_dict(cls, config_dict: Dict[str, Any]) -> 'FormatterConfig':
         """
         Create configuration from dictionary (useful for JSON config files)
-        
+
         Args:
             config_dict: Dictionary containing configuration values
-            
+
         Returns:
             FormatterConfig instance
-            
+
         Example:
             config_data = {
                 "validation_mode": "graceful",
@@ -172,15 +172,40 @@ class FormatterConfig:
             }
             config = FormatterConfig.from_dict(config_data)
         """
-        # Handle nested function definitions if present
-        if 'functions' in config_dict and isinstance(config_dict['functions'], dict):
-            # Functions can't be serialized easily, so this is mainly for other config
-            functions = config_dict.pop('functions')
-        else:
-            functions = {}
+        # Make a copy to avoid modifying the original
+        config_data = config_dict.copy()
         
+        # Handle nested formatting structure (some configs wrap everything in "formatting")
+        if 'formatting' in config_data and isinstance(config_data['formatting'], dict):
+            # Extract the formatting configuration
+            config_data = config_data['formatting'].copy()
+        
+        # Handle nested performance_monitoring configuration
+        if 'performance_monitoring' in config_data:
+            perf_config = config_data.pop('performance_monitoring')
+            if isinstance(perf_config, dict):
+                # Map nested performance_monitoring fields to flat config parameters
+                if 'enabled' in perf_config:
+                    config_data['enable_performance_monitoring'] = perf_config['enabled']
+                # Note: Other performance_monitoring fields like memory_tracking,
+                # regression_detection, etc. are used by PerformanceMonitor directly,
+                # not by FormatterConfig
+
+        # Handle nested function definitions if present
+        functions = {}
+        if 'functions' in config_data:
+            functions_data = config_data.pop('functions')
+            if isinstance(functions_data, dict):
+                # For now, we can't easily serialize/deserialize actual functions
+                # This would typically be handled by a more sophisticated config system
+                functions = functions_data
+
+        # Filter out any keys that aren't valid FormatterConfig parameters
+        valid_fields = set(cls.__dataclass_fields__.keys())
+        filtered_config = {k: v for k, v in config_data.items() if k in valid_fields}
+
         # Create config without functions first
-        config = cls(**config_dict)
+        config = cls(**filtered_config)
         config.functions = functions
         return config
     
@@ -195,24 +220,8 @@ class FormatterConfig:
         Returns:
             FormatterConfig instance
             
-        Raises:
-            FileNotFoundError: If config file doesn't exist
-            json.JSONDecodeError: If config file contains invalid JSON
-            ValueError: If config contains invalid values
-            
         Example:
-            # config.json contains:
-            # {
-            #   "formatting": {
-            #     "validation_mode": "graceful",
-            #     "output_mode": "console", 
-            #     "enable_colors": true,
-            #     "max_template_sections": 200
-            #   }
-            # }
-            
-            config = FormatterConfig.from_config_file('config.json')
-            formatter = DynamicFormatter(template, config=config)
+            config = FormatterConfig.from_config_file('configs/production.json')
         """
         config_path = Path(config_path)
         
@@ -220,17 +229,10 @@ class FormatterConfig:
             raise FileNotFoundError(f"Configuration file not found: {config_path}")
         
         try:
-            with open(config_path, 'r', encoding='utf-8') as f:
+            with open(config_path, 'r') as f:
                 config_data = json.load(f)
         except json.JSONDecodeError as e:
-            raise json.JSONDecodeError(
-                f"Invalid JSON in configuration file {config_path}: {e.msg}",
-                e.doc, e.pos
-            )
-        
-        # Support nested 'formatting' key for organized config files
-        if 'formatting' in config_data:
-            config_data = config_data['formatting']
+            raise ValueError(f"Invalid JSON in configuration file {config_path}: {e}")
         
         return cls.from_dict(config_data)
     
@@ -243,48 +245,72 @@ class FormatterConfig:
             prefix: Environment variable prefix (default: 'FORMATTER_')
             
         Returns:
-            FormatterConfig instance with values from environment variables
+            FormatterConfig instance with values from environment
             
         Example:
             # Set environment variables:
             # FORMATTER_VALIDATION_MODE=graceful
             # FORMATTER_OUTPUT_MODE=file
-            # FORMATTER_ENABLE_COLORS=false
-            
             config = FormatterConfig.from_environment()
         """
-        config_dict = {}
+        config_data = {}
         
-        for key, value in os.environ.items():
-            if key.startswith(prefix):
-                # Convert FORMATTER_VALIDATION_MODE to validation_mode
-                config_key = key[len(prefix):].lower()
+        # Map environment variables to config fields
+        env_mapping = {
+            f'{prefix}VALIDATION_MODE': 'validation_mode',
+            f'{prefix}VALIDATION_LEVEL': 'validation_level', 
+            f'{prefix}ENABLE_VALIDATION': 'enable_validation',
+            f'{prefix}OUTPUT_MODE': 'output_mode',
+            f'{prefix}ENABLE_COLORS': 'enable_colors',
+            f'{prefix}ENABLE_PERFORMANCE_MONITORING': 'enable_performance_monitoring',
+            f'{prefix}MAX_RECURSION_DEPTH': 'max_recursion_depth',
+            f'{prefix}MAX_TEMPLATE_SECTIONS': 'max_template_sections',
+            f'{prefix}MAX_TEMPLATE_LENGTH': 'max_template_length',
+            f'{prefix}STRICT_ARGUMENT_VALIDATION': 'strict_argument_validation',
+            f'{prefix}AUTO_CORRECT_SUGGESTIONS': 'auto_correct_suggestions',
+            f'{prefix}CACHE_PARSED_TEMPLATES': 'cache_parsed_templates',
+        }
+        
+        for env_var, config_field in env_mapping.items():
+            if env_var in os.environ:
+                value = os.environ[env_var]
                 
-                # Type conversion for common config values
-                if value.lower() in ('true', 'false'):
-                    config_dict[config_key] = value.lower() == 'true'
-                elif value.isdigit():
-                    config_dict[config_key] = int(value)
+                # Convert string values to appropriate types
+                if config_field in ['enable_validation', 'enable_colors', 'enable_performance_monitoring',
+                                   'strict_argument_validation', 'auto_correct_suggestions', 
+                                   'cache_parsed_templates']:
+                    config_data[config_field] = value.lower() in ('true', '1', 'yes', 'on')
+                elif config_field in ['max_recursion_depth', 'max_template_sections', 'max_template_length']:
+                    config_data[config_field] = int(value)
                 else:
-                    config_dict[config_key] = value
+                    config_data[config_field] = value
         
-        return cls.from_dict(config_dict) if config_dict else cls()
+        return cls.from_dict(config_data)
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self, include_functions: bool = False) -> Dict[str, Any]:
         """
-        Convert configuration to dictionary (useful for saving to JSON)
+        Convert configuration to dictionary (useful for JSON serialization)
         
-        Note: Functions are not included in the output as they can't be serialized.
+        Args:
+            include_functions: Whether to include function definitions (default: False)
+            
+        Returns:
+            Dictionary representation of configuration
         """
         result = {}
-        for key, value in self.__dict__.items():
-            if key == 'functions':
-                # Skip functions as they can't be serialized
+        
+        for field_name, field_def in self.__dataclass_fields__.items():
+            value = getattr(self, field_name)
+            
+            # Convert enums to string values
+            if isinstance(value, Enum):
+                result[field_name] = value.value
+            elif field_name == 'functions' and not include_functions:
+                # Skip functions unless explicitly requested
                 continue
-            elif isinstance(value, Enum):
-                result[key] = value.value
             else:
-                result[key] = value
+                result[field_name] = value
+        
         return result
     
     def to_config_file(self, config_path: Union[str, Path], nested: bool = True) -> None:
@@ -292,34 +318,43 @@ class FormatterConfig:
         Save configuration to JSON file
         
         Args:
-            config_path: Path where to save the configuration file
-            nested: If True, wrap config in 'formatting' key for organization
+            config_path: Path where to save the configuration
+            nested: Whether to use nested structure for performance_monitoring
         """
         config_path = Path(config_path)
-        config_dict = self.to_dict()
         
-        if nested:
-            output_dict = {'formatting': config_dict}
-        else:
-            output_dict = config_dict
+        config_data = self.to_dict(include_functions=False)
         
-        with open(config_path, 'w', encoding='utf-8') as f:
-            json.dump(output_dict, f, indent=2, sort_keys=True)
+        if nested and 'enable_performance_monitoring' in config_data:
+            # Convert flat performance monitoring to nested structure
+            perf_enabled = config_data.pop('enable_performance_monitoring')
+            config_data['performance_monitoring'] = {
+                'enabled': perf_enabled
+            }
+        
+        # Ensure directory exists
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        with open(config_path, 'w') as f:
+            json.dump(config_data, f, indent=2)
     
     def copy(self, **overrides) -> 'FormatterConfig':
         """
         Create a copy of this configuration with optional overrides
         
         Args:
-            **overrides: Configuration values to override
+            **overrides: Configuration fields to override
             
         Returns:
             New FormatterConfig instance
+            
+        Example:
+            dev_config = FormatterConfig.development()
+            test_config = dev_config.copy(output_mode='file', enable_colors=False)
         """
-        current_dict = self.to_dict()
-        current_dict['functions'] = self.functions.copy()
-        current_dict.update(overrides)
-        return FormatterConfig.from_dict(current_dict)
+        current_config = self.to_dict(include_functions=True)
+        current_config.update(overrides)
+        return self.__class__.from_dict(current_config)
     
     def is_strict_mode(self) -> bool:
         """Check if validation mode is strict"""

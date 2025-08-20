@@ -1,17 +1,17 @@
 {
-  "timestamp": 1755661585.6367762,
+  "timestamp": 1755668854.2376244,
   "total_operations": 100,
   "operations": [
     {
       "operation_name": "format_operation",
       "total_calls": 100,
-      "avg_duration_ms": 0.009313002228736877,
-      "recent_avg_duration_ms": 0.009313002228736877,
-      "min_duration_ms": 0.004400033503770828,
-      "max_duration_ms": 0.05639996379613876,
-      "duration_std_ms": 0.009014127737023267,
+      "avg_duration_ms": 0.011075005168095231,
+      "recent_avg_duration_ms": 0.011075005168095231,
+      "min_duration_ms": 0.005299923941493034,
+      "max_duration_ms": 0.06809993647038937,
+      "duration_std_ms": 0.009851978603517489,
       "avg_memory_usage_mb": 0.0,
-      "calls_per_second": 107376.75944222661
+      "calls_per_second": 90293.41158962078
     }
   ]
 }
