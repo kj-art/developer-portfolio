@@ -1,0 +1,86 @@
+Folder PATH listing for volume Windows-SSD
+Volume serial number is CC11-912E
+C:.
+¦   logger.py
+¦   structure.txt
+¦   __init__.py
+¦   
++---dynamic_formatting
+¦   ¦   benchmarks.py
+¦   ¦   config.py
+¦   ¦   dynamic_formatting.py
+¦   ¦   enhanced_formatter.py
+¦   ¦   formatting_state.py
+¦   ¦   performance_monitor.py
+¦   ¦   README.md
+¦   ¦   span_structures.py
+¦   ¦   template_parser.py
+¦   ¦   template_validation.py
+¦   ¦   __init__.py
+¦   ¦   
+¦   +---configs
+¦   +---examples
+¦   ¦       basic_examples.py
+¦   ¦       config_examples.py
+¦   ¦       performance_examples.py
+¦   ¦       validation_examples.py
+¦   ¦       
+¦   +---formatters
+¦   ¦   ¦   base.py
+¦   ¦   ¦   color.py
+¦   ¦   ¦   conditional.py
+¦   ¦   ¦   text.py
+¦   ¦   ¦   __init__.py
+¦   ¦   ¦   
+¦   ¦   +---__pycache__
+¦   ¦           base.cpython-312.pyc
+¦   ¦           color.cpython-312.pyc
+¦   ¦           conditional.cpython-312.pyc
+¦   ¦           text.cpython-312.pyc
+¦   ¦           __init__.cpython-312.pyc
+¦   ¦           
+¦   +---tests
+¦   ¦   ¦   conftest.py
+¦   ¦   ¦   test_basic.py
+¦   ¦   ¦   test_config_support.py
+¦   ¦   ¦   test_core_formatting.py
+¦   ¦   ¦   test_error_handling.py
+¦   ¦   ¦   test_function_fallback.py
+¦   ¦   ¦   test_performance.py
+¦   ¦   ¦   test_performance_monitor.py
+¦   ¦   ¦   test_positional_args.py
+¦   ¦   ¦   test_positional_regression.py
+¦   ¦   ¦   __init__.py
+¦   ¦   ¦   
+¦   ¦   +---fixtures
+¦   ¦   ¦       sample_templates.py
+¦   ¦   ¦       test_data.json
+¦   ¦   ¦       __init__.py
+¦   ¦   ¦       
+¦   ¦   +---__pycache__
+¦   ¦           test_performance_monitor.cpython-312-pytest-8.4.1.pyc
+¦   ¦           __init__.cpython-312.pyc
+¦   ¦           
+¦   +---__pycache__
+¦           config.cpython-312.pyc
+¦           conftest.cpython-312-pytest-8.4.1.pyc
+¦           dynamic_formatting.cpython-312.pyc
+¦           enhanced_formatter.cpython-312.pyc
+¦           formatters.cpython-312.pyc
+¦           formatting_state.cpython-312.pyc
+¦           performance_monitor.cpython-312.pyc
+¦           span_structures.cpython-312.pyc
+¦           template_parser.cpython-312.pyc
+¦           template_validation.cpython-312.pyc
+¦           test_basic.cpython-312-pytest-8.4.1.pyc
+¦           test_conditionals.cpython-312.pyc
+¦           test_config_support.cpython-312-pytest-8.4.1.pyc
+¦           token_parsing.cpython-312.pyc
+¦           __init__.cpython-312.pyc
+¦           
++---__pycache__
+        dynamic_formatting.cpython-312.pyc
+        logger.cpython-312.pyc
+        logging.cpython-312.pyc
+        __init__.cpython-312.pyc
+        

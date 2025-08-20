@@ -1,0 +1,7 @@
+{
+  "formatting": {
+    "validation_mode": "graceful",
+    "output_mode": "console",
+    "enable_validation": false
+  }
+}

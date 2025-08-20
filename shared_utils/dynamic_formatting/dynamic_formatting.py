@@ -356,7 +356,10 @@ class DynamicFormatter:
         
         # Handle conditional sections first
         if hasattr(section, 'function_name') and section.function_name:
-            func = self.config.functions.get(section.function_name)
+            if hasattr(self.config, 'functions') and isinstance(self.config.functions, dict):
+                func = self.config.functions.get(section.function_name)
+            else:
+                func = None
             if not func:
                 if self.config.is_strict_mode():
                     raise FunctionNotFoundError(
