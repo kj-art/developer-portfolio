@@ -12,16 +12,19 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
-# Add the parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent))
+# Add the project root to the path for imports
+project_root = Path(__file__).parent.parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
 try:
-    from config import FormatterConfig, ValidationMode, ValidationLevel
-    from dynamic_formatting import DynamicFormatter
+    from shared_utils.dynamic_formatting.config import FormatterConfig, ValidationMode, ValidationLevel
+    from shared_utils.dynamic_formatting.dynamic_formatting import DynamicFormatter
 except ImportError as e:
     print(f"Import error: {e}")
-    print("Make sure you're running this from the dynamic_formatting directory")
-    sys.exit(1)
+    print("Make sure you're running pytest from the project root directory")
+    # Don't exit during pytest collection - let pytest handle the error
+    pass
 
 
 class TestFormatterConfigFileSupport:

@@ -140,7 +140,7 @@ class DynamicFormatter:
             self._validate_template()
         
         # Parse template into sections
-        parser = TemplateParser(self.config.delimiter)
+        parser = TemplateParser(self.config.delimiter, TOKEN_FORMATTERS)
         self.sections = parser.parse_format_string(format_string)
     
     @classmethod
@@ -341,7 +341,7 @@ class DynamicFormatter:
         is missing from the data dictionary, causing the entire section to disappear.
         """
         # Handle required fields
-        if section.is_required and section.field_name not in data:
+        if hasattr(section, 'is_required') and section.is_required and section.field_name not in data:
             raise RequiredFieldError(
                 f"Required field '{section.field_name}' is missing",
                 field_name=section.field_name,
@@ -355,7 +355,7 @@ class DynamicFormatter:
         field_value = data[section.field_name]
         
         # Handle conditional sections first
-        if section.function_name:
+        if hasattr(section, 'function_name') and section.function_name:
             func = self.config.functions.get(section.function_name)
             if not func:
                 if self.config.is_strict_mode():
@@ -386,21 +386,67 @@ class DynamicFormatter:
                     # In graceful mode, hide the section if conditional fails
                     return ""
         
-        # For now, do simple rendering without complex formatting
-        # Build base text parts
+        # Build text parts - handle prefix, field value, and suffix
         text_parts: List[str] = []
         
-        if hasattr(section, 'prefix') and section.prefix:
-            if isinstance(section.prefix, str):
-                text_parts.append(section.prefix)
+        # Add prefix (defensive handling)
+        prefix = getattr(section, 'prefix', None)
+        if prefix:
+            if isinstance(prefix, str):
+                text_parts.append(prefix)
+            elif isinstance(prefix, list):
+                # Handle formatted spans in prefix
+                for span in prefix:
+                    if hasattr(span, 'text'):
+                        text_parts.append(span.text)
+                    else:
+                        text_parts.append(str(span))
+            else:
+                text_parts.append(str(prefix))
         
+        # Add the field value
         text_parts.append(str(field_value))
         
-        if hasattr(section, 'suffix') and section.suffix:
-            if isinstance(section.suffix, str):
-                text_parts.append(section.suffix)
+        # Add suffix (defensive handling)
+        suffix = getattr(section, 'suffix', None)
+        if suffix:
+            if isinstance(suffix, str):
+                text_parts.append(suffix)
+            elif isinstance(suffix, list):
+                # Handle formatted spans in suffix
+                for span in suffix:
+                    if hasattr(span, 'text'):
+                        text_parts.append(span.text)
+                    else:
+                        text_parts.append(str(span))
+            else:
+                text_parts.append(str(suffix))
         
-        return ''.join(text_parts)
+        complete_text = ''.join(text_parts)
+        
+        # Apply any formatting tokens (simplified approach)
+        formatting_tokens = getattr(section, 'whole_section_formatting_tokens', None)
+        if formatting_tokens and self.config.output_mode == 'console':
+            # For now, just apply basic color formatting if it exists
+            color_tokens = formatting_tokens.get('color', [])
+            if color_tokens:
+                # Simple color mapping for common colors
+                color_map = {
+                    'red': '\033[31m',
+                    'green': '\033[32m', 
+                    'yellow': '\033[33m',
+                    'blue': '\033[34m',
+                    'magenta': '\033[35m',
+                    'cyan': '\033[36m',
+                    'white': '\033[37m'
+                }
+                
+                # Use the first color token
+                color_name = str(color_tokens[0]).lower()
+                if color_name in color_map:
+                    complete_text = f"{color_map[color_name]}{complete_text}\033[0m"
+        
+        return complete_text
     
     def _make_error_user_friendly(self, text: str) -> str:
         """Convert synthetic field names to user-friendly position descriptions"""
