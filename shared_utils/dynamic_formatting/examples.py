@@ -30,7 +30,8 @@ try:
         FormatterError,
         RequiredFieldError
     )
-    print("✓ Successfully imported dynamic formatting package!")
+    # Use ASCII-safe checkmark that works on all Windows terminals
+    print("[OK] Successfully imported dynamic formatting package!")
 except ImportError:
     # Fallback: try importing from current directory (if modules are here)
     sys.path.insert(0, str(Path(__file__).parent))
@@ -46,7 +47,7 @@ except ImportError:
         FunctionExecutionError = formatters.FunctionExecutionError
         FormatterError = formatters.FormatterError
         RequiredFieldError = formatters.RequiredFieldError
-        print("✓ Successfully imported via fallback method!")
+        print("[OK] Successfully imported via fallback method!")
         
     except ImportError as e:
         print(f"Could not import dynamic formatting modules: {e}")
@@ -72,191 +73,94 @@ def demo_core_feature_graceful_missing_data():
     disappear when their required data isn't provided, eliminating the need for
     manual null checking and conditional string building.
     """
-    print("=== Core Feature: Graceful Missing Data Handling ===")
+    print("\n=== CORE FEATURE: Graceful Missing Data Handling ===")
+    print("This is the primary innovation - sections automatically disappear when data is missing\n")
     
-    # Single section example - keyword arguments
-    formatter = DynamicFormatter("{{Error: ;message}}")
+    # Template with multiple optional sections
+    formatter = DynamicFormatter("{{#green;Status: ;status}} {{#blue;User: ;user}} {{#yellow;Count: ;count}}")
     
-    result1 = formatter.format(message="Connection failed")
-    result2 = formatter.format()  # No message provided
-    print(f"1. Keyword with data: '{result1}'")      # "Error: Connection failed"  
-    print(f"2. Keyword without data: '{result2}'")   # "" (empty string)
+    # Scenario 1: All data present
+    result = formatter.format(status="OK", user="admin", count=42)
+    print(f"1. All data present: {result}")
     
-    # Single section example - positional arguments (NEW)
-    formatter = DynamicFormatter("{{Error: ;}}")
+    # Scenario 2: Missing user - user section disappears 
+    result = formatter.format(status="OK", count=42)
+    print(f"2. Missing user: {result}")
     
-    result3 = formatter.format("Connection failed")
-    result4 = formatter.format()  # No arguments provided
-    print(f"3. Positional with data: '{result3}'")      # "Error: Connection failed"  
-    print(f"4. Positional without data: '{result4}'")   # "" (empty string)
+    # Scenario 3: Only status - other sections disappear
+    result = formatter.format(status="ERROR")
+    print(f"3. Only status: {result}")
     
-    # Multiple sections example - keyword arguments
-    formatter = DynamicFormatter("{{Error: ;message}} {{Processing ;file_count; files}} {{Duration: ;seconds;s}}")
+    # Scenario 4: No data - completely empty result
+    result = formatter.format()
+    print(f"4. No data: '{result}' (empty)")
     
-    # All data present
-    result5 = formatter.format(message="Failed", file_count=25, seconds=12.5)
-    print(f"5. Keyword all data: '{result5}'")
-    
-    # Some data missing
-    result6 = formatter.format(file_count=25, seconds=12.5)  # No error message
-    print(f"6. Keyword partial data: '{result6}'")
-    
-    # Only one piece of data
-    result7 = formatter.format(message="Failed")  # Only error message
-    print(f"7. Keyword minimal data: '{result7}'")
-    
-    # No data at all
-    result8 = formatter.format()
-    print(f"8. Keyword no data: '{result8}'")
-    
-    # Multiple sections example - positional arguments (NEW)
-    formatter = DynamicFormatter("{{Error: ;}} {{Processing ; files}} {{Duration: ;s}}")
-    
-    # All data present
-    result9 = formatter.format("Failed", 25, 12.5)
-    print(f"9. Positional all data: '{result9}'")
-    
-    # Some data missing (fewer arguments)
-    result10 = formatter.format("Failed")  # Only first argument
-    print(f"10. Positional partial data: '{result10}'")
-    
-    print("\nKey insight: No manual null checking required!")
-    print("Compare to manual approach:")
-    print("  parts = []")
-    print("  if message: parts.append(f'Error: {message}')")
-    print("  if file_count: parts.append(f'Processing {file_count} files')")
-    print("  if seconds: parts.append(f'Duration: {seconds}s')")
-    print("  result = ' '.join(parts)")
+    print("\nKey insight: No conditional logic needed in your code!")
+    print("Before: if status: msg += f'Status: {status} '")
+    print("After:  formatter.format(status=status)  # Section disappears if None")
 
 
 def demo_positional_arguments():
-    """Demonstrate the new positional arguments feature"""
-    print("\n=== Positional Arguments Feature (NEW) ===")
+    """
+    NEW FEATURE: Positional arguments support
     
-    # 1. Basic positional syntax
-    formatter = DynamicFormatter("{{}}")
-    result = formatter.format("Hello")
-    print(f"1. Single field: '{result}'")
+    Use empty field names {{}} for cleaner templates when you have ordered data.
+    Missing positional arguments cause later sections to disappear gracefully.
+    """
+    print("\n=== NEW FEATURE: Positional Arguments ===")
+    print("Use {{}} syntax for ordered data without field names\n")
     
-    formatter = DynamicFormatter("{{}} {{}}")
-    result = formatter.format("Hello", "World")
-    print(f"2. Multiple fields: '{result}'")
+    # Template with positional arguments
+    formatter = DynamicFormatter("{{#red;Error: ;}} {{Code: ;}} {{#yellow;Details: ;}}")
     
-    # 3. Positional with prefixes and suffixes
-    formatter = DynamicFormatter("{{Error: ;}}")
+    # Scenario 1: All arguments provided
+    result = formatter.format("Connection failed", 500, "Timeout after 30s")
+    print(f"1. All args: {result}")
+    
+    # Scenario 2: Missing details - details section disappears
+    result = formatter.format("Connection failed", 500)
+    print(f"2. Missing details: {result}")
+    
+    # Scenario 3: Only error message
     result = formatter.format("Connection failed")
-    print(f"3. With prefix: '{result}'")
+    print(f"3. Only error: {result}")
     
-    formatter = DynamicFormatter("{{Count: ;;items}}")
-    result = formatter.format(25)
-    print(f"4. With prefix and suffix: '{result}'")
+    # Scenario 4: Mixed positional and named (in separate sections)
+    mixed_formatter = DynamicFormatter("{{Alert: ;}} {{User: ;username}} {{Time: ;}}")
+    result = mixed_formatter.format("System overload", "admin")  # username section disappears
+    print(f"4. Mixed template: {result}")
     
-    # 5. Complex formatting with positional args
-    formatter = DynamicFormatter("{{#red@bold;}}")
-    result = formatter.format("URGENT")
-    print(f"5. With formatting: {result}")
-    
-    formatter = DynamicFormatter("{{#red@bold;Alert: ;}}")
-    result = formatter.format("System down")
-    print(f"6. Formatting with prefix: {result}")
-    
-    # 7. Multiple formatted sections
-    formatter = DynamicFormatter("{{#red;Error: ;}} {{#green;Status: ;}}")
-    result = formatter.format("Failed", "Recovered")
-    print(f"7. Multiple formatted: {result}")
-    
-    # 8. Positional with functions
-    def priority_color(priority):
-        return {'high': 'red', 'medium': 'yellow', 'low': 'green'}[priority.lower()]
-    
-    formatter = DynamicFormatter("{{#priority_color@bold;Priority: ;}}", 
-                                functions={'priority_color': priority_color})
-    result = formatter.format("HIGH")
-    print(f"8. With function fallback: {result}")
-    
-    # 9. Positional with conditionals
-    def is_urgent(priority):
-        return priority.lower() in ['high', 'critical']
-    
-    formatter = DynamicFormatter("{{?is_urgent;URGENT: ;}}", 
-                                functions={'is_urgent': is_urgent})
-    result1 = formatter.format("HIGH")
-    result2 = formatter.format("LOW")
-    print(f"9. Conditional (urgent): '{result1}'")
-    print(f"10. Conditional (normal): '{result2}'")
-    
-    # 11. Missing arguments demonstration
-    formatter = DynamicFormatter("{{First: ;}} {{Second: ;}} {{Third: ;}}")
-    result1 = formatter.format("A", "B", "C")
-    result2 = formatter.format("A", "B")
-    result3 = formatter.format("A")
-    print(f"11. All arguments: '{result1}'")
-    print(f"12. Two arguments: '{result2}'")
-    print(f"13. One argument: '{result3}'")
-    
-    # 14. Comparison with keyword arguments
-    print("\n--- Keyword vs Positional Comparison ---")
-    
-    # Same template content, different argument styles
-    kw_formatter = DynamicFormatter("{{Error: ;message}} {{Code: ;code}}")
-    pos_formatter = DynamicFormatter("{{Error: ;}} {{Code: ;}}")
-    
-    kw_result = kw_formatter.format(message="Failed", code=404)
-    pos_result = pos_formatter.format("Failed", 404)
-    
-    print(f"Keyword style: '{kw_result}'")
-    print(f"Positional style: '{pos_result}'")
-    
-    print("\nBenefits of positional arguments:")
-    print("• Cleaner templates: {{}} vs {{field_name}}")
-    print("• Simpler function calls: format('a', 'b') vs format(field1='a', field2='b')")
-    print("• Good for fixed-order data like tuples or API responses")
-    print("• Still supports all formatting features (colors, functions, conditionals)")
+    print("\nBenefit: Cleaner templates for ordered data, still graceful with missing args")
 
 
 # ============================================================================
-# COMPREHENSIVE FEATURE SHOWCASE
+# COLOR FORMATTING DEMONSTRATIONS
 # ============================================================================
 
 def demo_all_color_features():
     """Demonstrate all color formatting capabilities"""
-    print("\n=== Color Features ===")
+    print("\n=== Color Formatting Features ===")
     
-    # 1. Built-in ANSI colors
-    formatter = DynamicFormatter("{{#red;ANSI Red: ;message}} {{#blue;ANSI Blue: ;message}}")
-    result = formatter.format(message="test")
-    print(f"1. ANSI colors: {result}")
+    # 1. Basic ANSI colors
+    basic_colors = ['red', 'green', 'blue', 'yellow', 'cyan', 'magenta', 'white', 'black']
+    print("1. Basic ANSI colors:")
+    for color in basic_colors:
+        formatter = DynamicFormatter(f"{{{{#{color};{color.capitalize()}: ;message}}}}")
+        result = formatter.format(message="sample")
+        print(f"   {result}")
     
     # 2. Hex colors
-    formatter = DynamicFormatter("{{#ff0000;Hex Red: ;message}} {{#0000ff;Hex Blue: ;message}}")
-    result = formatter.format(message="test")
-    print(f"2. Hex colors: {result}")
+    print("\n2. Hex colors:")
+    hex_colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff']
+    color_names = ['Red', 'Green', 'Blue', 'Yellow', 'Magenta', 'Cyan']
+    for hex_color, name in zip(hex_colors, color_names):
+        formatter = DynamicFormatter(f"{{{{#{hex_color};{name}: ;message}}}}")
+        result = formatter.format(message="hex")
+        print(f"   {result}")
     
-    # 3. Named colors (matplotlib)
-    formatter = DynamicFormatter("{{#crimson;Named Red: ;message}} {{#navy;Named Blue: ;message}}")
-    result = formatter.format(message="test")
-    print(f"3. Named colors: {result}")
-    
-    # 4. Color override behavior
-    formatter = DynamicFormatter("{{#red#green#blue;Multiple colors: ;message}}")
-    result = formatter.format(message="should be blue")
-    print(f"4. Color override: {result}")
-    
-    # 5. Color function fallback
-    def status_color(status):
-        return {'success': 'green', 'error': 'red', 'warning': 'yellow'}.get(status, 'white')
-    
-    formatter = DynamicFormatter("{{#status_color;Status: ;status}}", functions={'status_color': status_color})
-    result = formatter.format(status="error")
-    print(f"5. Color function: {result}")
-
-
-def demo_function_fallback_mechanics():
-    """Demonstrate exactly how function fallback works"""
-    print("\n=== Function Fallback Mechanics ===")
-    
-    def field_based_color(field_value):
-        """Function receives the actual field value, not other format data"""
+    # 3. Function-generated colors
+    def dynamic_color(field_value):
+        """Generate color based on content"""
         if 'error' in str(field_value).lower():
             return 'red'
         elif 'warning' in str(field_value).lower():
@@ -264,252 +168,335 @@ def demo_function_fallback_mechanics():
         elif 'success' in str(field_value).lower():
             return 'green'
         else:
-            return 'white'
+            return 'blue'
     
-    def field_based_style(field_value):
-        """Text style based on field content"""
-        if str(field_value).isupper():
-            return 'bold'
-        elif len(str(field_value)) > 10:
-            return 'italic'
+    print("\n3. Function-generated colors:")
+    formatter = DynamicFormatter("{{#dynamic_color;Log: ;message}}", functions={'dynamic_color': dynamic_color})
+    
+    messages = ["Error occurred", "Warning: disk space", "Success: completed", "Info: processing"]
+    for msg in messages:
+        result = formatter.format(message=msg)
+        print(f"   {result}")
+
+
+def demo_function_fallback_mechanics():
+    """Demonstrate the function fallback system"""
+    print("\n=== Function Fallback Mechanics ===")
+    
+    # Create functions that return different types
+    def error_color(field):
+        return '#ff4444'  # Returns hex color
+    
+    def warning_emphasis(field):
+        return 'bold'  # Returns text style
+    
+    def status_formatter(field):
+        if field == 'online':
+            return 'green'
+        elif field == 'offline':
+            return 'red'
         else:
-            return 'normal'
+            return 'yellow'
     
-    functions = {
-        'field_based_color': field_based_color,
-        'field_based_style': field_based_style
-    }
-    
-    # Function receives the field value it's applied to
+    # 1. Color function fallback
     formatter = DynamicFormatter(
-        "{{#field_based_color@field_based_style;Status: ;message}}",
-        functions=functions
+        "{{#error_color;Error: ;message}} {{#warning_emphasis@bold;Warning: ;warning}}", 
+        functions={
+            'error_color': error_color,
+            'warning_emphasis': warning_emphasis
+        }
     )
     
-    test_cases = [
-        "ERROR: System down",
-        "warning: slow response", 
-        "SUCCESS",
-        "normal operation status"
-    ]
+    result = formatter.format(message="Critical failure", warning="Low memory")
+    print(f"1. Color/style functions: {result}")
     
-    for i, message in enumerate(test_cases, 1):
-        result = formatter.format(message=message)
-        print(f"{i}. Message '{message}' → {result}")
+    # 2. Field-value dependent formatting
+    formatter = DynamicFormatter(
+        "{{#status_formatter;Server: ;status}}",
+        functions={'status_formatter': status_formatter}
+    )
     
-    print("\nFunction call details:")
-    print("- field_based_color() receives: the value of 'message' field")
-    print("- field_based_style() receives: the value of 'message' field")
-    print("- Both functions operate on the same field value")
+    for status in ['online', 'offline', 'maintenance']:
+        result = formatter.format(status=status)
+        print(f"2. Status '{status}': {result}")
+    
+    # 3. Chained function priority
+    def priority_color(priority):
+        priority_map = {1: 'red', 2: 'yellow', 3: 'green'}
+        return priority_map.get(priority, 'white')
+    
+    formatter = DynamicFormatter(
+        "{{#priority_color;Priority ;priority;: ;message}}",
+        functions={'priority_color': priority_color}
+    )
+    
+    for priority in [1, 2, 3]:
+        result = formatter.format(priority=priority, message=f"Task level {priority}")
+        print(f"3. Priority {priority}: {result}")
 
+
+# ============================================================================
+# TEXT FORMATTING DEMONSTRATIONS  
+# ============================================================================
 
 def demo_all_text_features():
     """Demonstrate all text formatting capabilities"""
-    print("\n=== Text Style Features ===")
+    print("\n=== Text Formatting Features ===")
     
     # 1. Individual text styles
-    styles = ['bold', 'italic', 'underline']
+    print("1. Individual text styles:")
+    styles = ['bold', 'italic', 'underline', 'strikethrough', 'dim']
     for style in styles:
-        formatter = DynamicFormatter(f"{{@{style};{style.title()}: ;message}}")
-        result = formatter.format(message="text")
-        print(f"1. {style}: {result}")
+        formatter = DynamicFormatter(f"{{{{@{style};{style.capitalize()}: ;text}}}}")
+        result = formatter.format(text="sample")
+        print(f"   {result}")
     
-    # 2. Combined text styles
-    formatter = DynamicFormatter("{{@bold@italic@underline;All styles: ;message}}")
-    result = formatter.format(message="emphasized")
-    print(f"2. Combined styles: {result}")
+    # 2. Combined styles
+    print("\n2. Combined text styles:")
+    combinations = [
+        'bold@italic',
+        'bold@underline', 
+        'italic@underline',
+        'bold@italic@underline'
+    ]
+    for combo in combinations:
+        formatter = DynamicFormatter(f"{{{{@{combo};Combined: ;text}}}}")
+        result = formatter.format(text="sample")
+        print(f"   {result}")
     
-    # 3. Text style function fallback
-    def emphasis_level(message):
-        # Use message content to determine emphasis
-        if len(message) > 10:
-            return 'bold'
-        elif len(message) > 5:
-            return 'italic'
-        return 'normal'
-    
-    formatter = DynamicFormatter("{{@emphasis_level;Priority: ;message}}", 
-                                functions={'emphasis_level': emphasis_level})
-    result = formatter.format(message="critical-alert-system-failure")
-    print(f"3. Text function: {result}")
-    
-    # 4. Reset behavior
-    formatter = DynamicFormatter("{{@bold@italic@reset;Reset test: ;message}}")
-    result = formatter.format(message="should be normal")
-    print(f"4. Reset styles: {result}")
+    # 3. Color + text style combinations
+    print("\n3. Color + text style combinations:")
+    color_style_combos = [
+        '#red@bold',
+        '#green@italic',
+        '#blue@underline',
+        '#yellow@bold@italic'
+    ]
+    for combo in color_style_combos:
+        formatter = DynamicFormatter(f"{{{{@{combo};Styled: ;text}}}}")
+        result = formatter.format(text="sample")
+        print(f"   {result}")
 
+
+# ============================================================================
+# CONDITIONAL FORMATTING DEMONSTRATIONS
+# ============================================================================
 
 def demo_conditional_features():
-    """Demonstrate all conditional formatting capabilities"""
+    """Demonstrate conditional section visibility"""
     print("\n=== Conditional Features ===")
     
-    def has_items(count):
-        return count > 0
+    # Define conditional functions
+    def is_error(field_value):
+        return 'error' in str(field_value).lower()
     
-    def is_urgent(priority):
-        return priority > 7
+    def has_user(user_field):
+        return user_field is not None and user_field.strip()
     
-    def has_errors(error_count):
-        return error_count > 0
-    
-    functions = {
-        'has_items': has_items,
-        'is_urgent': is_urgent,
-        'has_errors': has_errors
-    }
+    def is_high_priority(priority):
+        return priority and int(priority) <= 2
     
     # 1. Section-level conditionals
+    print("1. Section-level conditionals:")
     formatter = DynamicFormatter(
-        "{{Processing}} {{?has_items;found ;item_count; items}} {{?has_errors;with ;error_count; errors}}",
-        functions=functions
+        "{{Message: ;message}} {{?is_error;#red;ERROR FLAG}} {{?has_user;User: ;user}}",
+        functions={
+            'is_error': is_error,
+            'has_user': has_user
+        }
     )
     
-    result1 = formatter.format(item_count=25, error_count=3)
-    result2 = formatter.format(item_count=0, error_count=0)
-    print(f"1. Section conditionals (with data): '{result1}'")
-    print(f"2. Section conditionals (no data): '{result2}'")
+    test_cases = [
+        {'message': 'System running normally', 'user': 'admin'},
+        {'message': 'Error in database connection', 'user': 'admin'},
+        {'message': 'Error in database connection', 'user': ''},
+        {'message': 'Task completed'},
+    ]
     
-    # 3. Inline conditionals
+    for i, case in enumerate(test_cases, 1):
+        result = formatter.format(**case)
+        print(f"   Test {i}: {result}")
+    
+    # 2. Inline conditionals  
+    print("\n2. Inline conditionals:")
     formatter = DynamicFormatter(
-        "{{Task{?is_urgent} - URGENT{?has_errors} - ERRORS: ;task_name}}",
-        functions=functions
+        "{{Task ;task_id;}} {{?is_high_priority;(#red@bold;HIGH PRIORITY;)}}",
+        functions={'is_high_priority': is_high_priority}
     )
     
-    result3 = formatter.format(task_name="deployment", priority=9, error_count=2)
-    result4 = formatter.format(task_name="cleanup", priority=3, error_count=0)
-    print(f"3. Inline conditionals (urgent+errors): {result3}")
-    print(f"4. Inline conditionals (normal): {result4}")
-    
-    # 5. Mixed section and inline conditionals
-    formatter = DynamicFormatter(
-        "{{Status{?is_urgent} URGENT: ;status}} {{?has_errors;Found ;error_count; issues}}",
-        functions=functions
-    )
-    
-    result5 = formatter.format(status="deploy", priority=8, error_count=1)
-    print(f"5. Mixed conditionals: {result5}")
+    priorities = [1, 3, 5]
+    for priority in priorities:
+        result = formatter.format(task_id=f"T{priority*100}", priority=priority)
+        print(f"   Priority {priority}: {result}")
 
+
+# ============================================================================
+# ESCAPE SEQUENCES DEMONSTRATIONS
+# ============================================================================
 
 def demo_escape_sequences():
-    """Demonstrate comprehensive escape sequence handling"""
+    """Demonstrate escape sequence handling"""
     print("\n=== Escape Sequences ===")
     
-    # 1. Basic brace escaping
-    formatter = DynamicFormatter("{{Use \\{variable\\} syntax: ;example}}")
-    result = formatter.format(example="name")
-    print(f"1. Escaped braces: '{result}'")
+    # 1. Escaped braces
+    print("1. Escaped braces:")
+    formatter = DynamicFormatter("\\{\\{Not a template\\}\\} {{But this is: ;field}}")
+    result = formatter.format(field="value")
+    print(f"   Result: {result}")
     
-    # 2. Delimiter escaping
-    formatter = DynamicFormatter("{{Path: ;path}}", delimiter=';')
-    result = formatter.format(path="C:\\Program Files\\app\\file.txt")
-    print(f"2. Path with delimiters: '{result}'")
+    # 2. Escaped delimiters in templates
+    print("\n2. Escaped delimiters:")
+    formatter = DynamicFormatter("{{Field with \\; semicolon: ;field}}")
+    result = formatter.format(field="test")
+    print(f"   Result: {result}")
     
-    # 3. Mixed escaping with formatting
-    formatter = DynamicFormatter("{{#red;Error in \\{module\\}: ;error}}")
-    result = formatter.format(error="syntax error")
-    print(f"3. Escaping with formatting: {result}")
+    # 3. Complex escaping
+    print("\n3. Complex escaping:")
+    formatter = DynamicFormatter("\\{\\{escaped\\}\\} {{Real: ;field}} \\{\\{more escaped\\}\\}")
+    result = formatter.format(field="value")
+    print(f"   Result: {result}")
     
-    # 4. Escaping with conditionals
-    def has_value(value):
-        return bool(value)
-    
-    formatter = DynamicFormatter(
-        "{{Config{?has_value} \\{key\\}=\\{value\\}: ;setting}}",
-        functions={'has_value': has_value}
-    )
-    
-    result4 = formatter.format(setting="debug=true")
-    result5 = formatter.format(setting="")
-    print(f"4. Escaping with conditionals (has value): '{result4}'")
-    print(f"5. Escaping with conditionals (no value): '{result5}'")
+    # 4. Literal formatting tokens
+    print("\n4. Literal formatting tokens:")
+    formatter = DynamicFormatter("{{Use \\#red and \\@bold for: ;field}}")
+    result = formatter.format(field="formatting")
+    print(f"   Result: {result}")
 
+
+# ============================================================================
+# CUSTOM DELIMITER DEMONSTRATIONS
+# ============================================================================
 
 def demo_custom_delimiters():
-    """Demonstrate custom delimiter functionality"""
+    """Demonstrate custom delimiter support"""
     print("\n=== Custom Delimiters ===")
     
     # 1. Pipe delimiter
-    formatter = DynamicFormatter("{{#red|Error: |message}}", delimiter='|')
-    result = formatter.format(message="Connection failed")
-    print(f"1. Pipe delimiter: {result}")
+    print("1. Pipe delimiter:")
+    formatter = DynamicFormatter("{{#red|Error|field}} {{Status|status}}", delimiter='|')
+    result = formatter.format(field="Critical failure", status="FAILED")
+    print(f"   Result: {result}")
     
-    # 2. Double colon delimiter
-    formatter = DynamicFormatter("{{@bold::Status: ::status}}", delimiter='::')
-    result = formatter.format(status="Running")
-    print(f"2. Double colon delimiter: {result}")
+    # 2. Double colon delimiter  
+    print("\n2. Double colon delimiter:")
+    formatter = DynamicFormatter("{{#blue::Info::message}} {{Code::code}}", delimiter='::')
+    result = formatter.format(message="Process completed", code=200)
+    print(f"   Result: {result}")
     
-    # 3. Custom delimiter with paths
-    formatter = DynamicFormatter("{{Path: |path}}", delimiter='|')
-    result = formatter.format(path="file.txt|backup.txt")
-    print(f"3. Custom delimiter with paths: '{result}'")
+    # 3. Custom delimiter with escaping
+    print("\n3. Custom delimiter with escaping:")
+    formatter = DynamicFormatter("{{Text with \\| pipe|field}}", delimiter='|')
+    result = formatter.format(field="and value")
+    print(f"   Result: {result}")
 
+
+# ============================================================================
+# FIELD FORMATTING DEMONSTRATIONS
+# ============================================================================
 
 def demo_field_formatting():
     """Demonstrate inline field formatting"""
     print("\n=== Field Formatting ===")
     
-    def importance_color(level):
-        return {'low': 'cyan', 'medium': 'yellow', 'high': 'red'}[level]
+    # 1. Field-level color formatting
+    print("1. Field-level formatting:")
+    formatter = DynamicFormatter("{{Status: ;status}} {{User: ;{#blue}user}}")
+    result = formatter.format(status="Active", user="admin")
+    print(f"   Result: {result}")
     
-    # 1. Field with inline formatting
-    formatter = DynamicFormatter("{{Task: {#red}task_name}} priority: {{importance}}")
-    result = formatter.format(task_name="Deploy", importance="high")
-    print(f"1. Field formatting: {result}")
+    # 2. Field-level text formatting
+    print("\n2. Field text formatting:")
+    formatter = DynamicFormatter("{{Normal: ;normal}} {{Bold: ;{@bold}bold_field}}")
+    result = formatter.format(normal="regular", bold_field="emphasized")
+    print(f"   Result: {result}")
     
-    # 2. Field with function formatting
-    formatter = DynamicFormatter("{{Task: {#importance_color}task_name}} ({{importance}})", 
-                                functions={'importance_color': importance_color})
-    result = formatter.format(task_name="Deploy", importance="high")
-    print(f"2. Field function formatting: {result}")
-    
-    # 3. Complex field combinations
-    formatter = DynamicFormatter("{{Status: {#green@bold}status}} - {{message}}")
-    result = formatter.format(status="RUNNING", message="All systems operational")
-    print(f"3. Complex field formatting: {result}")
+    # 3. Combined field formatting
+    print("\n3. Combined field formatting:")
+    formatter = DynamicFormatter("{{Error: ;{#red@bold}error_msg}} {{Info: ;{#blue@italic}info}}")
+    result = formatter.format(error_msg="Critical", info="Details")
+    print(f"   Result: {result}")
 
+
+# ============================================================================
+# COMPLEX COMBINATIONS
+# ============================================================================
 
 def demo_complex_combinations():
     """Demonstrate complex feature combinations"""
-    print("\n=== Complex Combinations ===")
+    print("\n=== Complex Feature Combinations ===")
     
-    def level_color(level):
-        return {'DEBUG': 'cyan', 'INFO': 'green', 'WARNING': 'yellow', 
-                'ERROR': 'red', 'CRITICAL': 'magenta'}[level]
+    # Define helper functions
+    def severity_color(severity):
+        severity_map = {
+            'critical': '#ff0000',  # Red
+            'high': '#ff8800',      # Orange  
+            'medium': '#ffff00',    # Yellow
+            'low': '#88ff88',       # Light green
+            'info': '#8888ff'       # Light blue
+        }
+        return severity_map.get(severity, '#ffffff')
     
-    def level_style(level):
-        return 'bold' if level in ['ERROR', 'CRITICAL'] else 'normal'
+    def has_details(details):
+        return details and details.strip()
     
-    def has_duration(duration):
-        return duration > 0
+    def format_timestamp(timestamp):
+        return timestamp.strftime("%H:%M:%S") if timestamp else ""
     
-    def has_memory(memory):
-        return memory > 0
-    
-    functions = {
-        'level_color': level_color,
-        'level_style': level_style,
-        'has_duration': has_duration,
-        'has_memory': has_memory
-    }
-    
-    # Complex logging-style formatter
+    # 1. Security alert formatter
+    print("1. Security alert system:")
     formatter = DynamicFormatter(
-        "{{#level_color@level_style;[;levelname;]}} {{message}} "
-        "{{?has_duration;in ;duration;s}} {{?has_memory;using ;memory;MB}}",
-        functions=functions
+        "{{#severity_color@bold;[;severity;] ;message}} "
+        "{{?has_details;#888888;(;details;)}} "
+        "{{#888888;at ;{@italic}timestamp}}",
+        functions={
+            'severity_color': severity_color,
+            'has_details': has_details,
+            'format_timestamp': format_timestamp
+        }
     )
     
-    # Test various scenarios
-    scenarios = [
-        {'levelname': 'ERROR', 'message': 'Database connection failed', 'duration': 2.5, 'memory': 45},
-        {'levelname': 'INFO', 'message': 'Process completed', 'duration': 0.1, 'memory': 0},
-        {'levelname': 'WARNING', 'message': 'Slow query detected', 'duration': 8.3, 'memory': 0},
+    alerts = [
+        {'severity': 'critical', 'message': 'Unauthorized access attempt', 'details': 'Multiple failed logins', 'timestamp': datetime.now()},
+        {'severity': 'medium', 'message': 'Disk space warning', 'timestamp': datetime.now()},
+        {'severity': 'info', 'message': 'Backup completed successfully', 'details': '1.2GB archived', 'timestamp': datetime.now()},
     ]
     
-    for i, scenario in enumerate(scenarios, 1):
-        result = formatter.format(**scenario)
-        print(f"{i}. Complex scenario: {result}")
+    for alert in alerts:
+        result = formatter.format(**alert)
+        print(f"   {result}")
+    
+    # 2. Build status reporter
+    print("\n2. Build status reporter:")
+    def build_color(status):
+        return {'success': 'green', 'failed': 'red', 'running': 'yellow'}.get(status, 'white')
+    
+    def has_artifacts(artifacts):
+        return artifacts and len(artifacts) > 0
+    
+    formatter = DynamicFormatter(
+        "{{#build_color@bold;Build ;build_id; ;status}} "
+        "{{Duration: ;duration;s}} "
+        "{{?has_artifacts;Artifacts: ;artifacts}}",
+        functions={'build_color': build_color, 'has_artifacts': has_artifacts}
+    )
+    
+    builds = [
+        {'build_id': '#1234', 'status': 'success', 'duration': 45, 'artifacts': ['app.zip', 'docs.pdf']},
+        {'build_id': '#1235', 'status': 'failed', 'duration': 12},
+        {'build_id': '#1236', 'status': 'running', 'duration': 23},
+    ]
+    
+    for build in builds:
+        # Convert artifacts list to string for display
+        if 'artifacts' in build:
+            build['artifacts'] = ', '.join(build['artifacts'])
+        result = formatter.format(**build)
+        print(f"   {result}")
 
+
+# ============================================================================
+# FUN EXAMPLES
+# ============================================================================
 
 def demo_fun_examples():
     """Demonstrate fun and creative uses"""
@@ -582,191 +569,151 @@ def demo_fun_examples():
         print(f"3. Dynamic emphasis {i}: {result}")
 
 
+# ============================================================================
+# REAL-WORLD PATTERNS
+# ============================================================================
+
 def demo_real_world_patterns():
     """Demonstrate real-world usage patterns"""
     print("\n=== Real-World Patterns ===")
     
-    # 1. API Response Formatting
+    # 1. API response formatting
+    print("1. API response formatting:")
     def status_color(code):
         if 200 <= code < 300:
             return 'green'
         elif 400 <= code < 500:
             return 'yellow'
-        else:
+        elif code >= 500:
             return 'red'
+        else:
+            return 'blue'
     
-    def has_data(count):
-        return count > 0
-    
-    def has_errors(errors):
-        return errors > 0
-    
-    # Keyword version
-    api_formatter = DynamicFormatter(
-        "{{#status_color@bold;HTTP ;status_code}} {{?has_data;- ;record_count; records}} {{?has_errors;- ;error_count; errors}}",
-        functions={'status_color': status_color, 'has_data': has_data, 'has_errors': has_errors}
+    formatter = DynamicFormatter(
+        "{{#status_color@bold;HTTP ;status_code}} {{Method: ;method}} {{Path: ;path}} "
+        "{{Duration: ;duration;ms}} {{?has_error;#red;Error: ;error}}",
+        functions={'status_color': status_color, 'has_error': lambda e: bool(e)}
     )
     
     responses = [
-        {'status_code': 200, 'record_count': 150, 'error_count': 0},
-        {'status_code': 404, 'record_count': 0, 'error_count': 1},
-        {'status_code': 500, 'record_count': 0, 'error_count': 3}
+        {'status_code': 200, 'method': 'GET', 'path': '/api/users', 'duration': 45},
+        {'status_code': 404, 'method': 'GET', 'path': '/api/missing', 'duration': 12},
+        {'status_code': 500, 'method': 'POST', 'path': '/api/data', 'duration': 2000, 'error': 'Database timeout'},
     ]
     
-    print("Keyword style API responses:")
-    for i, response in enumerate(responses, 1):
-        result = api_formatter.format(**response)
-        print(f"  {i}. {result}")
+    for response in responses:
+        result = formatter.format(**response)
+        print(f"   {result}")
     
-    # Same formatter using positional arguments
-    api_pos_formatter = DynamicFormatter(
-        "{{#status_color@bold;HTTP ;}} {{?has_data;- ; records}} {{?has_errors;- ; errors}}",
-        functions={'status_color': status_color, 'has_data': has_data, 'has_errors': has_errors}
+    # 2. File processing status
+    print("\n2. File processing status:")
+    def size_color(size_mb):
+        if size_mb > 100:
+            return 'red'
+        elif size_mb > 10:
+            return 'yellow'
+        else:
+            return 'green'
+    
+    formatter = DynamicFormatter(
+        "{{Processing: ;filename}} {{#size_color;(;size_mb;MB)}} "
+        "{{Status: ;status}} {{Records: ;record_count}}",
+        functions={'size_color': size_color}
     )
     
-    print("Positional style API responses:")
-    for i, response in enumerate(responses, 1):
-        result = api_pos_formatter.format(response['status_code'], response['record_count'], response['error_count'])
-        print(f"  {i}. {result}")
-    
-    # 2. Build System Output
-    def build_status_color(status):
-        return {'SUCCESS': 'green', 'FAILED': 'red', 'BUILDING': 'yellow'}[status]
-    
-    def show_duration(duration):
-        return duration > 0
-    
-    def show_tests(test_count):
-        return test_count > 0
-    
-    build_formatter = DynamicFormatter(
-        "{{#build_status_color@bold;Build ;status}} {{?show_duration;in ;duration;s}} {{?show_tests;- ;test_count; tests passed}}",
-        functions={'build_status_color': build_status_color, 'show_duration': show_duration, 'show_tests': show_tests}
-    )
-    
-    builds = [
-        {'status': 'SUCCESS', 'duration': 45, 'test_count': 127},
-        {'status': 'FAILED', 'duration': 12, 'test_count': 0},
-        {'status': 'BUILDING', 'duration': 0, 'test_count': 0}
+    files = [
+        {'filename': 'users.csv', 'size_mb': 2.5, 'status': 'Complete', 'record_count': 1500},
+        {'filename': 'transactions.json', 'size_mb': 45.2, 'status': 'Processing'},
+        {'filename': 'archive.zip', 'size_mb': 250.8, 'status': 'Error'},
     ]
     
-    print("Build system output:")
-    for i, build in enumerate(builds, 1):
-        result = build_formatter.format(**build)
-        print(f"  {i}. {result}")
-    
-    # 3. File Processing Status
-    def processing_color(status):
-        if '/' in status:
-            processed, total = map(int, status.split('/'))
-            percentage = (processed / total) * 100 if total > 0 else 0
-            if percentage >= 100:
-                return 'green'
-            elif percentage >= 50:
-                return 'yellow'
-            else:
-                return 'red'
-        return 'white'
-    
-    def has_rate(rate):
-        return rate > 0
-    
-    def has_failures(failures):
-        return failures > 0
-    
-    file_formatter = DynamicFormatter(
-        "{{#processing_color;Processing: ;status}} {{?has_rate;at ;rate; files/sec}} {{?has_failures;(;failures; failed)}}",
-        functions={'processing_color': processing_color, 'has_rate': has_rate, 'has_failures': has_failures}
-    )
-    
-    progress_updates = [
-        {'status': '450/1000', 'rate': 125, 'failures': 0},
-        {'status': '750/1000', 'rate': 85, 'failures': 3},
-        {'status': '1000/1000', 'rate': 0, 'failures': 8}
-    ]
-    
-    print("File processing status:")
-    for i, update in enumerate(progress_updates, 1):
-        result = file_formatter.format(**update)
-        print(f"  {i}. {result}")
+    for file_info in files:
+        result = formatter.format(**file_info)
+        print(f"   {result}")
 
+
+# ============================================================================
+# EDGE CASES AND ERROR HANDLING
+# ============================================================================
 
 def demo_edge_cases():
-    """Demonstrate edge cases and error handling"""
+    """Demonstrate edge case handling and error scenarios"""
     print("\n=== Edge Cases & Error Handling ===")
     
-    # 1. Empty fields with conditionals
-    def is_present(value):
-        return bool(value and str(value).strip())
+    # 1. Empty and None values
+    print("1. Empty and None value handling:")
+    formatter = DynamicFormatter("{{Name: ;name}} {{Age: ;age}} {{Email: ;email}}")
     
-    formatter = DynamicFormatter(
-        "{{Status}} {{?is_present;: ;optional_field}}",
-        functions={'is_present': is_present}
-    )
+    test_data = [
+        {'name': 'John', 'age': 30, 'email': 'john@test.com'},
+        {'name': 'Jane', 'age': None, 'email': ''},
+        {'name': '', 'age': 25},
+        {}
+    ]
     
-    result1 = formatter.format(optional_field="active")
-    result2 = formatter.format(optional_field="")
-    result3 = formatter.format()  # Missing field
-    print(f"1. Optional field (present): '{result1}'")
-    print(f"2. Optional field (empty): '{result2}'")
-    print(f"3. Optional field (missing): '{result3}'")
+    for i, data in enumerate(test_data, 1):
+        result = formatter.format(**data)
+        print(f"   Test {i}: '{result}'")
     
-    # 2. Function chaining example
-    def get_level(priority):
-        if priority > 8:
-            return 'CRITICAL'
-        elif priority > 5:
-            return 'WARNING'
-        else:
-            return 'INFO'
-    
-    def level_color(level):
-        return {'CRITICAL': 'red', 'WARNING': 'yellow', 'INFO': 'green'}[level]
-    
-    formatter = DynamicFormatter(
-        "{{Priority: ;priority}} → {{#level_color@bold;Level: ;level}}",
-        functions={'get_level': get_level, 'level_color': level_color}
-    )
-    
-    # Manually chain the functions for this example
-    for priority in [3, 7, 9]:
-        level = get_level(priority)
-        result = formatter.format(priority=priority, level=level)
-        print(f"4. Chained functions (priority {priority}): {result}")
-    
-    # 3. Output mode switching
-    console_formatter = DynamicFormatter("{{#red@bold;Console: ;message}}", output_mode='console')
-    file_formatter = DynamicFormatter("{{#red@bold;File: ;message}}", output_mode='file')
+    # 2. Output mode differences
+    print("\n2. Output mode differences:")
+    template = "{{#red@bold;Error: ;message}}"
+    console_formatter = DynamicFormatter(template, output_mode='console')
+    file_formatter = DynamicFormatter(template, output_mode='file')
     
     console_result = console_formatter.format(message="test")
     file_result = file_formatter.format(message="test")
-    print(f"5. Console mode: {repr(console_result)}")
-    print(f"6. File mode: {repr(file_result)}")
+    print(f"   Console mode: {repr(console_result)}")
+    print(f"   File mode: '{file_result}'")
     
-    # 4. Error handling demonstrations (professional level)
-    print("\n--- Error Handling Examples ---")
+    # 3. Function errors and fallbacks
+    print("\n3. Function error handling:")
+    def failing_function(field):
+        raise ValueError("Function failed!")
+    
+    def fallback_color(field):
+        return 'blue'  # Safe fallback
+    
+    # This should handle the function error gracefully
+    formatter = DynamicFormatter(
+        "{{#failing_function;Message: ;message}} {{#fallback_color;Backup: ;backup}}",
+        functions={'failing_function': failing_function, 'fallback_color': fallback_color}
+    )
+    
+    try:
+        result = formatter.format(message="test", backup="works")
+        print(f"   With function error: {result}")
+    except Exception as e:
+        print(f"   Function error: {e}")
+    
+    # 4. Positional argument edge cases
+    print("\n4. Positional argument edge cases:")
     
     # Mixed arguments error
     try:
         formatter = DynamicFormatter("{{}} {{}}")
         formatter.format("pos", keyword="kw")
     except DynamicFormattingError as e:
-        print(f"Mixed args error: {e}")
+        print(f"   Mixed args error: {e}")
     
     # Too many positional arguments
     try:
         formatter = DynamicFormatter("{{}}")
         formatter.format("first", "second")
     except DynamicFormattingError as e:
-        print(f"Too many args error: {e}")
+        print(f"   Too many args error: {e}")
     
     # Required field missing (positional)
     try:
         formatter = DynamicFormatter("{{!}}")
         formatter.format()
     except RequiredFieldError as e:
-        print(f"Required field error: {e}")
+        print(f"   Required field error: {e}")
 
+
+# ============================================================================
+# COMPREHENSIVE DEMO RUNNER
+# ============================================================================
 
 def run_comprehensive_demo():
     """Run all feature demonstrations"""
@@ -794,12 +741,12 @@ def run_comprehensive_demo():
         try:
             demo_func()
         except Exception as e:
-            print(f"\n❌ Demo {demo_func.__name__} failed: {e}")
+            print(f"\n[ERROR] Demo {demo_func.__name__} failed: {e}")
             import traceback
             traceback.print_exc()
     
     print("\n" + "=" * 60)
-    print("✅ Comprehensive demo complete!")
+    print("[OK] Comprehensive demo complete!")
     print("\nKey features demonstrated:")
     print("• CORE: Graceful missing data handling - sections disappear when data is missing")
     print("• NEW: Positional arguments - simplified syntax for ordered data")

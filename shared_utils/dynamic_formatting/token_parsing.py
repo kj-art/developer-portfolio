@@ -17,6 +17,17 @@ PARSING ARCHITECTURE:
     4. Escape sequence processing converts \\{ → { throughout all levels
     5. All field sections are tracked for positional argument support
 
+POSITIONAL ARGUMENT PARSING RULES:
+    {{}} - valid positional field (empty field name)
+    {{#red}} - valid positional field with formatting token  
+    {{my_field;}} - valid for both, field name ignored for positional (prefix;field pattern)
+    {{my_field}} - valid for both, field name ignored for positional (single field)
+    {{#red;my_field}} - valid for both, token;field pattern
+    {{prefix;my_field}} - valid for both, prefix;field pattern
+    {{prefix;my_field;suffix}} - valid for both, prefix;field;suffix pattern
+    {{#red@bold;prefix;my_field}} - valid for both, token;prefix;field pattern
+    {{#red@bold;prefix;my_field;suffix}} - valid for both, token;prefix;field;suffix pattern
+
 PERFORMANCE:
     - Single-pass parsing with O(n) time complexity
     - Efficient escape sequence handling
@@ -43,7 +54,7 @@ class TemplateParser:
     def __init__(self, delimiter: str = ';', token_formatters: Dict = None):
         self.delimiter = delimiter
         self.token_formatters = token_formatters or {}
-        self.positional_sections = []  # Track all field sections for positional argument support
+        self.positional_field_count = 0  # Track number of field sections for positional support
     
     def parse_format_string(self, format_string: str) -> List[Union[str, FormatSection]]:
         """Parse a format string into sections, handling escape sequences"""
@@ -95,6 +106,19 @@ class TemplateParser:
     
     def _parse_template_content(self, content: str) -> FormatSection:
         """Parse the content of a template section {{...}}"""
+        if not content:
+            # Empty content like {{}} - this is a valid positional field
+            self.positional_field_count += 1
+            return FormatSection(
+                field_name=f"__pos_{self.positional_field_count - 1}__",
+                is_required=False,
+                prefix=None,
+                suffix=None,
+                field_formatting_tokens={},
+                function_name=None,
+                whole_section_formatting_tokens={}
+            )
+        
         # Handle required field marker
         is_required = False
         if content.startswith('!'):
@@ -109,8 +133,8 @@ class TemplateParser:
             found_token = False
             
             # Look for conditional function (?function_name)
-            if content.startswith('?') and ';' in content:
-                end_pos = content.find(';')
+            if content.startswith('?') and self.delimiter in content:
+                end_pos = content.find(self.delimiter)
                 function_name = content[1:end_pos]
                 content = content[end_pos + 1:]
                 found_token = True
@@ -125,7 +149,7 @@ class TemplateParser:
                     # Find the end of this token value
                     while i < len(content):
                         char = content[i]
-                        if char == ';':
+                        if char == self.delimiter:
                             # Semicolon ends this token and moves to next part
                             break
                         elif char in self.token_formatters:
@@ -148,7 +172,7 @@ class TemplateParser:
                     
                     # Move past this token
                     content = content[i:]
-                    if content.startswith(';'):
+                    if content.startswith(self.delimiter):
                         content = content[1:]
                     
                     found_token = True
@@ -157,38 +181,54 @@ class TemplateParser:
             if not found_token:
                 break
         
+        # If we have only tokens and no remaining content, this is a token-only field
+        if not content:
+            # Like {{#red}} - this is a valid positional field with formatting
+            self.positional_field_count += 1
+            return FormatSection(
+                field_name=f"__pos_{self.positional_field_count - 1}__",
+                is_required=is_required,
+                prefix=None,
+                suffix=None,
+                field_formatting_tokens={},
+                function_name=function_name,
+                whole_section_formatting_tokens=whole_section_tokens
+            )
+        
         # Parse remaining content (prefix;field;suffix pattern)
         parts = self._split_content(content)
         
-        # Always track this section for positional argument support
-        # Generate synthetic field name for positional tracking
-        synthetic_field = f"__pos_{len(self.positional_sections)}__"
-        self.positional_sections.append(synthetic_field)
-        
         if len(parts) == 1:
+            # Single part - could be just a field name or a field with inline formatting
             field_name, field_formatting = self._parse_field_with_formatting(parts[0])
             
+            self.positional_field_count += 1
             return FormatSection(
-                field_name=field_name or synthetic_field,  # Use synthetic if field is empty
+                field_name=field_name or f"__pos_{self.positional_field_count - 1}__",
                 is_required=is_required,
+                prefix=None,
+                suffix=None,
                 field_formatting_tokens=field_formatting,
                 function_name=function_name,
                 whole_section_formatting_tokens=whole_section_tokens
             )
         elif len(parts) == 2:
+            # Two parts - prefix;field
             prefix = self._parse_formatted_text(parts[0])
             field_name, field_formatting = self._parse_field_with_formatting(parts[1])
             
+            self.positional_field_count += 1
             return FormatSection(
-                field_name=field_name or synthetic_field,  # Use synthetic if field is empty
+                field_name=field_name or f"__pos_{self.positional_field_count - 1}__",
                 is_required=is_required,
                 prefix=prefix,
+                suffix=None,
                 field_formatting_tokens=field_formatting,
                 function_name=function_name,
                 whole_section_formatting_tokens=whole_section_tokens
             )
         elif len(parts) >= 3:
-            # Handle 3+ parts: take first as prefix, last as suffix, middle parts as field
+            # Three or more parts - prefix;field;suffix
             prefix_text = parts[0]
             suffix_text = parts[-1]
             
@@ -201,10 +241,11 @@ class TemplateParser:
             
             field_name, field_formatting = self._parse_field_with_formatting(field_part)
             
+            # Handle prefix and suffix functions
             prefix_func = None
             suffix_func = None
-            processed_prefix = ""
-            processed_suffix = ""
+            processed_prefix = None
+            processed_suffix = None
             
             if prefix_text.startswith('$'):
                 prefix_func = prefix_text[1:]
@@ -216,8 +257,9 @@ class TemplateParser:
             else:
                 processed_suffix = self._parse_formatted_text(suffix_text)
             
+            self.positional_field_count += 1
             return FormatSection(
-                field_name=field_name or synthetic_field,  # Use synthetic if field is empty
+                field_name=field_name or f"__pos_{self.positional_field_count - 1}__",
                 is_required=is_required,
                 prefix=processed_prefix, 
                 suffix=processed_suffix,
@@ -251,7 +293,6 @@ class TemplateParser:
                     if family_name not in formatting_tokens:
                         formatting_tokens[family_name] = []
                     
-                    # Store raw token value - will be parsed with field_value later
                     formatting_tokens[family_name].append(token_value)
                     found_token = True
                     break
@@ -261,179 +302,103 @@ class TemplateParser:
         
         return field_part, formatting_tokens
     
-    def _parse_formatted_text(self, text: str) -> Union[str, List[FormattedSpan]]:
-        """Parse text with inline formatting tokens including conditionals, handling escape sequences"""
-        if '{' not in text:
-            return text
+    def _parse_formatted_text(self, text: str) -> List[FormattedSpan]:
+        """Parse text that may contain inline formatting"""
+        if not text:
+            return []
         
         spans = []
         i = 0
+        current_text = ""
         
         while i < len(text):
             char = text[i]
             
-            # Handle escaped braces
+            # Check for escaped braces
             if char == '\\' and i + 1 < len(text) and text[i + 1] in '{}':
-                # Add escaped brace to current span or create new unformatted span
-                if not spans or spans[-1].formatting_tokens:
-                    spans.append(FormattedSpan(text[i + 1]))  # Add the literal brace
-                else:
-                    spans[-1].text += text[i + 1]  # Add to existing unformatted span
-                i += 2  # Skip both backslash and brace
+                current_text += text[i + 1]
+                i += 2
                 continue
-            
+                
             if char == '{':
-                # Look for formatting tokens or conditionals
-                token_end = text.find('}', i)
-                if token_end == -1:
-                    # No closing brace, treat as literal
-                    if not spans or spans[-1].formatting_tokens:
-                        spans.append(FormattedSpan(text[i:]))
-                    else:
-                        spans[-1].text += text[i:]
-                    break
-                
-                token_content = text[i+1:token_end]
-                
-                # Check if this is a conditional token
-                if token_content.startswith('?'):
-                    # This is an inline conditional: {?function}
-                    function_name = token_content[1:]  # Remove the '?'
-                    
-                    # Find the text that this conditional controls
-                    # Everything from after the } until the next unescaped { or end of string
-                    controlled_start = token_end + 1
-                    controlled_end = self._find_next_unescaped_brace(text, controlled_start)
-                    
-                    controlled_text = text[controlled_start:controlled_end]
-                    
-                    # Process escape sequences in the controlled text
-                    processed_controlled_text = self._process_escape_sequences(controlled_text)
-                    
-                    # Create a span for the controlled text with conditional formatting
-                    if processed_controlled_text:
-                        conditional_tokens = {'conditional': [function_name]}
-                        spans.append(FormattedSpan(processed_controlled_text, conditional_tokens))
-                    
-                    # Move past the controlled text
-                    i = controlled_end
-                    continue
-                
-                else:
-                    # Regular formatting tokens like #red, @bold
-                    formatting_tokens = {}
-                    
-                    # Parse multiple consecutive tokens within {} like {@italic@bold}
-                    token_pos = 0
-                    while token_pos < len(token_content):
-                        found_token = False
-                        for token_char, formatter in self.token_formatters.items():
-                            if token_content[token_pos:token_pos+1] == token_char:
-                                # Find the end of this specific token
-                                value_start = token_pos + 1
-                                value_end = value_start
-                                
-                                # Read until we hit another token char or end
-                                while value_end < len(token_content):
-                                    if token_content[value_end] in self.token_formatters:
-                                        break
-                                    value_end += 1
-                                
-                                token_value = token_content[value_start:value_end]
-                                if token_value:  # Only if we found a value
-                                    family_name = formatter.get_family_name()
-                                    if family_name not in formatting_tokens:
-                                        formatting_tokens[family_name] = []
-                                    formatting_tokens[family_name].append(token_value)
-                                    
-                                    token_pos = value_end
-                                    found_token = True
-                                    break
+                # Look for inline formatting token
+                found_token = False
+                for token_char, formatter in self.token_formatters.items():
+                    if text[i:].startswith('{' + token_char):
+                        # Found an inline token like {#red} or {#random_color}
+                        if current_text:
+                            spans.append(FormattedSpan(current_text))
+                            current_text = ""
                         
-                        if not found_token:
-                            token_pos += 1
-                    
-                    # Find the text that this formatting controls
-                    section_start = token_end + 1
-                    section_end = self._find_next_unescaped_brace(text, section_start)
-                    
-                    formatted_text = text[section_start:section_end]
-                    
-                    # Process escape sequences in the formatted text
-                    processed_formatted_text = self._process_escape_sequences(formatted_text)
-                    
-                    if processed_formatted_text or formatting_tokens:
-                        spans.append(FormattedSpan(processed_formatted_text, formatting_tokens))
-                    
-                    # Move past the formatted text
-                    i = section_end
-                    continue
+                        # Find the end of this token
+                        end_pos = text.find('}', i)
+                        if end_pos == -1:
+                            # No closing brace found, treat as literal text
+                            current_text += char
+                            i += 1
+                            break
+                        
+                        token_content = text[i + 2:end_pos]  # Skip '{' + token_char
+                        
+                        # Get the next character after the closing brace - that's what gets formatted
+                        next_char_start = end_pos + 1
+                        if next_char_start < len(text):
+                            # Get exactly one character to format
+                            formatted_char = text[next_char_start]
+                            
+                            family_name = formatter.get_family_name()
+                            token_dict = {family_name: [token_content]} if token_content else {}
+                            
+                            spans.append(FormattedSpan(formatted_char, token_dict))
+                            
+                            # Move past the token and the formatted character
+                            i = next_char_start + 1
+                        else:
+                            # No character to format, just move past the token
+                            i = end_pos + 1
+                        
+                        found_token = True
+                        break
+                
+                if not found_token:
+                    current_text += char
+                    i += 1
             else:
-                # Regular character - add to current span or create new span
-                if not spans or spans[-1].formatting_tokens:
-                    # Need a new unformatted span
-                    spans.append(FormattedSpan(text[i]))
-                else:
-                    # Add to existing unformatted span
-                    spans[-1].text += text[i]
+                current_text += char
                 i += 1
         
-        # Return simple string if no formatting
-        if len(spans) == 1 and not spans[0].formatting_tokens:
-            return spans[0].text
+        if current_text:
+            spans.append(FormattedSpan(current_text))
         
-        return spans
-    
-    def _find_next_unescaped_brace(self, text: str, start_pos: int) -> int:
-        """Find the next unescaped { character starting from start_pos"""
-        i = start_pos
-        while i < len(text):
-            if text[i] == '\\' and i + 1 < len(text) and text[i + 1] in '{}':
-                # Skip escaped brace
-                i += 2
-                continue
-            elif text[i] == '{':
-                return i
-            else:
-                i += 1
-        
-        return len(text)  # No more braces found
-    
-    def _process_escape_sequences(self, text: str) -> str:
-        """Process escape sequences in text, converting \\{ to { and \\} to }"""
-        result = ""
-        i = 0
-        
-        while i < len(text):
-            if text[i] == '\\' and i + 1 < len(text) and text[i + 1] in '{}':
-                # Convert escaped brace to literal brace
-                result += text[i + 1]
-                i += 2
-            else:
-                result += text[i]
-                i += 1
-        
-        return result
+        return spans if spans else [FormattedSpan("")]
     
     def _split_content(self, content: str) -> List[str]:
-        """Split content by delimiter, handling escaped delimiters"""
+        """Split content by delimiter, handling escape sequences"""
         parts = []
-        current = ""
+        current_part = ""
         i = 0
         
         while i < len(content):
-            char = content[i]
-            
-            if char == '\\' and i + 1 < len(content) and content[i + 1] == self.delimiter:
-                current += self.delimiter
-                i += 2
-            elif char == self.delimiter:
-                parts.append(current)
-                current = ""
-                i += 1
+            if content[i:i+len(self.delimiter)] == self.delimiter:
+                # Check if this delimiter is escaped
+                num_backslashes = 0
+                j = i - 1
+                while j >= 0 and content[j] == '\\':
+                    num_backslashes += 1
+                    j -= 1
+                
+                if num_backslashes % 2 == 0:
+                    # Even number of backslashes (including 0) means delimiter is not escaped
+                    parts.append(current_part)
+                    current_part = ""
+                    i += len(self.delimiter)
+                else:
+                    # Odd number of backslashes means delimiter is escaped
+                    current_part += content[i]
+                    i += 1
             else:
-                current += char
+                current_part += content[i]
                 i += 1
         
-        parts.append(current)
+        parts.append(current_part)
         return parts

@@ -1,11 +1,5 @@
 """
-Main dynamic formatting classes with function fallback support.
-
-PRIMARY BENEFIT: Template sections gracefully disappear when required data is missing,
-eliminating tedious manual null checking and conditional string building.
-
-This module contains the primary DynamicFormatter and DynamicLoggingFormatter
-classes that orchestrate the entire formatting system.
+Dynamic formatting system with graceful missing data handling and positional arguments support.
 
 CORE RESPONSIBILITIES:
     - Template compilation and caching
@@ -52,6 +46,17 @@ POSITIONAL ARGUMENTS EXAMPLES:
     
     # Missing arguments - later sections disappear
     result = formatter.format("Failed")  # "Error: Failed"
+
+POSITIONAL ARGUMENT PARSING RULES:
+    {{}} - valid positional field (empty field name)
+    {{#red}} - valid positional field with formatting token  
+    {{my_field;}} - valid for both, field name ignored for positional (prefix;field pattern)
+    {{my_field}} - valid for both, field name ignored for positional (single field)
+    {{#red;my_field}} - valid for both, token;field pattern
+    {{prefix;my_field}} - valid for both, prefix;field pattern
+    {{prefix;my_field;suffix}} - valid for both, prefix;field;suffix pattern
+    {{#red@bold;prefix;my_field}} - valid for both, token;prefix;field pattern
+    {{#red@bold;prefix;my_field;suffix}} - valid for both, token;prefix;field;suffix pattern
 """
 
 import logging
@@ -82,34 +87,41 @@ class DynamicFormatter:
     string building throughout your codebase.
     
     New Feature: Positional arguments support using empty field names in templates.
-    Use {{}} instead of {{field_name}} to enable positional argument matching.
     """
     
-    def __init__(self, format_string: str, delimiter: str = ';', 
+    def __init__(self, template: str, output_mode: str = 'console', 
                  functions: Optional[Dict[str, Callable]] = None,
-                 output_mode: str = 'console'):
-        self.format_string = format_string
-        self.delimiter = delimiter
-        self.functions = functions or {}
+                 delimiter: str = ';'):
+        """
+        Initialize the dynamic formatter
+        
+        Args:
+            template: Format template string with {{...}} sections
+            output_mode: 'console' for ANSI colors, 'file' for plain text
+            functions: Optional dictionary of functions for conditional and dynamic formatting
+            delimiter: Delimiter for separating template parts (default: ';')
+        """
+        self.template = template
         self.output_mode = output_mode
+        self.functions = functions or {}
+        self.delimiter = delimiter
         
-        # Set up function registry for formatters
-        for formatter in TOKEN_FORMATTERS.values():
-            formatter.set_function_registry(self.functions)
-        
-        # Parse the format string
+        # Parse the template
+        self.parser = TemplateParser(delimiter=delimiter, token_formatters=TOKEN_FORMATTERS)
         try:
-            self.parser = TemplateParser(delimiter, TOKEN_FORMATTERS)
-            self.sections = self.parser.parse_format_string(format_string)
+            self.sections = self.parser.parse_format_string(template)
         except ParseError as e:
-            raise DynamicFormattingError(f"Failed to parse format string: {e}")
+            raise DynamicFormattingError(f"Template parsing failed: {e}")
+        
+        # Count positional field sections for validation
+        self.positional_field_count = self.parser.positional_field_count
     
     def format(self, *args, **kwargs) -> str:
         """
-        Format the template with provided data using either positional or keyword arguments
+        Format the template with provided data, supporting both positional and keyword arguments
         
-        Core Feature: Missing fields cause their template sections to disappear
-        automatically, eliminating the need for manual null checking.
+        Core Feature: Missing fields cause their sections to disappear entirely,
+        eliminating manual null checking and conditional string building.
         
         Positional Arguments:
             Use empty field names in template: {{}} {{prefix;;suffix}}
@@ -138,23 +150,34 @@ class DynamicFormatter:
         if args and kwargs:
             raise DynamicFormattingError("Cannot mix positional and keyword arguments")
         
-        # Convert positional args to kwargs
+        # Handle positional arguments
         if args:
-            # Count actual field sections (not string literals)
-            field_sections = [s for s in self.sections if isinstance(s, FormatSection)]
+            # Empty template with no field sections - silently ignore arguments and return empty string
+            if self.positional_field_count == 0:
+                return ""
             
-            if len(args) > len(field_sections):
-                expected = len(field_sections)
-                got = len(args)
+            # Validate we don't have too many positional arguments
+            if len(args) > self.positional_field_count:
                 raise DynamicFormattingError(
-                    f"Too many positional arguments: expected {expected}, got {got}"
+                    f"Too many positional arguments: expected {self.positional_field_count}, got {len(args)}"
                 )
             
+            # Convert positional args to synthetic field mapping
             data = {}
-            # Map positional arguments to field sections in order
             for i, arg in enumerate(args):
-                if i < len(field_sections):
-                    data[field_sections[i].field_name] = arg
+                synthetic_field = f"__pos_{i}__"
+                data[synthetic_field] = arg
+                
+            # For mixed templates (with named fields), also map to original field names
+            # This allows templates like {{my_field}} to work with both positional and keyword args
+            field_index = 0
+            for section in self.sections:
+                if isinstance(section, FormatSection):
+                    if field_index < len(args):
+                        # If this section has a non-synthetic field name, also map the positional arg to it
+                        if not section.field_name.startswith('__pos_'):
+                            data[section.field_name] = args[field_index]
+                        field_index += 1
         else:
             data = kwargs
         
@@ -183,226 +206,170 @@ class DynamicFormatter:
         field_value = data.get(section.field_name)
         
         # Core feature: graceful missing data handling
-        # If field is missing and not required, section disappears (returns empty string)
         if field_value is None:
             if section.is_required:
-                field_name = self._make_error_user_friendly(section.field_name)
-                raise RequiredFieldError(f"Required field missing: {field_name}")
-            return ""  # Section disappears when field is missing - core feature
+                # Convert synthetic field names to user-friendly position descriptions for error messages
+                friendly_field = self._make_error_user_friendly(section.field_name)
+                raise RequiredFieldError(f"Required field '{friendly_field}' is missing")
+            else:
+                # Missing data - section disappears (core feature)
+                return ""
         
-        # Check conditional function
+        # Check section-level conditional function
         if section.function_name:
             if section.function_name not in self.functions:
-                raise FunctionNotFoundError(f"Conditional function not found: {section.function_name}")
+                raise FunctionNotFoundError(f"Conditional function '{section.function_name}' not found")
             
             try:
-                func = self.functions[section.function_name]
-                if not func(field_value):
-                    return ""
+                if not self.functions[section.function_name](field_value):
+                    return ""  # Function returned False - hide this section
             except Exception as e:
-                raise FunctionExecutionError(f"Conditional function '{section.function_name}' failed: {e}")
+                raise FunctionExecutionError(f"Error executing function '{section.function_name}': {e}")
         
-        # Build base formatting state for the whole section
-        base_section_state = self._build_formatting_state(
-            section.whole_section_formatting_tokens, field_value
+        # Section will be rendered - build formatting state and render
+        return self._render_section_with_state(section, field_value, data)
+    
+    def _render_section_with_state(self, section: FormatSection, field_value: Any, data: Dict[str, Any]) -> str:
+        """Render section with proper formatting state management"""
+        # Check if this is a simple section (no complex formatting)
+        has_complex_formatting = (
+            section.whole_section_formatting_tokens or
+            section.field_formatting_tokens or
+            (section.prefix and any(span.formatting_tokens for span in section.prefix)) or
+            (section.suffix and any(span.formatting_tokens for span in section.suffix))
         )
         
-        # Handle simple vs complex sections differently for performance
-        if section.is_simple_section():
-            return self._render_simple_section(section, field_value, base_section_state)
+        if not has_complex_formatting:
+            # Simple section - use efficient string concatenation
+            result = ""
+            if section.prefix:
+                result += "".join(span.text for span in section.prefix)
+            if section.prefix_function:
+                result += self._execute_function(section.prefix_function, field_value)
+            result += str(field_value)
+            if section.suffix:
+                result += "".join(span.text for span in section.suffix)
+            if section.suffix_function:
+                result += self._execute_function(section.suffix_function, field_value)
+            return result
         else:
-            return self._render_complex_section(section, field_value, base_section_state)
+            # Complex section - use span-based rendering with state management
+            return self._render_complex_section(section, field_value, data)
     
-    def _render_simple_section(self, section: FormatSection, field_value: Any, 
-                             base_state: FormattingState) -> str:
-        """Render a simple section (no inline formatting) efficiently"""
-        # Build complete text and apply formatting once
-        text_parts = []
+    def _render_complex_section(self, section: FormatSection, field_value: Any, data: Dict[str, Any]) -> str:
+        """Render complex section with full formatting state management"""
+        # Build base formatting state from section tokens
+        formatting_state = FormattingState()
         
-        if section.prefix_function:
-            func = self.functions.get(section.prefix_function)
-            if not func:
-                raise FunctionNotFoundError(f"Prefix function not found: {section.prefix_function}")
-            try:
-                text_parts.append(func(field_value))
-            except Exception as e:
-                raise FunctionExecutionError(f"Prefix function '{section.prefix_function}' failed: {e}")
-        elif isinstance(section.prefix, str) and section.prefix:
-            text_parts.append(section.prefix)
-        
-        text_parts.append(str(field_value))
-        
-        if section.suffix_function:
-            func = self.functions.get(section.suffix_function)
-            if not func:
-                raise FunctionNotFoundError(f"Suffix function not found: {section.suffix_function}")
-            try:
-                text_parts.append(func(field_value))
-            except Exception as e:
-                raise FunctionExecutionError(f"Suffix function '{section.suffix_function}' failed: {e}")
-        elif isinstance(section.suffix, str) and section.suffix:
-            text_parts.append(section.suffix)
-        
-        complete_text = ''.join(text_parts)
-        return self._apply_formatting_with_reset(complete_text, base_state)
-    
-    def _render_complex_section(self, section: FormatSection, field_value: Any, 
-                              base_state: FormattingState) -> str:
-        """Render a complex section with inline formatting"""
-        result_parts = []
-        has_any_formatting = False
-        
-        # Render prefix
-        if section.prefix_function:
-            func = self.functions.get(section.prefix_function)
-            if not func:
-                raise FunctionNotFoundError(f"Prefix function not found: {section.prefix_function}")
-            try:
-                prefix_text = func(field_value)
-                prefix_result = self._apply_formatting_no_reset(prefix_text, base_state)
-                result_parts.append(prefix_result)
-                if base_state.has_active_formatting():
-                    has_any_formatting = True
-            except Exception as e:
-                raise FunctionExecutionError(f"Prefix function '{section.prefix_function}' failed: {e}")
-        elif section.prefix:
-            prefix_result = self._render_formatted_spans_no_reset(
-                section.prefix, base_state, field_value
-            )
-            result_parts.append(prefix_result)
-            if prefix_result != (section.prefix if isinstance(section.prefix, str) else ""):
-                has_any_formatting = True
-        
-        # Render field with combined formatting
-        field_state = base_state.copy()
-        if section.field_formatting_tokens:
-            self._add_parsed_tokens_to_state(
-                field_state, section.field_formatting_tokens, field_value
-            )
-        
-        field_result = self._apply_formatting_no_reset(str(field_value), field_state)
-        result_parts.append(field_result)
-        if field_state.has_active_formatting():
-            has_any_formatting = True
-        
-        # Render suffix
-        if section.suffix_function:
-            func = self.functions.get(section.suffix_function)
-            if not func:
-                raise FunctionNotFoundError(f"Suffix function not found: {section.suffix_function}")
-            try:
-                suffix_text = func(field_value)
-                suffix_result = self._apply_formatting_no_reset(suffix_text, base_state)
-                result_parts.append(suffix_result)
-                if base_state.has_active_formatting():
-                    has_any_formatting = True
-            except Exception as e:
-                raise FunctionExecutionError(f"Suffix function '{section.suffix_function}' failed: {e}")
-        elif section.suffix:
-            suffix_result = self._render_formatted_spans_no_reset(
-                section.suffix, base_state, field_value
-            )
-            result_parts.append(suffix_result)
-            if suffix_result != (section.suffix if isinstance(section.suffix, str) else ""):
-                has_any_formatting = True
-        
-        # Add single reset at the end if any formatting was applied
-        result = ''.join(result_parts)
-        if has_any_formatting and self.output_mode == 'console':
-            result += '\033[0m'
-        
-        return result
-    
-    def _build_formatting_state(self, token_dict: Dict[str, List], field_value: Any) -> FormattingState:
-        """Build a formatting state from raw token dictionary"""
-        state = FormattingState()
-        self._add_parsed_tokens_to_state(state, token_dict, field_value)
-        return state
-    
-    def _add_parsed_tokens_to_state(self, state: FormattingState, token_dict: Dict[str, List], 
-                                   field_value: Any):
-        """Parse and add tokens to formatting state"""
-        for family_name, raw_tokens in token_dict.items():
+        # Apply whole-section formatting tokens
+        for family_name, tokens in section.whole_section_formatting_tokens.items():
             formatter = self._get_formatter_by_family(family_name)
-            parsed_tokens = []
-            
-            for raw_token in raw_tokens:
+            for token in tokens:
                 try:
-                    parsed_token = formatter.parse_token(str(raw_token), field_value)
-                    parsed_tokens.append(parsed_token)
-                except FormatterError as e:
-                    raise DynamicFormattingError(f"Token parsing failed for '{raw_token}': {e}")
-            
-            state.add_tokens(family_name, parsed_tokens)
+                    parsed_token = formatter.parse_token(token, field_value)
+                    formatting_state.add_tokens(family_name, [parsed_token])
+                except FormatterError:
+                    # Function fallback - try executing token as function
+                    if token in self.functions:
+                        try:
+                            function_result = self.functions[token](field_value)
+                            parsed_token = formatter.parse_token(str(function_result), field_value)
+                            formatting_state.add_tokens(family_name, [parsed_token])
+                        except Exception as e:
+                            raise FunctionExecutionError(f"Error executing function '{token}': {e}")
+                    else:
+                        raise FormatterError(f"Unknown token '{token}' and no matching function found")
+        
+        spans = []
+        
+        # Render prefix spans
+        if section.prefix:
+            for span in section.prefix:
+                spans.append(self._render_span(span, formatting_state.copy(), field_value))
+        
+        # Render prefix function
+        if section.prefix_function:
+            prefix_text = self._execute_function(section.prefix_function, field_value)
+            spans.append(self._apply_formatting(prefix_text, formatting_state))
+        
+        # Render field value with field-specific formatting
+        field_state = formatting_state.copy()
+        for family_name, tokens in section.field_formatting_tokens.items():
+            formatter = self._get_formatter_by_family(family_name)
+            for token in tokens:
+                try:
+                    parsed_token = formatter.parse_token(token, field_value)
+                    field_state.add_tokens(family_name, [parsed_token])
+                except FormatterError:
+                    # Function fallback
+                    if token in self.functions:
+                        try:
+                            function_result = self.functions[token](field_value)
+                            parsed_token = formatter.parse_token(str(function_result), field_value)
+                            field_state.add_tokens(family_name, [parsed_token])
+                        except Exception as e:
+                            raise FunctionExecutionError(f"Error executing function '{token}': {e}")
+                    else:
+                        raise FormatterError(f"Unknown token '{token}' and no matching function found")
+        
+        field_text = self._apply_formatting(str(field_value), field_state)
+        spans.append(field_text)
+        
+        # Render suffix spans
+        if section.suffix:
+            for span in section.suffix:
+                spans.append(self._render_span(span, formatting_state.copy(), field_value))
+        
+        # Render suffix function
+        if section.suffix_function:
+            suffix_text = self._execute_function(section.suffix_function, field_value)
+            spans.append(self._apply_formatting(suffix_text, formatting_state))
+        
+        return "".join(spans)
     
-    def _render_formatted_spans_no_reset(self, spans: Union[str, List[FormattedSpan]], 
-                                       base_state: FormattingState, field_value: Any) -> str:
-        """Render formatted spans with proper isolation between spans"""
-        if isinstance(spans, str):
-            return self._apply_formatting_no_reset(spans, base_state)
+    def _render_span(self, span: FormattedSpan, base_state: FormattingState, field_value: Any = None) -> str:
+        """Render a formatted text span with state management"""
+        if not span.formatting_tokens:
+            return self._apply_formatting(span.text, base_state)
         
-        result = ""
+        # Apply span-specific formatting tokens
+        span_state = base_state.copy()
+        for family_name, tokens in span.formatting_tokens.items():
+            formatter = self._get_formatter_by_family(family_name)
+            for token in tokens:
+                try:
+                    # For span-level functions, we need to call them for EACH character/span
+                    # not just once for the field value
+                    parsed_token = formatter.parse_token(token, span.text)
+                    span_state.add_tokens(family_name, [parsed_token])
+                except FormatterError:
+                    # Function fallback - call function with span text, not field value
+                    if token in self.functions:
+                        try:
+                            # Pass the span text to the function, not the field value
+                            function_result = self.functions[token](span.text) if span.text else self.functions[token]()
+                            parsed_token = formatter.parse_token(str(function_result), span.text)
+                            span_state.add_tokens(family_name, [parsed_token])
+                        except Exception as e:
+                            raise FunctionExecutionError(f"Error executing function '{token}': {e}")
+                    else:
+                        raise FormatterError(f"Unknown token '{token}' and no matching function found")
         
-        for span in spans:
-            # Check conditionals first - if any say to hide, skip this span
-            should_show_span = True
-            if 'conditional' in span.formatting_tokens:
-                conditional_formatter = self._get_formatter_by_family('conditional')
-                for raw_token in span.formatting_tokens['conditional']:
-                    try:
-                        parsed_token = conditional_formatter.parse_token(str(raw_token), field_value)
-                        if parsed_token == 'hide':
-                            should_show_span = False
-                            break
-                    except FormatterError:
-                        # If conditional function fails, hide the span (safe default)
-                        should_show_span = False
-                        break
-            
-            if not should_show_span:
-                continue  # Skip this span entirely
-            
-            # Start with base state
-            span_state = base_state.copy()
-            
-            # Apply span-specific formatting - REPLACE families, don't add to them
-            for family_name, raw_tokens in span.formatting_tokens.items():
-                # Skip conditional tokens - they were already processed
-                if family_name == 'conditional':
-                    continue
-                    
-                span_state.clear_family(family_name)
-                formatter = self._get_formatter_by_family(family_name)
-                
-                parsed_tokens = []
-                for raw_token in raw_tokens:
-                    try:
-                        parsed_token = formatter.parse_token(str(raw_token), field_value)
-                        parsed_tokens.append(parsed_token)
-                    except FormatterError as e:
-                        raise DynamicFormattingError(f"Span token parsing failed for '{raw_token}': {e}")
-                
-                # Handle reset specially
-                if parsed_tokens and str(parsed_tokens[0]) == 'reset':
-                    # Reset means this family should have NO formatting for this span
-                    continue  # Keep family cleared
-                else:
-                    # Add new tokens
-                    span_state.add_tokens(family_name, parsed_tokens)
-            
-            # Format this span with individual reset to prevent bleeding
-            if span_state.has_active_formatting() and self.output_mode == 'console':
-                format_codes = self._get_formatting_codes(span_state)
-                formatted_span = format_codes + span.text + '\033[0m'
-            else:
-                formatted_span = span.text
-            
-            result += formatted_span
-        
-        return result
+        return self._apply_formatting(span.text, span_state)
     
-    def _apply_formatting_with_reset(self, text: str, formatting_state: FormattingState) -> str:
-        """Apply formatting to text with proper reset handling"""
+    def _execute_function(self, function_name: str, field_value: Any) -> str:
+        """Execute a function and return its string result"""
+        if function_name not in self.functions:
+            raise FunctionNotFoundError(f"Function '{function_name}' not found")
+        
+        try:
+            result = self.functions[function_name](field_value)
+            return str(result)
+        except Exception as e:
+            raise FunctionExecutionError(f"Error executing function '{function_name}': {e}")
+    
+    def _apply_formatting(self, text: str, formatting_state: FormattingState) -> str:
+        """Apply formatting to text with automatic reset handling"""
         if not text:
             return text
         
@@ -428,7 +395,7 @@ class DynamicFormatter:
     
     def _get_formatting_codes(self, formatting_state: FormattingState) -> str:
         """Extract formatting codes from a formatting state"""
-        format_codes = []
+        format_codes: List[str] = []
         
         for family_name, tokens in formatting_state.family_states.items():
             if tokens:
@@ -459,7 +426,8 @@ class DynamicFormatter:
 
 class DynamicLoggingFormatter(logging.Formatter):
     """
-    Logging formatter that uses dynamic formatting with graceful missing data handling
+    Logging formatter that uses dynamic formatting with configurable graceful degradation,
+    enhanced error context, and optional template validation
     
     Automatically handles missing log fields - if duration, error_count, file_count, etc.
     are not present in the log record, their corresponding template sections simply
@@ -467,48 +435,42 @@ class DynamicLoggingFormatter(logging.Formatter):
     
     Supports both keyword-style templates ({{field_name}}) and positional-style 
     templates ({{}}) for different logging scenarios.
+    
+    Enhanced: Configurable validation modes for different deployment scenarios.
+    Production logging uses graceful mode to ensure logging never fails.
     """
     
-    def __init__(self, format_string: str, delimiter: str = ';', 
+    def __init__(self, template: str, output_mode: str = 'console',
                  functions: Optional[Dict[str, Callable]] = None,
-                 output_mode: str = 'console'):
+                 delimiter: str = ';'):
+        """
+        Initialize logging formatter
+        
+        Args:
+            template: Dynamic format template
+            output_mode: 'console' or 'file'
+            functions: Optional functions for conditional formatting
+            delimiter: Template delimiter (default ';')
+        """
         super().__init__()
-        try:
-            self.formatter = DynamicFormatter(format_string, delimiter, functions, output_mode)
-        except DynamicFormattingError as e:
-            # Fall back to a basic formatter if dynamic formatting fails
-            logging.getLogger(__name__).error(f"Dynamic formatting setup failed: {e}")
-            self.formatter = None
-            self.fallback_format = format_string
+        self.formatter = DynamicFormatter(
+            template=template,
+            output_mode=output_mode,
+            functions=functions,
+            delimiter=delimiter
+        )
     
     def format(self, record: logging.LogRecord) -> str:
-        # If dynamic formatter failed to initialize, use basic formatting
-        if self.formatter is None:
-            return f"[FORMATTING ERROR] {record.getMessage()}"
-        
-        # Build log data dictionary
-        log_data = {
-            'message': record.getMessage(),
-            'levelname': record.levelname,
-            'name': record.name,
-            'funcName': record.funcName,
-            'lineno': record.lineno,
-            'asctime': self.formatTime(record),
-        }
-        
-        # Add extra data if present
-        if hasattr(record, 'extra_data'):
-            log_data.update(record.extra_data)
-        
-        # Add other record attributes (excluding private ones)
-        for key, value in record.__dict__.items():
-            if key not in log_data and not key.startswith('_'):
-                log_data[key] = value
-        
+        """Format log record using dynamic formatting"""
         try:
-            # Core feature in action: missing fields (duration, file_count, etc.) 
-            # cause their template sections to disappear automatically
-            return self.formatter.format(**log_data)
-        except DynamicFormattingError as e:
-            # Return error message with original log message
+            # Convert log record to dictionary
+            record_dict = record.__dict__.copy()
+            
+            # Add some commonly needed derived fields
+            if hasattr(record, 'levelname'):
+                record_dict['level'] = record.levelname.lower()
+            
+            return self.formatter.format(**record_dict)
+        except Exception as e:
+            # Fallback to basic formatting if dynamic formatting fails
             return f"[FORMATTING ERROR: {e}] {record.getMessage()}"

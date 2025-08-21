@@ -1,0 +1,392 @@
+"""
+Comprehensive examples demonstrating positional arguments in the dynamic formatting system.
+
+This module shows all valid positional argument patterns and the core missing data behavior.
+"""
+
+import sys
+from pathlib import Path
+
+# Add the project root to path for imports
+project_root = Path(__file__).parent.parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+from shared_utils.dynamic_formatting import DynamicFormatter, DynamicFormattingError, RequiredFieldError
+
+
+def demo_core_missing_data_with_positional():
+    """
+    Demonstrate the core feature: sections disappear when positional arguments are missing
+    """
+    print("=" * 70)
+    print("CORE FEATURE: Missing Data Handling with Positional Arguments")
+    print("=" * 70)
+    
+    # Template with 4 sections
+    formatter = DynamicFormatter("{{Error: ;}} {{Count: ;}} {{Duration: ;s}} {{Memory: ;MB}}")
+    
+    print("Template: {{Error: ;}} {{Count: ;}} {{Duration: ;s}} {{Memory: ;MB}}")
+    print()
+    
+    # Supply different numbers of arguments
+    examples = [
+        (["Failed"], "1 argument - only first section appears"),
+        (["Failed", 42], "2 arguments - first two sections appear"),
+        (["Failed", 42, 12.5], "3 arguments - first three sections appear"),
+        (["Failed", 42, 12.5, 128], "4 arguments - all sections appear"),
+        ([], "0 arguments - all sections disappear (empty result)")
+    ]
+    
+    for args, description in examples:
+        result = formatter.format(*args)
+        print(f"{description}:")
+        print(f"  Args: {args}")
+        print(f"  Result: '{result}'")
+        print()
+    
+    print("Key insight: Fewer arguments = fewer sections automatically!")
+    print("No manual null checking or conditional building required.")
+
+
+def demo_all_positional_patterns():
+    """
+    Demonstrate all valid positional argument patterns according to the specifications
+    """
+    print("\n" + "=" * 70)
+    print("ALL VALID POSITIONAL ARGUMENT PATTERNS")
+    print("=" * 70)
+    
+    patterns = [
+        # (template, description, test_args)
+        ("{{}}", "{{}} - empty field (positional only)", ["test"]),
+        ("{{#red}}", "{{#red}} - token only (positional with formatting)", ["test"]),
+        ("{{my_field;}}", "{{my_field;}} - field as prefix pattern", ["test"]),
+        ("{{my_field}}", "{{my_field}} - single field (works for both)", ["test"]),
+        ("{{#red;my_field}}", "{{#red;my_field}} - token;field pattern", ["test"]),
+        ("{{prefix;my_field}}", "{{prefix;my_field}} - prefix;field pattern", ["test"]),
+        ("{{prefix;my_field;suffix}}", "{{prefix;my_field;suffix}} - prefix;field;suffix", ["test"]),
+        ("{{#red@bold;prefix;my_field}}", "{{#red@bold;prefix;my_field}} - token;prefix;field", ["test"]),
+        ("{{#red@bold;prefix;my_field;suffix}}", "{{#red@bold;prefix;my_field;suffix}} - full pattern", ["test"]),
+    ]
+    
+    for template, description, test_args in patterns:
+        print(f"{description}:")
+        print(f"  Template: {template}")
+        
+        try:
+            formatter = DynamicFormatter(template)
+            result = formatter.format(*test_args)
+            print(f"  Result: '{result}'")
+            
+            # Test missing data behavior
+            result_empty = formatter.format()
+            print(f"  With no args: '{result_empty}' (section disappears)")
+        except Exception as e:
+            print(f"  Error: {e}")
+        
+        print()
+
+
+def demo_real_world_positional_usage():
+    """
+    Demonstrate real-world usage patterns with positional arguments
+    """
+    print("\n" + "=" * 70)
+    print("REAL-WORLD POSITIONAL USAGE PATTERNS")
+    print("=" * 70)
+    
+    # CLI Progress Reporting
+    print("1. CLI Progress Reporting:")
+    progress_formatter = DynamicFormatter("{{#green;Progress:}} {{}}/{{}} {{Errors: ;}} {{Duration: ;s}}")
+    
+    examples = [
+        ([150, 200], "Basic progress"),
+        ([150, 200, 5], "Progress with errors"),
+        ([150, 200, 5, 12.3], "Full progress info"),
+        ([150, 200, 0, 12.3], "No errors, with duration")
+    ]
+    
+    for args, description in examples:
+        result = progress_formatter.format(*args)
+        print(f"   {description}: {result}")
+    print()
+    
+    # API Response Formatting
+    print("2. API Response Formatting:")
+    api_formatter = DynamicFormatter("{{#blue;API:}} {{; records}} {{Errors: ;}} {{; ms}}")
+    
+    api_examples = [
+        ([150], "Success only"),
+        ([150, 0], "Success, no errors"),
+        ([150, 3], "Success with errors"),
+        ([150, 0, 245], "Full response info")
+    ]
+    
+    for args, description in api_examples:
+        result = api_formatter.format(*args)
+        print(f"   {description}: {result}")
+    print()
+    
+    # Log Message Formatting
+    print("3. Log Message Formatting:")
+    log_formatter = DynamicFormatter("{{#red@bold;[;]}} {{}} {{User: ;}} {{Duration: ;ms}}")
+    
+    log_examples = [
+        (["ERROR", "Database connection failed"], "Basic error"),
+        (["ERROR", "Database connection failed", "admin"], "Error with user"),
+        (["ERROR", "Database connection failed", "admin", 1250], "Full error context")
+    ]
+    
+    for args, description in log_examples:
+        result = log_formatter.format(*args)
+        print(f"   {description}: {result}")
+
+
+def demo_positional_vs_keyword_comparison():
+    """
+    Show the difference between positional and keyword argument approaches
+    """
+    print("\n" + "=" * 70)
+    print("POSITIONAL vs KEYWORD ARGUMENT COMPARISON")
+    print("=" * 70)
+    
+    # Same template works for both
+    template = "{{#red;Error: ;}} {{Count: ;}} {{Duration: ;s}}"
+    formatter = DynamicFormatter(template)
+    
+    print(f"Template: {template}")
+    print()
+    
+    # Keyword approach
+    print("Keyword Arguments (original way):")
+    result1 = formatter.format(error="Failed", count=42, duration=12.5)
+    print(f"   All fields: {result1}")
+    
+    result2 = formatter.format(error="Failed", count=42)  # Missing duration
+    print(f"   Missing duration: {result2}")
+    
+    result3 = formatter.format(count=42)  # Missing error and duration
+    print(f"   Only count: {result3}")
+    print()
+    
+    # Positional approach - cleaner syntax for ordered data
+    print("Positional Arguments (new way):")
+    result4 = formatter.format("Failed", 42, 12.5)
+    print(f"   All fields: {result4}")
+    
+    result5 = formatter.format("Failed", 42)  # Missing duration
+    print(f"   Missing duration: {result5}")
+    
+    result6 = formatter.format("Failed")  # Missing count and duration
+    print(f"   Only error: {result6}")
+    print()
+    
+    print("Key advantages of positional arguments:")
+    print("• Cleaner syntax for ordered data")
+    print("• No need to remember field names")
+    print("• Same missing data behavior")
+    print("• Perfect for tuple/list data sources")
+
+
+def demo_error_handling():
+    """
+    Demonstrate error handling with positional arguments
+    """
+    print("\n" + "=" * 70)
+    print("ERROR HANDLING WITH POSITIONAL ARGUMENTS")
+    print("=" * 70)
+    
+    # Test too many arguments
+    print("1. Too Many Arguments:")
+    formatter = DynamicFormatter("{{}} {{}}")  # Only 2 fields
+    try:
+        result = formatter.format("first", "second", "third")  # 3 arguments
+    except DynamicFormattingError as e:
+        print(f"   Error: {e}")
+    print()
+    
+    # Test mixed arguments
+    print("2. Mixed Positional and Keyword Arguments:")
+    try:
+        result = formatter.format("pos", keyword="kw")
+    except DynamicFormattingError as e:
+        print(f"   Error: {e}")
+    print()
+    
+    # Test required fields
+    print("3. Required Field Missing:")
+    required_formatter = DynamicFormatter("{{!}}")  # Required field
+    try:
+        result = required_formatter.format()
+    except RequiredFieldError as e:
+        print(f"   Error: {e}")
+    print()
+    
+    # Test user-friendly error messages
+    print("4. User-Friendly Position Names:")
+    multi_required = DynamicFormatter("{{}} {{!}}")  # Second field required
+    try:
+        result = multi_required.format("first")  # Missing second
+    except RequiredFieldError as e:
+        print(f"   Error: {e}")
+        print("   Notice: Shows 'position 2' instead of '__pos_1__'")
+
+
+def demo_advanced_formatting():
+    """
+    Demonstrate advanced formatting features with positional arguments
+    """
+    print("\n" + "=" * 70)
+    print("ADVANCED FORMATTING WITH POSITIONAL ARGUMENTS")
+    print("=" * 70)
+    
+    # Color and style combinations
+    print("1. Colors and Text Styles:")
+    style_formatter = DynamicFormatter("{{#red@bold;ERROR: ;}} {{#green@italic;SUCCESS: ;}} {{#blue@underline;INFO: ;}}")
+    
+    result1 = style_formatter.format("Connection lost", "Data saved", "Process complete")
+    print(f"   All messages: {result1}")
+    
+    result2 = style_formatter.format("Connection lost")
+    print(f"   Error only: {result2}")
+    print()
+    
+    # Function fallback
+    print("2. Function Fallback for Dynamic Colors:")
+    def status_color(status):
+        colors = {"error": "red", "warning": "yellow", "success": "green", "info": "blue"}
+        return colors.get(status.lower(), "white")
+    
+    dynamic_formatter = DynamicFormatter(
+        "{{#status_color@bold;[;]}} {{}} {{Code: ;}}",
+        functions={'status_color': status_color}
+    )
+    
+    examples = [
+        (["ERROR", "Database connection failed", 500], "Error message"),
+        (["SUCCESS", "User logged in", 200], "Success message"),
+        (["WARNING", "Rate limit approaching"], "Warning (no code)"),
+        (["INFO", "Server started"], "Info message")
+    ]
+    
+    for args, description in examples:
+        result = dynamic_formatter.format(*args)
+        print(f"   {description}: {result}")
+    print()
+    
+    # Conditional sections
+    print("3. Conditional Sections:")
+    def show_debug(level):
+        return level.upper() in ["DEBUG", "TRACE"]
+    
+    conditional_formatter = DynamicFormatter(
+        "{{#red;[;]}} {{}} {{?show_debug;Debug: ;}}",
+        functions={'show_debug': show_debug}
+    )
+    
+    cond_examples = [
+        (["ERROR", "Something failed", "stack trace"], "Error with debug"),
+        (["DEBUG", "Variable x = 5", "detailed info"], "Debug with debug"),
+        (["INFO", "Process started"], "Info without debug")
+    ]
+    
+    for args, description in cond_examples:
+        result = conditional_formatter.format(*args)
+        print(f"   {description}: {result}")
+
+
+def demo_migration_from_manual_building():
+    """
+    Show how positional arguments eliminate manual string building
+    """
+    print("\n" + "=" * 70)
+    print("MIGRATION FROM MANUAL STRING BUILDING")
+    print("=" * 70)
+    
+    # Simulate API response data
+    api_responses = [
+        ("success", 150, None, 245),  # No errors
+        ("success", 150, 3, 245),    # With errors
+        ("error", None, 1, 1200),    # Failed request
+        ("timeout", None, None, 5000) # Timeout
+    ]
+    
+    print("OLD WAY - Manual Conditional Building:")
+    print("```python")
+    print("def format_response_old(status, records, errors, duration):")
+    print("    parts = []")
+    print("    parts.append(f'Status: {status}')")
+    print("    if records is not None:")
+    print("        parts.append(f'Records: {records}')")
+    print("    if errors:")
+    print("        parts.append(f'Errors: {errors}')")
+    print("    if duration:")
+    print("        parts.append(f'Duration: {duration}ms')")
+    print("    return ' '.join(parts)")
+    print("```")
+    print()
+    
+    print("NEW WAY - Dynamic Formatting with Positional Arguments:")
+    print("```python")
+    print("formatter = DynamicFormatter('{{Status: ;}} {{Records: ;}} {{Errors: ;}} {{Duration: ;ms}}')")
+    print("result = formatter.format(status, records, errors, duration)")
+    print("```")
+    print()
+    
+    formatter = DynamicFormatter("{{Status: ;}} {{Records: ;}} {{Errors: ;}} {{Duration: ;ms}}")
+    
+    print("Results comparison:")
+    for status, records, errors, duration in api_responses:
+        # Old way simulation
+        parts = [f"Status: {status}"]
+        if records is not None:
+            parts.append(f"Records: {records}")
+        if errors:
+            parts.append(f"Errors: {errors}")
+        if duration:
+            parts.append(f"Duration: {duration}ms")
+        old_result = " ".join(parts)
+        
+        # New way
+        new_result = formatter.format(status, records, errors, duration)
+        
+        print(f"   Data: {(status, records, errors, duration)}")
+        print(f"   Old: {old_result}")
+        print(f"   New: {new_result}")
+        print()
+    
+    print("Benefits of the new approach:")
+    print("• No manual conditional logic")
+    print("• No parts array management")
+    print("• Automatic missing data handling")
+    print("• Cleaner, more declarative code")
+
+
+def main():
+    """Run all positional argument demonstrations"""
+    print("DYNAMIC FORMATTING - POSITIONAL ARGUMENTS COMPREHENSIVE DEMO")
+    print("=" * 70)
+    print("Demonstrating all features and patterns for positional argument support")
+    
+    demo_core_missing_data_with_positional()
+    demo_all_positional_patterns()
+    demo_real_world_positional_usage()
+    demo_positional_vs_keyword_comparison()
+    demo_error_handling()
+    demo_advanced_formatting()
+    demo_migration_from_manual_building()
+    
+    print("\n" + "=" * 70)
+    print("✅ DEMO COMPLETE!")
+    print("=" * 70)
+    print("\nKey Takeaways:")
+    print("• Positional arguments work with ALL formatting features")
+    print("• Missing data behavior is identical to keyword arguments")
+    print("• Cleaner syntax for ordered data (tuples, API responses, etc.)")
+    print("• Eliminates manual conditional string building")
+    print("• User-friendly error messages with position numbers")
+    print("• Cannot mix positional and keyword arguments")
+
+
+if __name__ == "__main__":
+    main()
