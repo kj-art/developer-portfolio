@@ -9,10 +9,12 @@ from typing import Dict, Callable, Any, Optional, Union, List, Tuple
 try:
     from .parsing import TemplateParser
     from .formatting import FormatApplier
+    from .token_handlers import create_token_handlers, ConditionalTokenHandler
     from .exceptions import StringSmithError, MissingMandatoryFieldError
 except ImportError:
     from parsing import TemplateParser
     from formatting import FormatApplier
+    from token_handlers import create_token_handlers, ConditionalTokenHandler
     from exceptions import StringSmithError, MissingMandatoryFieldError
 
 
@@ -48,6 +50,7 @@ class TemplateFormatter:
         
         self.parser = TemplateParser(delimiter, escape_char)
         self.format_applier = FormatApplier(self.functions)
+        self.token_handlers = create_token_handlers(self.functions)
         
         # Parse the template once at initialization
         self.sections = self.parser.parse_template(template)
@@ -87,8 +90,6 @@ class TemplateFormatter:
                     result_parts.append(section_result)
             except MissingMandatoryFieldError as e:
                 # Re-raise with better error message for positional args
-                # If no kwargs were provided and the field name doesn't start with __pos_, 
-                # this is likely intended for positional args
                 if not kwargs and not section.field_name.startswith("__pos_"):
                     # Count variable sections before this one to get the position
                     pos_index = 0
@@ -99,66 +100,6 @@ class TemplateFormatter:
                             pos_index += 1
                     raise MissingMandatoryFieldError(f"Required positional argument {pos_index} not provided")
                 raise
-        
-        return "".join(result_parts)
-    
-    def _format_part_with_inline_content(self, part, content: str, field_value: Any, section_formatting: List[str]) -> str:
-        """Format content with inline formatting applied."""
-        if not part.inline_formatting:
-            # No inline formatting, just apply section formatting
-            return self.format_applier.apply_formatting(content, section_formatting)
-        
-        # Start with section-level formatting
-        current_formatting = section_formatting[:]
-        result_parts = []
-        
-        # Process inline formatting
-        i = 0
-        text = content
-        
-        for inline_format in part.inline_formatting:
-            # Add text before this formatting change
-            if i < inline_format.position:
-                text_segment = text[i:inline_format.position]
-                if text_segment:
-                    formatted_segment = self.format_applier.apply_formatting(text_segment, current_formatting)
-                    result_parts.append(formatted_segment)
-                i = inline_format.position
-            
-            # Handle the inline formatting change
-            if inline_format.type == "condition":
-                # Boolean condition - evaluate and decide whether to continue
-                try:
-                    condition_result = self._evaluate_function(inline_format.value, field_value)
-                    if not condition_result:
-                        # Skip the rest of this part
-                        break
-                except Exception as e:
-                    raise StringSmithError(f"Error evaluating inline condition '{inline_format.value}': {e}")
-            
-            elif inline_format.type == "color":
-                if inline_format.value in ("normal", "default"):
-                    # Reset color
-                    current_formatting = [f for f in current_formatting if not f.startswith("#_")]
-                else:
-                    # Apply new color (remove old color first)
-                    current_formatting = [f for f in current_formatting if not f.startswith("#_")]
-                    current_formatting.append(f"#_{inline_format.value}")
-            
-            elif inline_format.type == "emphasis":
-                if inline_format.value in ("normal", "default"):
-                    # Reset all emphasis
-                    current_formatting = [f for f in current_formatting if not f.startswith("@_")]
-                else:
-                    # Add emphasis (can stack)
-                    current_formatting.append(f"@_{inline_format.value}")
-        
-        # Add remaining text
-        if i < len(text):
-            remaining_text = text[i:]
-            if remaining_text:
-                formatted_segment = self.format_applier.apply_formatting(remaining_text, current_formatting)
-                result_parts.append(formatted_segment)
         
         return "".join(result_parts)
     
@@ -232,75 +173,8 @@ class TemplateFormatter:
         
         return "".join(parts)
     
-    def _format_part(self, part, field_value: Any, section_formatting: List[str]) -> Optional[str]:
-        """
-        Format a single part (prefix or suffix) with inline formatting.
-        """
-        if not part.content and not part.inline_formatting:
-            return part.content  # Return empty string or None as-is
-        
-        return self._format_part_with_content(part, part.content, field_value, section_formatting)
-    
-    def _format_part_with_content(self, part, text_content: str, field_value: Any, section_formatting: List[str]) -> Optional[str]:
-        """
-        Format a part with specific text content and inline formatting.
-        """
-        # Start with section-level formatting
-        current_formatting = section_formatting[:]
-        result_parts = []
-        
-        # Process inline formatting
-        i = 0
-        text = text_content
-        
-        for inline_format in part.inline_formatting:
-            # Add text before this formatting
-            if i < inline_format.position:
-                text_segment = text[i:inline_format.position]
-                if text_segment:
-                    formatted_segment = self.format_applier.apply_formatting(text_segment, current_formatting)
-                    result_parts.append(formatted_segment)
-                i = inline_format.position
-            
-            # Handle the inline formatting
-            if inline_format.type == "condition":
-                # Boolean condition - evaluate and decide whether to continue
-                try:
-                    condition_result = self._evaluate_function(inline_format.value, field_value)
-                    if not condition_result:
-                        # Skip the rest of this part
-                        return "".join(result_parts) if result_parts else None
-                except Exception as e:
-                    raise StringSmithError(f"Error evaluating inline condition '{inline_format.value}': {e}")
-            
-            elif inline_format.type == "color":
-                if inline_format.value == "normal" or inline_format.value == "default":
-                    # Reset color
-                    current_formatting = [f for f in current_formatting if not f.startswith("#_")]
-                else:
-                    # Apply new color (remove old color first)
-                    current_formatting = [f for f in current_formatting if not f.startswith("#_")]
-                    current_formatting.append(f"#_{inline_format.value}")
-            
-            elif inline_format.type == "emphasis":
-                if inline_format.value == "normal" or inline_format.value == "default":
-                    # Reset all emphasis
-                    current_formatting = [f for f in current_formatting if not f.startswith("@_")]
-                else:
-                    # Add emphasis (can stack)
-                    current_formatting.append(f"@_{inline_format.value}")
-        
-        # Add remaining text
-        if i < len(text):
-            remaining_text = text[i:]
-            if remaining_text:
-                formatted_segment = self.format_applier.apply_formatting(remaining_text, current_formatting)
-                result_parts.append(formatted_segment)
-        
-        return "".join(result_parts)
-    
     def _format_part_with_inline_content(self, part, content: str, field_value: Any, section_formatting: List[str]) -> str:
-        """Format content with inline formatting applied."""
+        """Format content with inline formatting applied using token handlers."""
         if not part.inline_formatting:
             # No inline formatting, just apply section formatting
             return self.format_applier.apply_formatting(content, section_formatting)
@@ -318,44 +192,40 @@ class TemplateFormatter:
             if i < inline_format.position:
                 text_segment = text[i:inline_format.position]
                 if text_segment:
-                    formatted_segment = self.format_applier.apply_formatting(text_segment, current_formatting)
-                    result_parts.append(formatted_segment)
+                    # Check if we should show this text based on conditionals
+                    conditional_handler = self.token_handlers['condition']
+                    if isinstance(conditional_handler, ConditionalTokenHandler):
+                        if conditional_handler.should_show_text(current_formatting):
+                            formatted_segment = self.format_applier.apply_formatting(text_segment, current_formatting)
+                            result_parts.append(formatted_segment)
                 i = inline_format.position
             
-            # Handle the inline formatting change
-            if inline_format.type == "condition":
-                # Boolean condition - evaluate and decide whether to continue
+            # Handle the inline formatting change using token handlers
+            if inline_format.type in self.token_handlers:
+                handler = self.token_handlers[inline_format.type]
                 try:
-                    condition_result = self._evaluate_function(inline_format.value, field_value)
-                    if not condition_result:
-                        # Skip the rest of this part
-                        break
+                    current_formatting = handler.handle_token(inline_format.value, current_formatting, field_value)
+                    
+                    # Special handling for conditionals - if they say hide, skip the rest
+                    if inline_format.type == "condition":
+                        conditional_handler = self.token_handlers['condition']
+                        if isinstance(conditional_handler, ConditionalTokenHandler):
+                            if not conditional_handler.should_show_text(current_formatting):
+                                # Skip the rest of this part
+                                break
                 except Exception as e:
-                    raise StringSmithError(f"Error evaluating inline condition '{inline_format.value}': {e}")
-            
-            elif inline_format.type == "color":
-                if inline_format.value in ("normal", "default"):
-                    # Reset color
-                    current_formatting = [f for f in current_formatting if not f.startswith("#_")]
-                else:
-                    # Apply new color (remove old color first)
-                    current_formatting = [f for f in current_formatting if not f.startswith("#_")]
-                    current_formatting.append(f"#_{inline_format.value}")
-            
-            elif inline_format.type == "emphasis":
-                if inline_format.value in ("normal", "default"):
-                    # Reset all emphasis
-                    current_formatting = [f for f in current_formatting if not f.startswith("@_")]
-                else:
-                    # Add emphasis (can stack)
-                    current_formatting.append(f"@_{inline_format.value}")
+                    raise StringSmithError(f"Error handling inline {inline_format.type} token '{inline_format.value}': {e}")
         
         # Add remaining text
         if i < len(text):
             remaining_text = text[i:]
             if remaining_text:
-                formatted_segment = self.format_applier.apply_formatting(remaining_text, current_formatting)
-                result_parts.append(formatted_segment)
+                # Check if we should show this text based on conditionals
+                conditional_handler = self.token_handlers['condition']
+                if isinstance(conditional_handler, ConditionalTokenHandler):
+                    if conditional_handler.should_show_text(current_formatting):
+                        formatted_segment = self.format_applier.apply_formatting(remaining_text, current_formatting)
+                        result_parts.append(formatted_segment)
         
         return "".join(result_parts)
     

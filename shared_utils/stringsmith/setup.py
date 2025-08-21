@@ -31,10 +31,9 @@ setup(
     ],
     python_requires=">=3.7",
     install_requires=[
-        # No required dependencies for basic functionality
+        "rich>=10.0.0",
     ],
     extras_require={
-        "colors": ["rich>=10.0.0"],
         "dev": ["pytest>=6.0.0", "pytest-cov>=2.0.0", "black>=21.0.0", "flake8>=3.8.0"],
     },
     keywords="template formatting string conditional sections ansi colors",

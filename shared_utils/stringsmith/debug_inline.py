@@ -27,7 +27,7 @@ def debug_random_color():
     """Test the random color issue."""
     print("=== Random Color Debug ===")
     
-    def random_color():
+    def random_color(field):
         color = random.choice(['red', 'green', 'blue'])
         print(f"Function called, returning: {color}")
         return color
@@ -46,7 +46,10 @@ def debug_random_color():
     print(f"Template: {template_string}")
     
     try:
-        formatter = TemplateFormatter(template_string, functions={'random_color': random_color})
+        formatter = TemplateFormatter(
+            template_string,
+            functions={'random_color': random_color}
+        )
         print("Template parsed successfully")
         print(f"Number of sections: {len(formatter.sections)}")
         for i, section in enumerate(formatter.sections):
