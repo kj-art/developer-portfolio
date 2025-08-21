@@ -186,7 +186,7 @@ def fun_examples():
     import random
     
     # Random color function
-    def random_color():
+    def random_color(field):
         return random.choice(['red', 'green', 'blue', 'yellow', 'cyan', 'magenta'])
     
     # Your original example - now working with inline formatting!
