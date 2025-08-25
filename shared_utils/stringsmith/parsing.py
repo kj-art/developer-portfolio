@@ -3,38 +3,17 @@ Template parsing logic for StringSmith.
 """
 
 import re
-from typing import List, Optional, NamedTuple
+from typing import List, Optional, Dict, Tuple
 
 # Handle both relative and absolute imports
 try:
     from .exceptions import StringSmithError
+    from .token_handlers import TOKEN_REGISTRY, SORTED_TOKENS, TemplatePart, TemplateSection
+    from .inline_formatting import InlineFormatting
 except ImportError:
     from exceptions import StringSmithError
-
-
-class InlineFormatting(NamedTuple):
-    """Represents inline formatting within a part."""
-    position: int  # Position in the text where this formatting starts
-    type: str  # "color", "emphasis", or "condition"
-    value: str  # The formatting value or function name
-
-
-class TemplatePart(NamedTuple):
-    """Represents a part of a section (prefix, field, or suffix)."""
-    content: str  # The text content
-    inline_formatting: List[InlineFormatting]  # Any inline formatting
-
-
-class TemplateSection(NamedTuple):
-    """Represents a complete template section."""
-    is_mandatory: bool
-    section_condition: Optional[str]  # Function name for section-level condition
-    section_formatting: List[str]  # Section-level formatting (color_, emphasis_, or custom function)
-    field_name: str  # Variable name (or synthetic name for positional)
-    prefix: Optional[TemplatePart]
-    field_part: TemplatePart  # The field itself (may have inline formatting)
-    suffix: Optional[TemplatePart]
-
+    from token_handlers import TOKEN_REGISTRY, SORTED_TOKENS, TemplatePart, TemplateSection
+    from inline_formatting import InlineFormatting
 
 class TemplateParser:
     """Parses template strings into structured sections."""
@@ -47,8 +26,13 @@ class TemplateParser:
         self.section_pattern = re.compile(r'\{\{(.*?)\}\}')
         
         # Regex to find inline formatting
-        self.inline_pattern = re.compile(r'\{([#@?])([^}]*)\}')
-    
+        #self.inline_pattern = re.compile(r'\{([#@?])([^}]*)\}')
+        escaped_tokens = [re.escape(token) for token in SORTED_TOKENS]
+        token_pattern = '|'.join(escaped_tokens)
+        #self.inline_pattern = re.compile(f'\\{{({token_pattern})([^}}]*)\\}}')
+        esc = re.escape(escape_char)  # "\\" becomes "\\\\"
+        self.inline_pattern = re.compile(f'(?<!{esc})(?:{esc}{esc})*\\{{({token_pattern})([^}}]*)\\}}')
+
     def parse_template(self, template: str) -> List[TemplateSection]:
         """
         Parse a template string into sections and regular text.
@@ -89,229 +73,155 @@ class TemplateParser:
         
         return TemplateSection(
             is_mandatory=False,
-            section_condition=None,
             section_formatting=[],
-            field_name="",  # No field name for text sections
+            field_name=None,
             prefix=prefix_part,
-            field_part=field_part,
+            field=field_part,
             suffix=None
         )
+    
+    def _split_unescaped(self, content: str) -> List[str]:
+        """Split on delimiter preceded by even number (including 0) of escape chars."""
+        # Match: (even number of escape chars)(delimiter)
+        # (?<!\\) ensures we're not in the middle of escape sequence
+        # (\\\\)* matches zero or more pairs of escapes (even count)
+        esc = re.escape(self.escape_char)
+        delim = re.escape(self.delimiter)
+        pattern = f"(?<!{esc})(?:{esc}{esc})*{delim}"
+        
+        return re.split(pattern, content)
+
+    def split_by_substrings(self, text: str, substrings: List[str]) -> Dict[str, List[str]]:
+        """Split text by multiple substrings, keeping track of which delimiter was used."""
+        
+        # Sort by length (longest first) to avoid partial matches
+        sorted_subs = sorted(substrings, key=len, reverse=True)
+        
+        # Create regex pattern with capturing groups
+        escaped_subs = [re.escape(sub) for sub in sorted_subs]
+        pattern = f"({'|'.join(escaped_subs)})"
+        
+        # Split while keeping delimiters
+        parts = re.split(pattern, text)
+        
+        # Organize into dict
+        result = {sub: [] for sub in substrings}
+        current_key = None
+        
+        for part in parts:
+            if part in substrings:
+                current_key = part
+            elif current_key is not None and part:  # Skip empty parts
+                result[current_key].append(part)
+        
+        return result
+    
+    def _extract_starting_token(self, text: str) -> Tuple[Optional[str], str]:
+        """Extract starting token and return (token, remaining_text)."""
+        if text:
+            # Sort by length descending to match longest tokens first
+            for token in SORTED_TOKENS:
+                if text.startswith(token):
+                    remaining = text[len(token):]
+                    return token, remaining
+        
+        return None, text
     
     def _parse_section(self, content: str) -> TemplateSection:
         """Parse the content of a single {{}} section."""
         is_mandatory = False
-        section_condition = None
-        section_formatting = []
         
         # Check for mandatory marker
         if content.startswith('!'):
             is_mandatory = True
             content = content[1:]
         
-        # Parse section-level tokens (can be multiple consecutive tokens)
-        remaining_content = content
-        
-        while remaining_content and remaining_content[0] in ('?', '#', '@'):
-            token_type = remaining_content[0]
-            remaining_content = remaining_content[1:]  # Remove the token character
-            
-            # Find where this token ends (either at next token or delimiter)
-            token_end = 0
-            while token_end < len(remaining_content):
-                char = remaining_content[token_end]
-                if char in ('?', '#', '@'):
-                    # Next token starts here
-                    break
-                elif char == self.delimiter:
-                    # Delimiter found - end of tokens
-                    break
-                token_end += 1
-            
-            token_part = remaining_content[:token_end]
-            remaining_content = remaining_content[token_end:]
-            
-            # Process the token
-            if token_type == '?':
-                section_condition = token_part
-            elif token_type in ('#', '@'):
-                section_formatting.append(f"{token_type}_{token_part}")
-        
-        # If we have remaining content and it starts with delimiter, skip it
-        if remaining_content.startswith(self.delimiter):
-            remaining_content = remaining_content[1:]
-        
-        # Parse the remaining parts based on count
-        if remaining_content:
-            remaining_parts = self._split_unescaped(remaining_content)
+        parts = self._split_unescaped(content)
+        if self._extract_starting_token(parts[0])[0]:
+            format_part = parts.pop(0)
+            section_tokens = self.split_by_substrings(format_part, TOKEN_REGISTRY.keys())
         else:
-            remaining_parts = []
-        
-        if not remaining_parts:
-            # No parts - this shouldn't happen in normal usage
-            raise StringSmithError(f"Invalid section format: {{{{{content}}}}}")
-        
-        if len(remaining_parts) == 1:
-            # {{field}} or {{?func;field}} or {{#color;field}}
-            prefix = None
-            field_text = self._unescape_part(remaining_parts[0])
-            # Parse field for inline formatting and extract clean field name
-            field_part = self._parse_part(field_text)
-            field_name = field_part.content
-            suffix = None
-        elif len(remaining_parts) == 2:
-            # {{prefix;field}} or {{?func;prefix;field}} or {{#color;prefix;field}}
-            prefix_text = self._unescape_part(remaining_parts[0])
-            field_text = self._unescape_part(remaining_parts[1])
-            # Parse field for inline formatting and extract clean field name
-            field_part = self._parse_part(field_text)
-            field_name = field_part.content
-            suffix = None
-            prefix = self._parse_part(prefix_text) if prefix_text else None
-        elif len(remaining_parts) == 3:
-            # {{prefix;field;suffix}} or {{?func;prefix;field;suffix}} etc.
-            prefix_text = self._unescape_part(remaining_parts[0])
-            field_text = self._unescape_part(remaining_parts[1])
-            suffix_text = self._unescape_part(remaining_parts[2])
-            # Parse field for inline formatting and extract clean field name
-            field_part = self._parse_part(field_text)
-            field_name = field_part.content
-            prefix = self._parse_part(prefix_text) if prefix_text else None
-            suffix = self._parse_part(suffix_text) if suffix_text else None
-        else:
-            raise StringSmithError(f"Too many parts in section: {{{{{content}}}}}")
-        
-        # field_part is now properly parsed
-        
+            section_tokens = {}
+
+        prefix = ''
+        field = ''
+        suffix = ''
+
+        match len(parts):
+            case 0: pass
+            case 1: field = parts[0]
+            case 2: prefix, field = parts
+            case 3: prefix, field, suffix = parts
+            case _: raise StringSmithError(f"Too many parts in section: {{{{{content}}}}}")
+
+        field_part = self._parse_field_part(field)
         return TemplateSection(
-            is_mandatory=is_mandatory,
-            section_condition=section_condition,
-            section_formatting=section_formatting,
-            field_name=field_name,
-            prefix=prefix,
-            field_part=field_part,
-            suffix=suffix
-        )
+                is_mandatory=is_mandatory,
+                section_formatting=section_tokens,
+                field_name=field_part.content,
+                prefix=self._parse_text_part(prefix),
+                field=field_part,
+                suffix=self._parse_text_part(suffix)
+            )
     
-    def _parse_part(self, text: str) -> TemplatePart:
-        """Parse a part (prefix or suffix) for inline formatting."""
+    def _parse_field_part(self, text: str) -> TemplatePart:
+        formatting = self._parse_text_part(text)
+        if any(fmt.position != 0 for fmt in formatting.inline_formatting):
+            raise StringSmithError("Field formatting tokens must be at the beginning of the field part")
+        return formatting
+
+    def _parse_text_part(self, text: str) -> TemplatePart:
+        """Extract inline formatting tokens and return clean positions + clean text."""
+        
         inline_formatting = []
+        clean_position = 0
+        result = ""
+        last_end = 0
         
-        # Find all inline formatting tokens
-        for match in self.inline_pattern.finditer(text):
-            token_type = match.group(1)  # #, @, or ?
+        for match in re.finditer(self.inline_pattern, text):
+            # Add text before this match (unescaped)
+            text_before = text[last_end:match.start()]
+            unescaped_before = self._unescape_part(text_before)
+            result += unescaped_before
+            clean_position += len(unescaped_before)  # Use unescaped length for position
+            
+            # Validate and process token
+            token_type = match.group(1)
             token_value = match.group(2)
-            position = match.start()
+            if '{' in token_value or '}' in token_value:
+                raise StringSmithError(f"Nested braces not allowed in token: '{{{token_type}{token_value}}}'")
             
-            if token_type == '#':
-                inline_formatting.append(InlineFormatting(position, "color", token_value))
-            elif token_type == '@':
-                inline_formatting.append(InlineFormatting(position, "emphasis", token_value))
-            elif token_type == '?':
-                inline_formatting.append(InlineFormatting(position, "condition", token_value))
-        
-        # Remove the inline formatting tokens from the text but keep position tracking
-        clean_text = text
-        offset = 0
-        
-        # Sort inline formatting by position (reverse order for removal)
-        sorted_formatting = sorted(inline_formatting, key=lambda x: x.position, reverse=True)
-        
-        for formatting in sorted_formatting:
-            # Find the original token in the text
-            start_pos = formatting.position
-            # Find the end of the token (next '}')
-            end_pos = text.find('}', start_pos) + 1
-            if end_pos > start_pos:
-                # Remove the token from clean_text and adjust positions
-                clean_text = clean_text[:start_pos] + clean_text[end_pos:]
-        
-        # Adjust positions in inline_formatting after token removal
-        adjusted_formatting = []
-        for formatting in inline_formatting:
-            # Calculate how many characters were removed before this position
-            chars_removed = 0
-            for other in inline_formatting:
-                if other.position < formatting.position:
-                    # Find token length
-                    token_start = other.position
-                    token_end = text.find('}', token_start) + 1
-                    chars_removed += token_end - token_start
+            # Record token at current clean position
+            inline_formatting.append(InlineFormatting(clean_position, token_type, token_value))
             
-            new_position = formatting.position - chars_removed
-            adjusted_formatting.append(InlineFormatting(
-                new_position, formatting.type, formatting.value
-            ))
+            last_end = match.end()
         
-        # Sort by position for processing
-        adjusted_formatting.sort(key=lambda x: x.position)
+        # Add remaining text after processing escape sequences
+        remaining_text = text[last_end:]
+        result += self._unescape_part(remaining_text)
         
-        return TemplatePart(content=clean_text, inline_formatting=adjusted_formatting)
+        return TemplatePart(content=result, inline_formatting=inline_formatting)
     
-    def _find_unescaped_delimiter(self, text: str) -> int:
-        """Find the first unescaped delimiter in the text."""
-        i = 0
-        while i < len(text):
-            if text[i] == self.delimiter:
-                # Check if it's escaped
-                if i > 0 and text[i-1] == self.escape_char:
-                    # Check if the escape char itself is escaped
-                    escape_count = 0
-                    j = i - 1
-                    while j >= 0 and text[j] == self.escape_char:
-                        escape_count += 1
-                        j -= 1
-                    # If even number of escape chars, the delimiter is not escaped
-                    if escape_count % 2 == 0:
-                        return i
-                else:
-                    return i
-            i += 1
-        return -1
-    
-    def _split_unescaped(self, text: str) -> List[str]:
-        """Split text by unescaped delimiters."""
-        parts = []
-        current_part = ""
-        i = 0
+    def _unescape_part(self, part: str) -> str:
+        """Remove escape sequences from a part."""
+        if not part:
+            return part
         
-        while i < len(text):
-            if text[i] == self.delimiter:
-                # Check if it's escaped
-                if i > 0 and text[i-1] == self.escape_char:
-                    # Check if the escape char itself is escaped
-                    escape_count = 0
-                    j = i - 1
-                    while j >= 0 and text[j] == self.escape_char:
-                        escape_count += 1
-                        j -= 1
-                    # If odd number of escape chars, the delimiter is escaped
-                    if escape_count % 2 == 1:
-                        current_part += text[i]
-                    else:
-                        parts.append(current_part)
-                        current_part = ""
-                else:
-                    parts.append(current_part)
-                    current_part = ""
+        result = ""
+        i = 0
+        while i < len(part):
+            char = part[i]
+            if char == self.escape_char and i + 1 < len(part):
+                # Escaped character - add the next character literally
+                result += part[i + 1]
+                i += 2
             else:
-                current_part += text[i]
-            i += 1
+                # Regular character
+                result += char
+                i += 1
         
-        parts.append(current_part)
-        return parts
-    
-    def _unescape_part(self, text: str) -> str:
-        """Remove escape characters from a part within a section."""
-        # Unescape delimiters within the part
-        text = text.replace(f'{self.escape_char}{self.delimiter}', self.delimiter)
-        text = text.replace(f'{self.escape_char}{self.escape_char}', self.escape_char)  # Unescape escape char last
-        return text
+        return result
     
     def _unescape_text(self, text: str) -> str:
-        """Remove escape characters from regular text."""
-        # Unescape curly braces and delimiters
-        text = text.replace(f'{self.escape_char}{{', '{')
-        text = text.replace(f'{self.escape_char}}}', '}')
-        text = text.replace(f'{self.escape_char}{self.delimiter}', self.delimiter)
-        text = text.replace(f'{self.escape_char}{self.escape_char}', self.escape_char)  # Unescape escape char last
-        return text
+        """Remove escape sequences from literal text."""
+        return self._unescape_part(text)
