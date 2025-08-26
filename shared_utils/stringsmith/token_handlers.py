@@ -8,16 +8,15 @@ common reset logic, eliminating repetitive code.
 
 from abc import ABC, abstractmethod
 from typing import List, Dict, Callable, Any, Optional
+import inspect
 
 # Handle both relative and absolute imports
 try:
     from .exceptions import StringSmithError
     from .template_ast import TemplateSection, TemplatePart
-    from .inline_formatting import InlineFormatting
 except ImportError:
     from exceptions import StringSmithError
     from template_ast import TemplateSection, TemplatePart
-    from inline_formatting import InlineFormatting
 
 from rich.color import Color
 
@@ -37,7 +36,14 @@ class BaseTokenHandler(ABC):
 
     def get_reset_ansi(self):
         return self._reset_ansi
-        
+    
+    def _call_function(self, token_value, field_value):
+        func = self.functions[token_value]
+        sig = inspect.signature(func)
+        if len(sig.parameters) == 0:
+            return func()
+        return func(field_value)
+
     def _determine_token_prefix(self) -> str:
         for token, handler_class in TOKEN_REGISTRY.items():
             if handler_class == type(self):
@@ -78,8 +84,7 @@ class BaseTokenHandler(ABC):
         if token_value in self.functions: # the token's value is a call to one of the custom functions
             if field_value is None: # no field provided - this is a bake pass
                 return None
-            else:
-                token_value = str(self.functions[token_value](field_value))
+            token_value = str(self._call_function(token_value, field_value))
         
         ansi_code = self._reset_ansi if self.is_reset_token(token_value) else self.get_ansi_code(token_value)
         return f'{ansi_code}{text[0]}', f'{ansi_code}{text[1]}', f'{ansi_code}{text[2]}'
@@ -91,7 +96,7 @@ class BaseTokenHandler(ABC):
         if token_value in self.functions:
             if is_bake:
                 return text_segment, False
-            token_value = str(self.functions[token_value](field_value))
+            token_value = str(self._call_function(token_value, field_value))
         
         ansi_code = self._reset_ansi if self.is_reset_token(token_value) else self.get_ansi_code(token_value)
 
@@ -166,7 +171,7 @@ class EmphasisTokenHandler(BaseTokenHandler):
         # Try custom function first
         if value in self.functions:
             try:
-                function_result = self.functions[value](field_value)
+                function_result = self._call_function(value, field_value)
                 if isinstance(function_result, str) and function_result.strip():
                     # If function returns text, it's a custom formatter - handle specially
                     return current_formatting + [f"{self.get_token_prefix()}{value}"]
@@ -196,7 +201,7 @@ class ConditionalTokenHandler(BaseTokenHandler):
             if field_value is None: # no field provided - this is a bake pass
                 return None
             else:
-                token_value = self.functions[token_value](field_value)
+                token_value = self._call_function(token_value, field_value)
         else:
             raise StringSmithError(f"Error applying function '{token_value}'")
         return text if token_value else ('', '', '')
@@ -232,7 +237,7 @@ class ConditionalTokenHandler(BaseTokenHandler):
             elif token_value not in self.functions:
                 raise StringSmithError(f"Error applying function '{token_value}'")
             else:
-                result += v if self.functions[token_value](field_value) else ''
+                result += v if self._call_function(token_value, field_value) else ''
         return result
 
 # Token handler registry
