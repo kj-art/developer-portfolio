@@ -50,6 +50,7 @@ class TemplateFormatter:
             escape_char: Character used for escaping special characters (default: "\\")
             functions: Optional dictionary of custom functions for formatting and conditionals
         """
+        
         self.template = template
         self.delimiter = delimiter
         self.escape_char = escape_char
@@ -219,7 +220,6 @@ class TemplateFormatter:
                     new_section.field.content +  
                     new_section.suffix.content
                 )
-
         return ''.join(result_parts)
     
     def apply_inline_formatting(self, text_segment: str, formatting: List[InlineFormatting], field_value: str):
