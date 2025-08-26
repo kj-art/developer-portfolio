@@ -140,13 +140,10 @@ class TemplateFormatter:
                     return None
                 arg = args[arg_index]
                 arg_index += 1
-                return None if arg is None else str(arg)
+                return arg
         else:
             def get_var(field_name):
-                if field_name == '':
-                    return None
-                val = kwargs.get(field_name)
-                return None if val is None else str(val)
+                return None if field_name == '' else kwargs.get(field_name)
 
         result_parts = []
         reset_ansi = ''
@@ -196,7 +193,7 @@ class TemplateFormatter:
                     new_section.field.content = handler.finalize(new_section.field, field_value)
                     new_section.suffix.content = handler.finalize(new_section.suffix, field_value)
                 
-                new_section.field.content += field_value
+                new_section.field.content += str(field_value)
                 
                 # apply sectional formatting
                 for tkn in new_section.section_formatting:
