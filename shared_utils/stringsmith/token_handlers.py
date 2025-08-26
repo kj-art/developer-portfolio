@@ -1,9 +1,31 @@
 """
-Token handlers for StringSmith inline formatting.
+Token handlers for StringSmith inline formatting and conditional logic.
 
-This module provides a base class for token handlers and specific implementations
-for different token types (color, emphasis, conditions). The base class handles
-common reset logic, eliminating repetitive code.
+This module provides the handler architecture for processing formatting tokens
+(#color, @emphasis, ?conditional) discovered during template parsing. Each handler
+type manages ANSI code generation, validation, and application logic for its
+token category.
+
+Handler Architecture:
+    BaseTokenHandler: Abstract base providing common reset logic and function calling
+    ColorTokenHandler: Manages color formatting with matplotlib and hex support  
+    EmphasisTokenHandler: Handles text styling (bold, italic, underline, etc.)
+    ConditionalTokenHandler: Processes boolean conditional functions
+
+Token Registry:
+    Central registry mapping token prefixes to their handler classes enables
+    extensibility and dynamic token processing during template parsing.
+
+Performance Optimizations:
+    - Token validation happens during template initialization, not per format() call
+    - ANSI code generation is cached where possible to reduce string operations
+    - Reset sequences are pre-computed to minimize formatting overhead
+
+Professional Features:
+    - Comprehensive color support: matplotlib named colors, hex codes, RGB values
+    - Rich text emphasis: bold, italic, underline, strikethrough, dim
+    - Custom function integration: User-defined formatting and conditional logic
+    - Graceful error handling: Clear error messages for invalid tokens and functions
 """
 
 from abc import ABC, abstractmethod

@@ -40,13 +40,48 @@ class TemplateFormatter:
     
     def __init__(self, template: str, delimiter: str = ';', escape_char: str = '\\', functions: Optional[Dict[str, Callable]] = None):
         """
-        Advanced template formatter with conditional sections and rich formatting.
+        Initialize a template formatter with conditional sections and rich formatting.
+        
+        Templates are "baked" during initialization - formatting tokens are parsed,
+        validated, and cached for optimal runtime performance. Invalid colors/emphasis 
+        styles are caught at creation time rather than during formatting operations.
+        
+        Args:
+            template (str): Template string using {{}} sections for conditional content.
+                        Sections can include formatting tokens (#color, @emphasis, ?conditional),
+                        prefixes, field names, and suffixes separated by the delimiter.
+            delimiter (str, optional): Character separating parts within sections. 
+                                    Defaults to ';'. Common alternatives: '|', ':'.
+            escape_char (str, optional): Character for escaping special sequences.
+                                    Defaults to '\\'. Use to include literal braces.
+            functions (Dict[str, Callable], optional): Custom functions for formatting
+                                                    and conditionals. Function names become
+                                                    available as formatting tokens.
+        
+        Raises:
+            StringSmithError: If template contains invalid formatting tokens or syntax errors.
+            
+        Examples:
+            >>> # Basic conditional sections
+            >>> formatter = TemplateFormatter("{{Hello ;name;}}")
+            >>> formatter.format(name="World")  # "Hello World"
+            >>> formatter.format()              # "" (section disappears)
+            
+            >>> # Color and emphasis formatting
+            >>> formatter = TemplateFormatter("{{#red@bold;ERROR: ;message;}}")
+            >>> formatter.format(message="Failed")  # Red bold "ERROR: Failed"
+            
+            >>> # Custom functions
+            >>> def priority_color(level):
+            ...     return 'red' if level > 5 else 'yellow'
+            >>> formatter = TemplateFormatter("{{#priority_color;Level ;priority;: ;message;}}",
+            ...                             functions={'priority_color': priority_color})
+            >>> formatter.format(priority=8, message="Critical")  # Red "Level 8: Critical"
         
         Performance Notes:
-            Templates are "baked" during initialization - formatting tokens are parsed,
-            validated, and cached. This means template creation is slower but format()
-            calls are faster. Invalid colors/emphasis styles are caught at creation time
-            rather than during formatting.
+            - Template parsing is front-loaded during initialization for faster formatting
+            - Color/emphasis validation happens once at creation, not per format() call
+            - Recommended to create formatters once and reuse for multiple format operations
         """
         
         self.template = template
@@ -122,18 +157,47 @@ class TemplateFormatter:
 
     def format(self, *args, **kwargs) -> str:
         """
-        Format the template with provided variables.
+        Format template with provided variables using conditional section logic.
+        
+        Core behavior: Sections automatically disappear when their field variables
+        are missing, eliminating manual null checking and conditional string building.
+        Mandatory sections (prefixed with '!') throw errors when variables are missing.
         
         Args:
-            *args: Positional arguments (cannot be mixed with kwargs)
-            **kwargs: Keyword arguments (cannot be mixed with args)
+            *args: Positional arguments mapped to template fields in order.
+                Field names in template are ignored when using positional args.
+            **kwargs: Keyword arguments mapped to template fields by name.
             
         Returns:
-            Formatted string with conditional sections applied
-            
+            str: Formatted string with ANSI color codes (if formatting used) and
+                missing data sections omitted. Empty string if no sections render.
+        
         Raises:
-            StringSmithError: If args and kwargs are mixed
-            MissingMandatoryFieldError: If mandatory fields are missing
+            StringSmithError: If positional and keyword arguments are mixed.
+            MissingMandatoryFieldError: If mandatory field (marked with '!') is missing.
+            
+        Examples:
+            >>> # Conditional sections disappear gracefully
+            >>> formatter = TemplateFormatter("{{User: ;username;}} {{(ID: ;user_id;)}}")
+            >>> formatter.format(username="admin")      # "User: admin "
+            >>> formatter.format(user_id=123)          # " (ID: 123)"
+            >>> formatter.format()                     # ""
+            
+            >>> # Positional arguments
+            >>> formatter = TemplateFormatter("{{first}} + {{second}} = {{result}}")
+            >>> formatter.format("15", "27", "42")     # "15 + 27 = 42"
+            >>> formatter.format("15", "27")           # "15 + 27 = "
+            
+            >>> # Mandatory sections enforce required data
+            >>> formatter = TemplateFormatter("{{!name}} logged in {{at ;timestamp;}}")
+            >>> formatter.format(name="admin", timestamp="10:30")  # "admin logged in at 10:30"
+            >>> formatter.format(timestamp="10:30")    # Raises MissingMandatoryFieldError
+        
+        Professional Use Cases:
+            - Logging: Status messages with optional context that varies by log level
+            - Reporting: Data displays where some fields may be missing or null
+            - CLI output: User notifications with conditional additional information
+            - Data processing: Template-based output generation with sparse datasets
         """
         if args and kwargs:
             raise StringSmithError('Cannot mix positional and keyword arguments')

@@ -1,7 +1,30 @@
+"""
+Abstract Syntax Tree structures for StringSmith template representation.
+
+This module defines the data structures that represent parsed templates as
+structured objects, enabling efficient conditional evaluation and formatting
+during runtime operations.
+
+Key Classes:
+    TemplateSection: Represents a complete {{...}} section with prefix, field, suffix
+    TemplatePart: Base class for template components with formatting metadata
+    Section types: Mandatory vs optional sections, literal text vs variable sections
+
+Design Philosophy:
+    Template structures mirror the logical intent of conditional formatting:
+    sections that should appear or disappear based on data availability. This
+    enables the core StringSmith feature of graceful missing data handling.
+
+Runtime Behavior:
+    TemplateSection objects are evaluated during format() calls to determine
+    whether they should render based on variable availability and mandatory status.
+"""
+
 from __future__ import annotations
 from typing import List, Optional, Dict
-import copy
 from dataclasses import dataclass
+import copy
+
 try:
     from .inline_formatting import InlineFormatting
 except ImportError:

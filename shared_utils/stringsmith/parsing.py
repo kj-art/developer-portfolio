@@ -1,5 +1,25 @@
 """
-Template parsing logic for StringSmith.
+Template parsing engine for StringSmith conditional formatting.
+
+This module handles the core parsing logic that converts template strings into
+structured AST-like objects for efficient runtime evaluation. The parser recognizes
+template sections ({{...}}), inline formatting tokens (#color, @emphasis, ?conditional),
+escape sequences, and custom delimiters.
+
+Key Components:
+    TemplateParser: Main parsing class that processes templates into TemplateSection objects
+    Section parsing: Converts {{field}} syntax into structured conditional sections
+    Inline formatting: Processes {#color} and {@emphasis} tokens within template text
+    Escape handling: Manages backslash escapes for literal braces and delimiters
+
+Architecture:
+    Templates are parsed once during TemplateFormatter initialization and cached as
+    structured objects. This front-loads parsing overhead for optimal runtime performance
+    during repeated format() operations.
+
+Thread Safety:
+    TemplateParser instances are stateless after construction and safe for concurrent
+    use across multiple threads.
 """
 
 import re
