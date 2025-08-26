@@ -49,17 +49,6 @@ class BaseTokenHandler(ABC):
             if handler_class == type(self):
                 return f"{token}"
         raise ValueError(f"No token assigned to {type(self).__name__}")
-    
-    def get_token_prefix(self) -> str:
-        return self._token_prefix
-    
-    @classmethod
-    def get_token_char(cls) -> str:
-        """Get the token character assigned to this handler class."""
-        for token, handler_class in TOKEN_REGISTRY.items():
-            if handler_class == cls:
-                return token
-        raise ValueError(f"No token assigned to {cls.__name__}")
 
     def is_reset_token(self, value: str) -> bool:
         """Check if this token value is a reset/default token."""
@@ -165,32 +154,6 @@ class EmphasisTokenHandler(BaseTokenHandler):
         reset_strikethrough = '29'
         self._reset_ansi = f'\033[{";".join([reset_bold, reset_italic, reset_underline, reset_strikethrough])}m'
     
-    def reset_formatting(self, current_formatting: List[str]) -> List[str]:
-        """Remove all emphasis formatting from current_formatting."""
-        return [f for f in current_formatting if not f.startswith(self.get_token_prefix())]
-    
-    def apply_formatting(self, value: str, current_formatting: List[str], field_value: Any = None) -> List[str]:
-        """Apply emphasis formatting, emphasis can stack."""
-        # Try custom function first
-        if value in self.functions:
-            try:
-                function_result = self._call_function(value, field_value)
-                if isinstance(function_result, str) and function_result.strip():
-                    # If function returns text, it's a custom formatter - handle specially
-                    return current_formatting + [f"{self.get_token_prefix()}{value}"]
-                else:
-                    # Function returned emphasis name, recursively handle
-                    return self.handle_token(str(function_result), current_formatting, field_value)
-            except Exception as e:
-                raise StringSmithError(f"Error applying emphasis function '{value}': {e}")
-        
-        # Apply standard emphasis (can stack)
-        if value in self.emphasis_codes:
-            return current_formatting + [f"{self.get_token_prefix()}{value}"]
-        else:
-            # Unknown emphasis, ignore silently
-            return current_formatting
-    
     def get_ansi_code(self, emphasis_value: str) -> str:
         """Get ANSI code for emphasis value."""
         code = self.emphasis_codes.get(emphasis_value, None)
@@ -226,7 +189,7 @@ class ConditionalTokenHandler(BaseTokenHandler):
         self._reset_ansi = ''
 
     def get_ansi_code(self, token_value: str) -> str:
-        pass #return '\uE000'
+        return ''
     
     def finalize(self, template_part: TemplatePart, field_value: Any) -> str:
         template_part = template_part.copy()

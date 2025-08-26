@@ -3,21 +3,19 @@ Core template formatter implementation.
 """
 
 import re
-from typing import Dict, Callable, Any, Optional, Union, List, Tuple
+from typing import Dict, Callable, Optional, List
 
 # Handle both relative and absolute imports
 try:
     from .parsing import TemplateParser
-    from .formatting import FormatApplier
-    from .token_handlers import create_token_handlers, ConditionalTokenHandler
+    from .token_handlers import create_token_handlers
     from .exceptions import StringSmithError, MissingMandatoryFieldError
     from .inline_formatting import InlineFormatting
     from .template_ast import TemplatePart
     from .token_handlers import TOKEN_REGISTRY
 except ImportError:
     from parsing import TemplateParser
-    from formatting import FormatApplier
-    from token_handlers import create_token_handlers, ConditionalTokenHandler
+    from token_handlers import create_token_handlers
     from exceptions import StringSmithError, MissingMandatoryFieldError
     from inline_formatting import InlineFormatting
     from template_ast import TemplatePart
@@ -42,13 +40,13 @@ class TemplateFormatter:
     
     def __init__(self, template: str, delimiter: str = ';', escape_char: str = '\\', functions: Optional[Dict[str, Callable]] = None):
         """
-        Initialize the template formatter.
+        Advanced template formatter with conditional sections and rich formatting.
         
-        Args:
-            template: Template string with {{}} sections
-            delimiter: Character to separate parts within sections (default: ";")
-            escape_char: Character used for escaping special characters (default: "\\")
-            functions: Optional dictionary of custom functions for formatting and conditionals
+        Performance Notes:
+            Templates are "baked" during initialization - formatting tokens are parsed,
+            validated, and cached. This means template creation is slower but format()
+            calls are faster. Invalid colors/emphasis styles are caught at creation time
+            rather than during formatting.
         """
         
         self.template = template
@@ -57,7 +55,6 @@ class TemplateFormatter:
         self.functions = functions or {}
         
         self.parser = TemplateParser(delimiter, escape_char)
-        self.format_applier = FormatApplier(self.functions)
         self.token_handlers = create_token_handlers(self.functions)
         
         self.sections = self.parser.parse_template(template)
@@ -68,6 +65,15 @@ class TemplateFormatter:
             fmt.adjust_position(offset)
 
     def _bake_template(self, *args, **kwargs) -> str:
+        """
+        Pre-process template sections for performance.
+        
+        This "baking" process:
+        - Validates all formatting tokens (colors, emphasis, functions)
+        - Caches ANSI codes and formatting state
+        - Applies sectional formatting that doesn't depend on runtime data
+        - Raises errors for invalid tokens at creation time, not format() time
+        """
         for s, section in enumerate(self.sections):
             # skip literal sections of string
             if section.suffix == None:
