@@ -68,7 +68,7 @@ Use `!` prefix to require specific variables:
 formatter = TemplateFormatter("{{!name}} logged in {{at ;timestamp;}}")
 formatter.format(name="admin", timestamp="10:30")  # "admin logged in at 10:30"
 formatter.format(name="admin")                      # "admin logged in " 
-formatter.format(timestamp="10:30")                 # Raises MissingMandatoryFieldError
+# formatter.format(timestamp="10:30")               # Raises MissingMandatoryFieldError
 ```
 
 ### Rich Color Formatting
@@ -144,8 +144,8 @@ log_formatter = TemplateFormatter(
 )
 
 # Automatically includes user context when available, omits when not
-logger.info(log_formatter.format(level="INFO", timestamp="10:30", module="auth", message="Login attempt"))
-logger.info(log_formatter.format(level="INFO", timestamp="10:30", module="auth", user_id=123, message="Login successful"))
+print(log_formatter.format(level="INFO", timestamp="10:30", module="auth", message="Login attempt"))
+print(log_formatter.format(level="INFO", timestamp="10:30", module="auth", user_id=123, message="Login successful"))
 ```
 
 ### Data Reporting  
@@ -171,82 +171,6 @@ for company in companies:
 # Company: TechCorp (Revenue: $150M) ✓ Profitable [Notes: Strong growth]  
 # Company: StartupXYZ (Revenue: $50M)
 # Company: MegaCorp (Revenue: $500M)
-```
-
-### CLI User Interfaces
-```python
-def status_color(status):
-    colors = {'running': 'yellow', 'complete': 'green', 'failed': 'red', 'pending': 'dim'}
-    return colors.get(status.lower(), 'white')
-
-def in_progress(status):
-    return status.lower() == 'running'
-
-def has_eta(eta):
-    return eta is not None
-
-status_formatter = TemplateFormatter(
-    "{{#status_color;operation;}} {{?in_progress;(;progress;% complete);}} {{?has_eta; ETA: ;eta;}}",
-    functions={'status_color': status_color, 'in_progress': in_progress, 'has_eta': has_eta}
-)
-
-# Clean output regardless of available progress information
-print(status_formatter.format(operation="Backup", status="running", progress=45, eta="5 min"))
-# Yellow "Backup (45% complete) ETA: 5 min"
-
-print(status_formatter.format(operation="Backup", status="complete"))
-# Green "Backup" (progress info auto-hidden)
-```
-
-## Advanced Features
-
-### Custom Delimiters
-Change the section delimiter for different use cases:
-
-```python
-# Using pipe delimiter for cleaner syntax
-formatter = TemplateFormatter("{{Error|message|!}}", delimiter="|")
-print(formatter.format(message="Something went wrong"))  # "ErrorSomething went wrong!"
-
-# Using colon delimiter
-formatter = TemplateFormatter("{{Label:value:}}", delimiter=":")
-print(formatter.format(value="test"))  # "Labeltest"
-```
-
-### Escape Sequences
-Include literal braces and delimiters:
-
-```python
-# Escape braces to include them literally
-formatter = TemplateFormatter("Use \\{name\\} for {{name}}")
-print(formatter.format(name="variables"))  # "Use {name} for variables"
-
-# Escape delimiters  
-formatter = TemplateFormatter("{{Ratio\\;percent;value;}}")
-print(formatter.format(value="50"))  # "Ratio;percent50"
-
-# Custom escape character
-formatter = TemplateFormatter("Use ~{name~} for {{name}}", escape_char="~")
-print(formatter.format(name="variables"))  # "Use {name} for variables"
-```
-
-### Inline Formatting
-Apply formatting within template sections:
-
-```python
-def is_success(status):
-    return status == "success"
-
-formatter = TemplateFormatter(
-    "Task {?is_success}{#green}✓{#normal}{@normal}: {{task}} {{Status: ;status;}}",
-    functions={'is_success': is_success}
-)
-
-print(formatter.format(task="Deploy", status="success"))
-# "Task ✓: Deploy Status: success" (with green checkmark)
-
-print(formatter.format(task="Deploy", status="failed"))  
-# "Task : Deploy Status: failed" (no checkmark or green color)
 ```
 
 ## API Reference
@@ -287,51 +211,17 @@ TemplateFormatter(
 - `field`: Optional field (section disappears if missing)
 - Empty field: Use positional arguments
 
-**Examples:**
-- `{{message}}` - Simple field substitution
-- `{{Error: ;message;}}` - Field with prefix
-- `{{!name}}` - Mandatory field
-- `{{#red;Error: ;message;}}` - Red colored section
-- `{{@bold;Warning: ;message;}}` - Bold text section  
-- `{{#blue@italic;Info: ;message;}}` - Blue italic section
-- `{{?is_error;[ERROR] ;level;}}` - Conditional section
-
-## Color Support
-
-### Built-in Colors
-All matplotlib named colors: `red`, `green`, `blue`, `yellow`, `black`, `white`, `cyan`, `magenta`, etc.
-
-### Extended Colors (with Rich)
-Install with `pip install stringsmith[colors]` for:
-- CSS4 named colors (140+ colors like `coral`, `crimson`, `navy`, `teal`)
-- Hex color codes (`#FF0000`, `ff0000`)
-- RGB values (`rgb(255,0,0)`)  
-- HSL values (`hsl(0,100%,50%)`)
-
-### Text Emphasis Styles
-- `bold`: Bold text
-- `italic`: Italic text  
-- `underline`: Underlined text
-- `strikethrough`: Strikethrough text
-- `dim`: Dimmed text
-
-## Performance Characteristics
-
-- **Template Parsing**: O(n) during initialization, cached for reuse
-- **Format Operations**: O(sections) runtime complexity, minimal string operations
-- **Memory Usage**: Lightweight parsed representation, shared across format calls
-- **Thread Safety**: Immutable formatters enable safe concurrent usage
-
-Benchmarks show 2-3x performance improvement over equivalent manual conditional logic in applications with repeated formatting operations.
-
 ## Installation
 
-```bash
-# Basic installation
-pip install stringsmith
+```python
+# Install from source
+pip install -e .
 
 # With extended color support
-pip install stringsmith[colors]
+pip install -e ".[colors]"
+
+# With development tools
+pip install -e ".[dev]"
 ```
 
 ## Requirements
@@ -340,102 +230,19 @@ pip install stringsmith[colors]
 - No required dependencies for basic functionality
 - Optional: `rich>=10.0.0` for comprehensive color support
 
-## Professional Integration
-
-### Logging Integration
-```python
-import logging
-from stringsmith import TemplateFormatter
-
-class StringSmithLogAdapter(logging.LoggerAdapter):
-    def __init__(self, logger, formatter):
-        super().__init__(logger, {})
-        self.formatter = formatter
-    
-    def process(self, msg, kwargs):
-        # Format message with available context
-        formatted_msg = self.formatter.format(message=msg, **kwargs.get('extra', {}))
-        return formatted_msg, kwargs
-
-# Usage
-log_formatter = TemplateFormatter("{{[;timestamp;] ;}}{{#level_color;[;level;];}} {{message}}")
-logger = StringSmithLogAdapter(logging.getLogger(__name__), log_formatter)
-logger.info("User login", extra={'timestamp': '10:30', 'level': 'INFO'})
-```
-
-### Configuration-Driven Templates
-```python
-import json
-from stringsmith import TemplateFormatter
-
-# Load templates from configuration
-with open('templates.json') as f:
-    templates = json.load(f)
-
-formatters = {
-    name: TemplateFormatter(template['format'], functions=template.get('functions', {}))
-    for name, template in templates.items()
-}
-
-# Use configured formatters
-user_formatter = formatters['user_status']
-print(user_formatter.format(username="admin", status="active", last_login="10:30"))
-```
-
-## Error Handling
-
-StringSmith provides structured exceptions for different error categories:
-
-```python
-from stringsmith import TemplateFormatter
-from stringsmith.exceptions import StringSmithError, MissingMandatoryFieldError
-
-try:
-    formatter = TemplateFormatter("{{!required_field}} and {{optional_field}}")
-    result = formatter.format(optional_field="present")
-except MissingMandatoryFieldError as e:
-    print(f"Required data missing: {e}")
-except StringSmithError as e:
-    print(f"Template error: {e}")
-```
-
-## Development and Testing
+## Testing
 
 ```bash
-# Install development dependencies
-pip install stringsmith[dev]
-
 # Run tests
-pytest tests/
+pytest
 
 # Run with coverage
-pytest --cov=stringsmith tests/
+pytest --cov=stringsmith
 
-# Code formatting
-black stringsmith/
-flake8 stringsmith/
+# Run specific test categories
+pytest -m "not slow"
 ```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes with tests
-4. Ensure all tests pass (`pytest`)
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
 
 ## License
 
 MIT License - see LICENSE file for details.
-
-## Changelog
-
-### v0.1.0
-- Initial release with conditional sections
-- Color and emphasis formatting support  
-- Custom function integration
-- Positional argument support
-- Professional error handling
-- Comprehensive test suite
