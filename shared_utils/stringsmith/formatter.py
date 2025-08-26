@@ -38,7 +38,7 @@ class TemplateFormatter:
     - Both positional and keyword arguments (but not mixed)
     """
 
-    _SYNTHETIC_FIELD_NAME_PREFIX = '__pos_'
+    _ANSI_ESCAPE = re.compile(r'\x1b\[[0-9;]*[A-Za-z]')
     
     def __init__(self, template: str, delimiter: str = ';', escape_char: str = '\\', functions: Optional[Dict[str, Callable]] = None):
         """
@@ -106,6 +106,12 @@ class TemplateFormatter:
             if replaced:
                 template_part.inline_formatting.pop(f)
                 self._update_positions(template_part.inline_formatting[f:], len(template_part.content) - str_len)
+
+    def _has_non_ansi(self, text: str) -> bool:
+        # Remove all ANSI sequences
+        stripped = TemplateFormatter._ANSI_ESCAPE.sub('', text)
+        # Check if there's anything left
+        return bool(stripped)
 
     def format(self, *args, **kwargs) -> str:
         """
@@ -199,10 +205,22 @@ class TemplateFormatter:
                     handler = self.token_handlers[tkn]
                     new_section = handler.apply_sectional_formatting(new_section, field_value)
                 
+                if self._has_non_ansi(new_section.prefix.content):
+                    new_section.prefix.content += reset_ansi
+                else:
+                    new_section.prefix.content = ''
+                if self._has_non_ansi(new_section.field.content):
+                    new_section.field.content += reset_ansi
+                else:
+                    new_section.field.content = ''
+                if self._has_non_ansi(new_section.suffix.content):
+                    new_section.suffix.content += reset_ansi
+                else:
+                    new_section.suffix.content = ''    
                 result_parts.append(
-                    new_section.prefix.content + reset_ansi +
-                    new_section.field.content + reset_ansi + 
-                    new_section.suffix.content + reset_ansi
+                    new_section.prefix.content + 
+                    new_section.field.content +  
+                    new_section.suffix.content
                 )
 
         return ''.join(result_parts)
