@@ -124,6 +124,10 @@ class ColorTokenHandler(BaseTokenHandler):
     def get_ansi_code(self, color_value: str) -> str:
         """Get ANSI color code for a color value using Rich."""
         try:
+            # Check if it looks like hex and add # prefix if needed
+            if (len(color_value) == 6 and 
+                all(c.lower() in '0123456789abcdef' for c in color_value)):
+                color_value = f"#{color_value}"
             color = Color.parse(color_value)
             ansi_codes = color.get_ansi_codes()
             if isinstance(ansi_codes, tuple) and len(ansi_codes) > 0:
