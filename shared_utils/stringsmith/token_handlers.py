@@ -136,10 +136,9 @@ class ColorTokenHandler(BaseTokenHandler):
                     return f'\033[{ansi_codes}m'
                 return ansi_codes
         except Exception:
-            # Return empty string if color couldn't be parsed
-            return ""
+            pass
         
-        return ""
+        raise StringSmithError(f"Unknown color '{color_value}'. Valid colors: named colors (red, green, blue), hex codes (FF0000), or custom functions.")
 
 
 class EmphasisTokenHandler(BaseTokenHandler):
@@ -190,8 +189,10 @@ class EmphasisTokenHandler(BaseTokenHandler):
     
     def get_ansi_code(self, emphasis_value: str) -> str:
         """Get ANSI code for emphasis value."""
-        return self.emphasis_codes.get(emphasis_value, '')
-
+        code = self.emphasis_codes.get(emphasis_value, None)
+        if code is None:
+            raise StringSmithError(f"Unknown emphasis style '{emphasis_value}'. Valid styles: bold, italic, underline, strikethrough, dim, or custom functions.")
+        return code
 
 class ConditionalTokenHandler(BaseTokenHandler):
     """Handles conditional tokens (?function_name)."""
@@ -220,7 +221,7 @@ class ConditionalTokenHandler(BaseTokenHandler):
     def _set_reset_ansi(self):
         self._reset_ansi = ''
 
-    def get_ansi_code(self, token_value: str):
+    def get_ansi_code(self, token_value: str) -> str:
         pass #return '\uE000'
     
     def finalize(self, template_part: TemplatePart, field_value: Any) -> str:
