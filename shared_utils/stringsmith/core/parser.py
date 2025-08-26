@@ -25,15 +25,10 @@ Thread Safety:
 import re
 from typing import List, Optional, Dict, Tuple
 
-# Handle both relative and absolute imports
-try:
-    from .exceptions import StringSmithError
-    from .token_handlers import TOKEN_REGISTRY, SORTED_TOKENS, TemplatePart, TemplateSection
-    from .inline_formatting import InlineFormatting
-except ImportError:
-    from exceptions import StringSmithError
-    from token_handlers import TOKEN_REGISTRY, SORTED_TOKENS, TemplatePart, TemplateSection
-    from inline_formatting import InlineFormatting
+
+from ..exceptions import StringSmithError
+from ..tokens import TOKEN_REGISTRY, SORTED_TOKENS
+from . import TemplatePart, TemplateSection, InlineFormatting
 
 class TemplateParser:
     """Parses template strings into structured sections."""

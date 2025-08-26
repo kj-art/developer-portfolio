@@ -2,24 +2,14 @@
 Core template formatter implementation.
 """
 
-import re
 from typing import Dict, Callable, Optional, List
 
-# Handle both relative and absolute imports
-try:
-    from .parsing import TemplateParser
-    from .token_handlers import create_token_handlers
-    from .exceptions import StringSmithError, MissingMandatoryFieldError
-    from .inline_formatting import InlineFormatting
-    from .template_ast import TemplatePart
-    from .token_handlers import TOKEN_REGISTRY
-except ImportError:
-    from parsing import TemplateParser
-    from token_handlers import create_token_handlers
-    from exceptions import StringSmithError, MissingMandatoryFieldError
-    from inline_formatting import InlineFormatting
-    from template_ast import TemplatePart
-    from token_handlers import TOKEN_REGISTRY
+from .parser import TemplateParser
+from ..tokens import create_token_handlers, TOKEN_REGISTRY
+from ..exceptions import StringSmithError, MissingMandatoryFieldError
+from .inline_formatting import InlineFormatting
+from .ast import TemplatePart
+from ..utils import has_non_ansi
 
 class TemplateFormatter:
     """
@@ -36,7 +26,7 @@ class TemplateFormatter:
     - Both positional and keyword arguments (but not mixed)
     """
 
-    _ANSI_ESCAPE = re.compile(r'\x1b\[[0-9;]*[A-Za-z]')
+    
     
     def __init__(self, template: str, delimiter: str = ';', escape_char: str = '\\', functions: Optional[Dict[str, Callable]] = None):
         """
@@ -148,12 +138,6 @@ class TemplateFormatter:
             if replaced:
                 template_part.inline_formatting.pop(f)
                 self._update_positions(template_part.inline_formatting[f:], len(template_part.content) - str_len)
-
-    def _has_non_ansi(self, text: str) -> bool:
-        # Remove all ANSI sequences
-        stripped = TemplateFormatter._ANSI_ESCAPE.sub('', text)
-        # Check if there's anything left
-        return bool(stripped)
 
     def format(self, *args, **kwargs) -> str:
         """
@@ -273,15 +257,15 @@ class TemplateFormatter:
                     handler = self.token_handlers[tkn]
                     new_section = handler.apply_sectional_formatting(new_section, field_value)
                 
-                if self._has_non_ansi(new_section.prefix.content):
+                if has_non_ansi(new_section.prefix.content):
                     new_section.prefix.content += reset_ansi
                 else:
                     new_section.prefix.content = ''
-                if self._has_non_ansi(new_section.field.content):
+                if has_non_ansi(new_section.field.content):
                     new_section.field.content += reset_ansi
                 else:
                     new_section.field.content = ''
-                if self._has_non_ansi(new_section.suffix.content):
+                if has_non_ansi(new_section.suffix.content):
                     new_section.suffix.content += reset_ansi
                 else:
                     new_section.suffix.content = ''    

@@ -25,10 +25,7 @@ from typing import List, Optional, Dict
 from dataclasses import dataclass
 import copy
 
-try:
-    from .inline_formatting import InlineFormatting
-except ImportError:
-    from inline_formatting import InlineFormatting
+from .inline_formatting import InlineFormatting
 
 @dataclass
 class TemplatePart:

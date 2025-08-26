@@ -28,24 +28,13 @@ Professional Use Cases:
 - Template-based output generation
 """
 
-# Handle both relative and absolute imports for flexible usage
-try:
-    from .formatter import TemplateFormatter
-    from .exceptions import (
-        StringSmithError,
-        MissingMandatoryFieldError,
-        ParseError,
-        FormattingError,
-    )
-except ImportError:
-    # Fallback for direct execution or development
-    from formatter import TemplateFormatter
-    from exceptions import (
-        StringSmithError,
-        MissingMandatoryFieldError,
-        ParseError,
-        FormattingError,
-    )
+from .core import TemplateFormatter
+from .exceptions import (
+    StringSmithError,
+    MissingMandatoryFieldError,
+    ParseError,
+    FormattingError,
+)
 
 # Package metadata
 __version__ = "0.1.0"

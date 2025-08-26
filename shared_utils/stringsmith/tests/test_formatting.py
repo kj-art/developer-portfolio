@@ -9,13 +9,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 
-try:
-    from formatter import TemplateFormatter
-    from exceptions import StringSmithError, MissingMandatoryFieldError
-except ImportError:
-    from stringsmith import TemplateFormatter
-    from stringsmith.exceptions import StringSmithError, MissingMandatoryFieldError
-
+from ..core import TemplateFormatter
+from exceptions import StringSmithError, MissingMandatoryFieldError
 
 def strip_ansi(text):
     """Remove ANSI escape sequences from text for content testing."""
