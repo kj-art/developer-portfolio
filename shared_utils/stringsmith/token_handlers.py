@@ -92,9 +92,9 @@ class BaseTokenHandler(ABC):
             if is_bake:
                 return text_segment, False
             token_value = str(self.functions[token_value](field_value))
+        
+        ansi_code = self._reset_ansi if self.is_reset_token(token_value) else self.get_ansi_code(token_value)
 
-        #return self._apply_inline_formatting(text_segment, token_value, position)
-        ansi_code = self.get_ansi_code(token_value)
         if ansi_code:
             return f"{text_segment[:position]}{ansi_code}{text_segment[position:]}", True
         
@@ -222,10 +222,11 @@ class ConditionalTokenHandler(BaseTokenHandler):
         template_part = template_part.copy()
         pieces = template_part.content.split('\uE000')
         result = pieces.pop(0)
-        if len(pieces) != len(template_part.inline_formatting):
+        inline_formatting = [item for item in template_part.inline_formatting if item.type == self._token]
+        if len(pieces) != len(inline_formatting):
             raise StringSmithError(f"Error finalizing text_segment '{template_part.content}': Mismatch between formatting length and number of conditional ANSI markers")
         for i, v in enumerate(pieces):
-            token_value = template_part.inline_formatting[i].value
+            token_value = inline_formatting[i].value
             if self.is_reset_token(token_value):
                 result += v
             elif token_value not in self.functions:
