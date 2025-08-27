@@ -148,7 +148,7 @@ def custom_function_examples():
     
     # Custom formatting function
     def highlight(text):
-        return f">>> {text} <<<"
+        return text
     
     def box_text(text):
         return f"[{text}]"
@@ -166,8 +166,8 @@ def custom_function_examples():
         }
     )
     
-    print(f"With code: '{formatter.format(message='Server down', code='ERR123')}'")
-    print(f"No code: '{formatter.format(message='Server down', code='UNKNOWN')}'")
+    print(f"With code: '{formatter.format(message='red', code='ERR123')}'")
+    print(f"No code: '{formatter.format(message='yellow', code='UNKNOWN')}'")
     
     # Box text function with emphasis
     formatter = TemplateFormatter(

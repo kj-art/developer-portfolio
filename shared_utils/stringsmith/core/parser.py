@@ -154,30 +154,9 @@ class TemplateParser:
     
     def _parse_section(self, content: str) -> TemplateSection:
         """Parse the content of a single {{}} section."""
-        is_mandatory = False
-        
-        # Check for mandatory marker
-        if content.startswith('!'):
-            is_mandatory = True
-            content = content[1:]
-        
-        parts = self._split_unescaped(content)
-        if self._extract_starting_token(parts[0])[0]:
-            format_part = parts.pop(0)
-            section_tokens = self.split_by_substrings(format_part, TOKEN_REGISTRY.keys())
-        else:
-            section_tokens = {}
-
-        prefix = ''
-        field = ''
-        suffix = ''
-
-        match len(parts):
-            case 0: pass
-            case 1: field = parts[0]
-            case 2: prefix, field = parts
-            case 3: prefix, field, suffix = parts
-            case _: raise StringSmithError(f"Too many parts in section: {{{{{content}}}}}")
+        is_mandatory, content = self._extract_mandatory_marker(content)
+        section_tokens, parts = self._extract_formatting_tokens(content)
+        prefix, field, suffix = self._split_into_parts(parts)
 
         field_part = self._parse_field_part(field)
         return TemplateSection(
@@ -188,6 +167,48 @@ class TemplateParser:
                 field=field_part,
                 suffix=self._parse_text_part(suffix)
             )
+    
+    def _extract_mandatory_marker(self, content: str) -> tuple[bool, str]:
+        """Extract mandatory marker and return cleaned content."""
+        if content.startswith('!'):
+            return True, content[1:]
+        return False, content
+    
+    def _extract_formatting_tokens(self, content: str) -> tuple[Dict[str, List[str]], List[str]]:
+        """Extract formatting tokens from the beginning of section content."""
+        parts = self._split_unescaped(content)
+        
+        if not parts:
+            return {}, []
+        
+        first_token, _ = self._extract_starting_token(parts[0])
+        if first_token:
+            format_part = parts.pop(0)
+            section_tokens = self.split_by_substrings(format_part, TOKEN_REGISTRY.keys())
+            return section_tokens, parts
+        
+        return {}, parts
+    
+    def _split_into_parts(self, parts: List[str]) -> tuple[str, str, str]:
+        """Split remaining parts into prefix, field, and suffix."""
+        prefix = ''
+        field = ''
+        suffix = ''
+
+        match len(parts):
+            case 0: 
+                pass
+            case 1: 
+                field = parts[0]
+            case 2: 
+                prefix, field = parts
+            case 3: 
+                prefix, field, suffix = parts
+            case _: 
+                section_repr = f"{{{{{self.delimiter.join(parts)}}}}}"
+                raise StringSmithError(f"Too many parts in section: {section_repr}")
+
+        return prefix, field, suffix
     
     def _parse_field_part(self, text: str) -> TemplatePart:
         """Parse field component with validation for field-specific formatting rules."""
