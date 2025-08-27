@@ -126,6 +126,8 @@ def conditional_examples():
             'is_warning': is_warning
         }
     )
+
+    print(formatter.get_template_info())
     
     print(f"Error: '{formatter.format(level='error', message='Something broke')}'")
     print(f"Warning: '{formatter.format(level='warning', message='Check this')}'")
@@ -148,7 +150,7 @@ def custom_function_examples():
     
     # Custom formatting function
     def highlight(text):
-        return text
+        return f">>> {text} <<<"
     
     def box_text(text):
         return f"[{text}]"
@@ -166,8 +168,8 @@ def custom_function_examples():
         }
     )
     
-    print(f"With code: '{formatter.format(message='red', code='ERR123')}'")
-    print(f"No code: '{formatter.format(message='yellow', code='UNKNOWN')}'")
+    print(f"With code: '{formatter.format(message='Server down', code='ERR123')}'")
+    print(f"No code: '{formatter.format(message='Server down', code='UNKNOWN')}'")
     
     # Box text function with emphasis
     formatter = TemplateFormatter(

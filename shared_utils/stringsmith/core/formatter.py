@@ -291,10 +291,38 @@ class TemplateFormatter:
             
         return result
     
-    def apply_inline_formatting(self, text_segment: str, formatting: List[InlineFormatting], field_value: str):
-        """Apply a list of inline formatting tokens to a text segment."""
-        for f in range(len(formatting) - 1, -1, -1):
-            fmt = formatting[f]
-            text_segment = self.token_handlers[fmt.type].apply_inline_formatting(text_segment, fmt.position, fmt.value, field_value)
-
-        return text_segment
+    def get_template_info(self) -> Dict[str, any]:
+        """
+        Get information about this template's structure.
+        
+        Returns:
+            Dict[str, any]: Template metadata and structure information.
+            
+        Examples:
+            >>> formatter = TemplateFormatter("{{#red;Error: ;message;}}")
+            >>> info = formatter.get_template_info()
+            >>> info['field_count']
+            1
+            >>> info['has_formatting']
+            True
+        """
+        field_sections = [s for s in self.sections if s.field_name is not None]
+        
+        return {
+            'template': self.template,
+            'total_sections': len(self.sections),
+            'field_count': len(field_sections),
+            'literal_sections': len(self.sections) - len(field_sections),
+            'mandatory_fields': [s.field_name for s in field_sections if s.is_mandatory],
+            'optional_fields': [s.field_name for s in field_sections if not s.is_mandatory],
+            'has_formatting': any(s.section_formatting for s in field_sections),
+            'has_inline_formatting': any(
+                part.inline_formatting 
+                for s in field_sections 
+                for part in [s.prefix, s.field, s.suffix] 
+                if part is not None
+            ),
+            'delimiter': self.delimiter,
+            'escape_char': self.escape_char,
+            'custom_functions': list(self.functions.keys())
+        }
