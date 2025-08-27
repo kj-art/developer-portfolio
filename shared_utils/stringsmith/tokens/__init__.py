@@ -1,6 +1,4 @@
-"""
-Token handling system for StringSmith.
-"""
+"""Token handling system for StringSmith."""
 
 from .base import BaseTokenHandler
 from .color import ColorTokenHandler

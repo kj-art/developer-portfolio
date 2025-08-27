@@ -1,6 +1,4 @@
-"""
-Token registry for StringSmith handlers.
-"""
+"""Token registry for StringSmith handlers."""
 
 from typing import Dict, Callable
 from .base import BaseTokenHandler

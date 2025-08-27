@@ -1,31 +1,52 @@
 """
 StringSmith - Advanced template formatting with conditional sections and inline formatting.
 
-A professional Python library that provides f-string-like functionality with conditional 
-sections that are completely omitted when variables aren't provided, plus rich formatting 
-options including colors and text emphasis.
+StringSmith provides f-string-like functionality with conditional sections that automatically
+disappear when variables aren't provided, plus rich formatting options including colors
+and text emphasis. It eliminates manual null checking and conditional string building.
 
 Core Features:
-- Conditional sections that disappear when variables are missing
-- Mandatory field validation with structured error handling
-- Rich color formatting (matplotlib colors, hex codes, custom functions)
-- Text emphasis formatting (bold, italic, underline, etc.)
-- Custom function integration for formatting and conditionals
-- Performance-optimized template parsing and caching
-- Thread-safe immutable formatters
-- Professional error handling with detailed context
+    - **Conditional Sections**: Template sections disappear when variables are missing
+    - **Mandatory Field Validation**: Required fields (marked with `!`) enforce data presence  
+    - **Rich Formatting**: ANSI colors, text emphasis, and custom styling functions
+    - **Performance Optimized**: Templates parsed once, formatted many times efficiently
+    - **Thread Safe**: Immutable formatters safe for concurrent use
+    - **Extensible**: Custom formatting functions and conditional logic
 
 Quick Start:
+    Basic conditional formatting:
     >>> from stringsmith import TemplateFormatter
     >>> formatter = TemplateFormatter("{{Hello ;name;}}")
     >>> formatter.format(name="World")  # "Hello World"
     >>> formatter.format()              # "" (section disappears)
 
+    Rich formatting with colors and emphasis:
+    >>> formatter = TemplateFormatter("{{#red@bold;ERROR: ;message;}}")
+    >>> formatter.format(message="Failed")  # Red bold "ERROR: Failed"
+
+    Custom functions for dynamic behavior:
+    >>> def priority_color(level):
+    ...     return 'red' if int(level) > 5 else 'yellow'
+    >>> formatter = TemplateFormatter(
+    ...     "{{#priority_color;Level ;priority;: ;message;}}", 
+    ...     functions={'priority_color': priority_color}
+    ... )
+    >>> formatter.format(priority=8, message="Critical")  # Red "Level 8: Critical"
+
 Professional Use Cases:
-- Application logging with conditional context
-- Data reporting with sparse datasets
-- CLI user interfaces with dynamic status
-- Template-based output generation
+    - Application logging with conditional context that varies by log level
+    - Data reporting with sparse or missing datasets
+    - CLI interfaces with dynamic status messages
+    - Business intelligence with formatted reports
+    - Monitoring systems with context-sensitive formatting
+
+Thread Safety:
+    All StringSmith components are thread-safe after initialization.
+    TemplateFormatter instances are immutable and can be used safely
+    across multiple concurrent threads.
+
+Author: Krishna R Jain <krishna@krishnajain.com>
+License: MIT
 """
 
 from .core import TemplateFormatter

@@ -2,24 +2,9 @@
 Template parsing engine for StringSmith conditional formatting.
 
 This module handles the core parsing logic that converts template strings into
-structured AST-like objects for efficient runtime evaluation. The parser recognizes
-template sections ({{...}}), inline formatting tokens (#color, @emphasis, ?conditional),
-escape sequences, and custom delimiters.
-
-Key Components:
-    TemplateParser: Main parsing class that processes templates into TemplateSection objects
-    Section parsing: Converts {{field}} syntax into structured conditional sections
-    Inline formatting: Processes {#color} and {@emphasis} tokens within template text
-    Escape handling: Manages backslash escapes for literal braces and delimiters
-
-Architecture:
-    Templates are parsed once during TemplateFormatter initialization and cached as
-    structured objects. This front-loads parsing overhead for optimal runtime performance
-    during repeated format() operations.
-
-Thread Safety:
-    TemplateParser instances are stateless after construction and safe for concurrent
-    use across multiple threads.
+structured AST objects for efficient runtime evaluation. The parser recognizes
+template sections ({{...}}), inline formatting tokens, escape sequences, and
+custom delimiters.
 """
 
 import re
@@ -31,36 +16,62 @@ from ..tokens import TOKEN_REGISTRY, SORTED_TOKENS
 from . import TemplatePart, TemplateSection, InlineFormatting
 
 class TemplateParser:
-    """Parses template strings into structured sections."""
+    """
+    Parses template strings into structured AST representations for efficient evaluation.
+    
+    TemplateParser converts StringSmith template strings into TemplateSection objects
+    that can be efficiently evaluated with runtime data. The parser handles the full
+    complexity of StringSmith template syntax including formatting tokens, escape
+    sequences, and custom delimiters.
+    
+    Args:
+        delimiter (str, optional): Character(s) separating components within template
+                                 sections. Defaults to ';'.
+        escape_char (str, optional): Character(s) for escape sequences. Defaults to '\\'.
+        
+    Examples:
+        >>> parser = TemplateParser()
+        >>> sections = parser.parse_template("{{Hello ;name;}}")
+        
+        >>> parser = TemplateParser(delimiter='|')
+        >>> sections = parser.parse_template("{{Hello|name|!}}")
+    """
     
     def __init__(self, delimiter: str = ";", escape_char: str = "\\"):
+        """Initialize parser with configurable syntax options."""
         self.delimiter = delimiter
         self.escape_char = escape_char
         
-        # Regex to find template sections
+        # Pre-compile regex patterns for efficient parsing
         self.section_pattern = re.compile(r'\{\{(.*?)\}\}')
         
-        # Regex to find inline formatting
-        #self.inline_pattern = re.compile(r'\{([#@?])([^}]*)\}')
+        # Inline formatting pattern with escape handling
         escaped_tokens = [re.escape(token) for token in SORTED_TOKENS]
         token_pattern = '|'.join(escaped_tokens)
-        #self.inline_pattern = re.compile(f'\\{{({token_pattern})([^}}]*)\\}}')
         esc = re.escape(escape_char)  # "\\" becomes "\\\\"
         self.inline_pattern = re.compile(f'(?<!{esc})(?:{esc}{esc})*\\{{({token_pattern})([^}}]*)\\}}')
 
     def parse_template(self, template: str) -> List[TemplateSection]:
         """
-        Parse a template string into sections and regular text.
+        Parse a complete template string into structured sections.
         
-        Returns a list of TemplateSection objects and text segments.
+        Args:
+            template (str): Template string to parse.
+        
+        Returns:
+            List[TemplateSection]: Ordered list of template sections.
+        
+        Raises:
+            StringSmithError: If template contains invalid syntax.
         """
         sections = []
         last_end = 0
         
+        # Process each {{...}} section
         for match in self.section_pattern.finditer(template):
             start, end = match.span()
             
-            # Add any text before this section as a literal text section
+            # Add literal text before this section
             if start > last_end:
                 text_content = self._unescape_text(template[last_end:start])
                 if text_content:  # Only add non-empty text
@@ -73,7 +84,7 @@ class TemplateParser:
             
             last_end = end
         
-        # Add any remaining text
+        # Add remaining literal text
         if last_end < len(template):
             text_content = self._unescape_text(template[last_end:])
             if text_content:
@@ -82,21 +93,21 @@ class TemplateParser:
         return sections
     
     def _create_text_section(self, text: str) -> TemplateSection:
-        """Create a section for literal text (no variables)."""
+        """Create a TemplateSection for literal text (no variables)."""
         field_part = TemplatePart(content="", inline_formatting=[])
         prefix_part = TemplatePart(content=text, inline_formatting=[])
         
         return TemplateSection(
             is_mandatory=False,
             section_formatting=[],
-            field_name=None,
+            field_name=None,  # None indicates literal text
             prefix=prefix_part,
             field=field_part,
             suffix=None
         )
     
     def _split_unescaped(self, content: str) -> List[str]:
-        """Split on delimiter preceded by even number (including 0) of escape chars."""
+        """Split content on delimiter characters that are not escaped."""
         # Match: (even number of escape chars)(delimiter)
         # (?<!\\) ensures we're not in the middle of escape sequence
         # (\\\\)* matches zero or more pairs of escapes (even count)
@@ -107,8 +118,7 @@ class TemplateParser:
         return re.split(pattern, content)
 
     def split_by_substrings(self, text: str, substrings: List[str]) -> Dict[str, List[str]]:
-        """Split text by multiple substrings, keeping track of which delimiter was used."""
-        
+        """Split text by multiple substrings, tracking which delimiter was used."""
         # Sort by length (longest first) to avoid partial matches
         sorted_subs = sorted(substrings, key=len, reverse=True)
         
@@ -119,7 +129,7 @@ class TemplateParser:
         # Split while keeping delimiters
         parts = re.split(pattern, text)
         
-        # Organize into dict
+        # Organize into dictionary
         result = {sub: [] for sub in substrings}
         current_key = None
         
@@ -180,21 +190,29 @@ class TemplateParser:
             )
     
     def _parse_field_part(self, text: str) -> TemplatePart:
+        """Parse field component with validation for field-specific formatting rules."""
         formatting = self._parse_text_part(text)
-        if any(fmt.position != 0 for fmt in formatting.inline_formatting):
-            raise StringSmithError("Field formatting tokens must be at the beginning of the field part")
+
+        # Validate that all formatting tokens are at the beginning
+        for fmt in formatting.inline_formatting:
+            if fmt.position != 0:
+                raise StringSmithError(
+                    f"Field formatting tokens must be at the beginning of the field part. "
+                    f"Found {fmt.type}{fmt.value} token at position {fmt.position} in '{text}'"
+                )
+            
         return formatting
 
     def _parse_text_part(self, text: str) -> TemplatePart:
-        """Extract inline formatting tokens and return clean positions + clean text."""
-        
+        """Parse text part extracting inline formatting tokens and calculating positions."""  
         inline_formatting = []
         clean_position = 0
         result = ""
         last_end = 0
         
+        # Process each inline formatting token
         for match in re.finditer(self.inline_pattern, text):
-            # Add text before this match (unescaped)
+            # Add text before this token
             text_before = text[last_end:match.start()]
             unescaped_before = self._unescape_part(text_before)
             result += unescaped_before
@@ -206,19 +224,19 @@ class TemplateParser:
             if '{' in token_value or '}' in token_value:
                 raise StringSmithError(f"Nested braces not allowed in token: '{{{token_type}{token_value}}}'")
             
-            # Record token at current clean position
+            # Record token at current position
             inline_formatting.append(InlineFormatting(clean_position, token_type, token_value))
             
             last_end = match.end()
         
-        # Add remaining text after processing escape sequences
+        # Add remaining text
         remaining_text = text[last_end:]
         result += self._unescape_part(remaining_text)
         
         return TemplatePart(content=result, inline_formatting=inline_formatting)
     
     def _unescape_part(self, part: str) -> str:
-        """Remove escape sequences from a part."""
+        """Remove escape sequences from text part."""
         if not part:
             return part
         
@@ -227,7 +245,7 @@ class TemplateParser:
         while i < len(part):
             char = part[i]
             if char == self.escape_char and i + 1 < len(part):
-                # Escaped character - add the next character literally
+                # Escaped character - add next character literally
                 result += part[i + 1]
                 i += 2
             else:

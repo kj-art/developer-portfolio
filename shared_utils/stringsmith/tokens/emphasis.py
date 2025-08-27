@@ -1,9 +1,26 @@
+"""Text emphasis token handler for StringSmith."""
+
 from typing import Dict, Callable
 from .base import BaseTokenHandler
 from ..exceptions import StringSmithError
 
 class EmphasisTokenHandler(BaseTokenHandler):
-    """Handles text emphasis tokens (@bold, @italic, etc.)."""
+    """
+    Handles text emphasis tokens (@bold, @italic, @underline, etc.).
+    
+    Supported emphasis styles:
+        - bold: Bold text
+        - italic: Italic text  
+        - underline: Underlined text
+        - strikethrough: Strikethrough text
+        - dim: Dimmed text
+    
+    Examples:
+        >>> handler = EmphasisTokenHandler('@', {})
+        >>> handler.get_ansi_code('bold')      # '\033[1m'
+        >>> handler.get_ansi_code('italic')    # '\033[3m' 
+        >>> handler.get_ansi_code('normal')    # Reset codes
+    """
     
     def __init__(self, token: str, functions: Dict[str, Callable] = None):
         super().__init__(token, functions)
@@ -16,14 +33,24 @@ class EmphasisTokenHandler(BaseTokenHandler):
         }
 
     def _set_reset_ansi(self) -> str:
-        reset_bold = '22'
-        reset_italic = '23'
-        reset_underline = '24'
-        reset_strikethrough = '29'
-        self._reset_ansi = f'\033[{";".join([reset_bold, reset_italic, reset_underline, reset_strikethrough])}m'
+        """Set ANSI reset codes for emphasis formatting."""
+        # Reset bold, italic, underline, strikethrough
+        reset_codes = ['22', '23', '24', '29']
+        self._reset_ansi = f'\033[{";".join(reset_codes)}m'
     
     def get_ansi_code(self, emphasis_value: str) -> str:
-        """Get ANSI code for emphasis value."""
+        """
+        Generate ANSI code for emphasis style.
+        
+        Args:
+            emphasis_value (str): Emphasis style name.
+            
+        Returns:
+            str: ANSI escape sequence for text emphasis.
+            
+        Raises:
+            StringSmithError: If emphasis style is not recognized.
+        """
         code = self.emphasis_codes.get(emphasis_value, None)
         if code is None:
             raise StringSmithError(f"Unknown emphasis style '{emphasis_value}'. Valid styles: bold, italic, underline, strikethrough, dim, or custom functions.")
