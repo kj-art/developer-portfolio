@@ -35,6 +35,9 @@ class TemplatePart:
             content=self.content,
             inline_formatting=[copy.deepcopy(f) for f in self.inline_formatting]
         )
+    
+    def get_inline_formatting_of_type(self, token: str) -> List[InlineFormatting]:
+        return [f for f in self.inline_formatting if f.type == token]
 
 @dataclass
 class TemplateSection:
@@ -98,3 +101,7 @@ class TemplateSection:
             field=copy_part(self.field),
             suffix=copy_part(self.suffix)
         )
+    
+    def get_parts(self) -> List[TemplatePart]:
+        """Get all parts for iteration."""
+        return [part for part in [self.prefix, self.field, self.suffix]]

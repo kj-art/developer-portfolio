@@ -97,10 +97,12 @@ class BaseTokenHandler(ABC):
         
         raise StringSmithError(f"Error applying function '{token_value}'")
         
-    def finalize(self, template_part: TemplatePart, field_value: Any) -> str:
-        """Finalize template part after all formatting applied."""
-        return template_part.content
-
+    def finalize(self, section: TemplateSection, field_value: Any) -> bool:
+        """Finalize template section after all formatting applied."""
+        # remember, if overriding this function, to use part.get_inline_formatting_of_type(self._token) on each part
+        # otherwise, you will be running finalize on other tokens
+        return True
+    
     @abstractmethod
     def get_ansi_code(self, token_value: str) -> str:
         """Generate ANSI code for token value. Must be implemented by subclasses."""

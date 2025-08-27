@@ -5,12 +5,14 @@ from .base import BaseTokenHandler
 from .color import ColorTokenHandler
 from .emphasis import EmphasisTokenHandler
 from .conditional import ConditionalTokenHandler
+from .literal import LiteralTokenHandler
 
 # Token registry mapping prefixes to handler classes
 TOKEN_REGISTRY = {
     '?': ConditionalTokenHandler,
     '#': ColorTokenHandler,
     '@': EmphasisTokenHandler,
+    '$': LiteralTokenHandler
 }
 
 RESET_ANSI = ''.join(

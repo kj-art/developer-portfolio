@@ -143,9 +143,7 @@ class TemplateFormatter:
                 self.sections[s] = self.token_handlers[tkn].apply_sectional_formatting(self.sections[s])
             
             section = self.sections[s]
-
-            parts = self._get_parts(section)
-            for p, part in enumerate(parts):
+            for p, part in enumerate(section.get_parts()):
                 self._update_positions(part.inline_formatting, len(part.content) - str_len[p])
                 self._bake_inline_formatting(part)
 
@@ -215,13 +213,10 @@ class TemplateFormatter:
                 
                 # Create working copy for this formatting operation
                 new_section = section.copy()
-
-                for part in self._get_parts(new_section):
-                    self._apply_runtime_inline_formatting(part, field_value)
-                    self._finalize_part(part, field_value)
-                
-                # Add actual field value
-                new_section.field.content += str(field_value)
+                self._apply_runtime_inline_formatting(new_section, field_value)
+                if self._finalize_section(new_section, field_value):
+                    print('add field value')
+                    new_section.field.content += str(field_value)
                 
                 # Apply sectional formatting that requires runtime field values
                 for tkn in new_section.section_formatting:
@@ -234,20 +229,24 @@ class TemplateFormatter:
                 result_parts.append(self._assemble_section_with_resets(new_section))
         return ''.join(result_parts)
     
-    def _apply_runtime_inline_formatting(self, part: TemplatePart, field_value: Any):
-        """Apply runtime inline formatting to a single template part."""
-        for f in range(len(part.inline_formatting) - 1, -1, -1):
-            fmt = part.inline_formatting[f]
-            part.content, *_ = self.token_handlers[fmt.type].apply_inline_formatting(
-                part.content,
-                fmt.position,
-                fmt.value,
-                field_value)
+    def _apply_runtime_inline_formatting(self, section: TemplateSection, field_value: Any):
+        """Apply runtime inline formatting to a template section."""
+        for part in section.get_parts():
+            for f in range(len(part.inline_formatting) - 1, -1, -1):
+                fmt = part.inline_formatting[f]
+                part.content, applied = self.token_handlers[fmt.type].apply_inline_formatting(
+                    part.content,
+                    fmt.position,
+                    fmt.value,
+                    field_value)
+                if applied:
+                    part.inline_formatting.pop(f)
                 
-    def _finalize_part(self, part: TemplatePart, field_value: Any):
-        """Finalize template part after all formatting has been applied."""
+    def _finalize_section(self, section: TemplateSection, field_value: Any) -> bool:
+        add_suffix = True
         for f in TOKEN_REGISTRY:
-            part.content = self.token_handlers[f].finalize(part, field_value)
+            add_suffix = self.token_handlers[f].finalize(section, field_value) and add_suffix
+        return add_suffix
     
     def _set_up_variable_accessor(self, args, kwargs):
         """Create variable accessor function based on argument type."""
@@ -266,14 +265,10 @@ class TemplateFormatter:
                 return None if field_name == '' else kwargs.get(field_name)
             return get_var
 
-    def _get_parts(self, section: TemplateSection) -> List[TemplatePart]:
-        """Get all non-None parts from a template section for iteration."""
-        return [part for part in [section.prefix, section.field, section.suffix] if part is not None]
-
-    def _assemble_section_with_resets(self, section):
+    def _assemble_section_with_resets(self, section: TemplateSection):
         """Assemble section parts with proper reset codes between formatted parts."""
         result = ''
-        for part in self._get_parts(section):
+        for part in section.get_parts():
             if has_non_ansi(part.content):
                 part.content += RESET_ANSI
             else:
@@ -310,7 +305,7 @@ class TemplateFormatter:
             'has_inline_formatting': any(
                 part.inline_formatting 
                 for s in field_sections 
-                for part in [s.prefix, s.field, s.suffix] 
+                for part in s.get_parts() 
                 if part is not None
             ),
             'delimiter': self.delimiter,

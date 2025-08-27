@@ -3,7 +3,7 @@
 from typing import Any, Optional
 from .base import BaseTokenHandler
 from ..exceptions import StringSmithError
-from ..core import TemplatePart
+from ..core import TemplateSection, TemplatePart
 
 class ConditionalTokenHandler(BaseTokenHandler):
     """
@@ -45,12 +45,17 @@ class ConditionalTokenHandler(BaseTokenHandler):
         # Insert marker for finalization processing
         return f"{text_segment[:position]}\uE000{text_segment[position:]}", False        
     
-    def finalize(self, template_part: TemplatePart, field_value: Any) -> str:
+    def finalize(self, section: TemplateSection, field_value: Any) -> bool:
         """Process conditional markers and show/hide content accordingly."""
+        for part in section.get_parts():
+            part.content = self._finalize(part, field_value)
+        return True
+    
+    def _finalize(self, template_part: TemplatePart, field_value: Any) -> str:
         template_part = template_part.copy()
         pieces = template_part.content.split('\uE000')
         result = pieces.pop(0)
-        inline_formatting = [item for item in template_part.inline_formatting if item.type == self._token]
+        inline_formatting = template_part.get_inline_formatting_of_type(self._token)
         if len(pieces) != len(inline_formatting):
             raise StringSmithError(f"Error finalizing text_segment '{template_part.content}': Mismatch between formatting length and number of conditional ANSI markers")
         for i, v in enumerate(pieces):

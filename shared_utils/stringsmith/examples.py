@@ -150,10 +150,10 @@ def custom_function_examples():
     
     # Custom formatting function
     def highlight(text):
-        return f">>> {text} <<<"
+        return 'red'
     
     def box_text(text):
-        return f"[{text}]"
+        return 'italic' if text.lower() == 'ready' else 'bold'
     
     # Custom condition function
     def has_numbers(text):
@@ -161,7 +161,7 @@ def custom_function_examples():
     
     # Separate sections for different formatting (simplified)
     formatter = TemplateFormatter(
-        "{{#highlight;Important: ;message;}} {{?has_numbers;Code: ;code;}}",
+        "{{#highlight;Important: ;message;}}{{?has_numbers; Code: ;code;}}",
         functions={
             'highlight': highlight,
             'has_numbers': has_numbers
@@ -208,21 +208,26 @@ def fun_examples():
     print(f"1. Random character colors: \n\ta. {results[0]} \n\tb. {results[1]} \n\tc. {results[2]}")
     
     # Progress indicator
-    def get_progress_color():
-        return random.choice(['green', 'yellow', 'red'])
-    
-    def make_bar(text):
-        return f"[{'█' * len(text)}{'░' * (10 - len(text))}]"
+    def get_progress_color(val):
+        if val < 50:
+            return 'red'
+        if val < 100:
+            return 'yellow'
+        return 'green'
+        
+    def make_bar(val):
+        num = round(val/10)
+        return f"[{'█' * num}{'░' * (10 - num)}] {val}%"
     
     formatter = TemplateFormatter(
-        "{{#get_progress_color@make_bar;Progress: ;status;}} Complete!",
+        "{{#get_progress_color;Progress: ;{$make_bar}status;}} Complete!",
         functions={
             'get_progress_color': get_progress_color,
             'make_bar': make_bar
         }
     )
     
-    for status in ['25%', '50%', '100%']:
+    for status in [25, 50, 100]:
         result = formatter.format(status=status)
         print(f"Progress: '{result}'")
     
