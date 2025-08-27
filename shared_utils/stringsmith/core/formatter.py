@@ -111,10 +111,9 @@ class TemplateFormatter:
         self.escape_char = escape_char
         self.functions = functions or {}
         
-        self.parser = TemplateParser(delimiter, escape_char)
         self.token_handlers = create_token_handlers(self.functions)
 
-        self.sections = self.parser.parse_template(template)
+        self.sections = TemplateParser(delimiter, escape_char).parse_template(template)
         self._bake_template()
         
     def _update_positions(self, format_list: List[InlineFormatting], offset: int):
