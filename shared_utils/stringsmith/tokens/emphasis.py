@@ -21,6 +21,8 @@ class EmphasisTokenHandler(BaseTokenHandler):
         >>> handler.get_ansi_code('italic')    # '\033[3m' 
         >>> handler.get_ansi_code('normal')    # Reset codes
     """
+
+    RESET_ANSI = '\033[22;23;24;29m'
     
     def __init__(self, token: str, functions: Dict[str, Callable] = None):
         super().__init__(token, functions)
@@ -31,12 +33,6 @@ class EmphasisTokenHandler(BaseTokenHandler):
             'strikethrough': '\033[9m',
             'dim': '\033[2m',
         }
-
-    def _set_reset_ansi(self) -> str:
-        """Set ANSI reset codes for emphasis formatting."""
-        # Reset bold, italic, underline, strikethrough
-        reset_codes = ['22', '23', '24', '29']
-        self._reset_ansi = f'\033[{";".join(reset_codes)}m'
     
     def get_ansi_code(self, emphasis_value: str) -> str:
         """

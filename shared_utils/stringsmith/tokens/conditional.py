@@ -19,6 +19,8 @@ class ConditionalTokenHandler(BaseTokenHandler):
         >>> # Template: {{?is_error;[ERROR] ;level}}
         >>> # Shows "[ERROR] " prefix only when level is 'error'
     """
+
+    RESET_ANSI = ''
     
     def _apply_sectional_formatting(self, token_value: str, field_value: Any, text: tuple[str, str, str]) -> Optional[tuple]:
         """Apply conditional logic to section visibility."""
@@ -42,14 +44,6 @@ class ConditionalTokenHandler(BaseTokenHandler):
 
         # Insert marker for finalization processing
         return f"{text_segment[:position]}\uE000{text_segment[position:]}", False        
-
-    def _set_reset_ansi(self):
-        """Conditional tokens don't use ANSI codes."""
-        self._reset_ansi = ''
-
-    def get_ansi_code(self, token_value: str) -> str:
-        """Conditional tokens don't generate ANSI codes."""
-        return ''
     
     def finalize(self, template_part: TemplatePart, field_value: Any) -> str:
         """Process conditional markers and show/hide content accordingly."""
@@ -69,3 +63,7 @@ class ConditionalTokenHandler(BaseTokenHandler):
                 # Show piece only if function returns truthy value
                 result += v if self._call_function(token_value, field_value) else ''
         return result
+    
+    def get_ansi_code(self, token_value: str) -> str:
+        """Conditional tokens don't generate ANSI codes."""
+        return ''

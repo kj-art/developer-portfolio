@@ -13,6 +13,11 @@ TOKEN_REGISTRY = {
     '@': EmphasisTokenHandler,
 }
 
+RESET_ANSI = ''.join(
+    handler_class.RESET_ANSI 
+    for handler_class in TOKEN_REGISTRY.values()
+)
+
 # Tokens sorted by length (longest first) for parsing
 SORTED_TOKENS = sorted(TOKEN_REGISTRY.keys(), key=len, reverse=True)
 

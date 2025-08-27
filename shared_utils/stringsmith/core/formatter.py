@@ -8,7 +8,7 @@ public interface for StringSmith's conditional template formatting capabilities.
 from typing import Dict, Callable, Optional, List, Any
 
 from .parser import TemplateParser
-from ..tokens import create_token_handlers, TOKEN_REGISTRY, BaseTokenHandler
+from ..tokens import create_token_handlers, TOKEN_REGISTRY, RESET_ANSI
 from ..exceptions import StringSmithError, MissingMandatoryFieldError
 from .inline_formatting import InlineFormatting
 from .ast import TemplatePart, TemplateSection
@@ -113,7 +113,7 @@ class TemplateFormatter:
         
         self.parser = TemplateParser(delimiter, escape_char)
         self.token_handlers = create_token_handlers(self.functions)
-        
+
         self.sections = self.parser.parse_template(template)
         self._bake_template()
         
@@ -200,7 +200,6 @@ class TemplateFormatter:
         
         get_var = self._set_up_variable_accessor(args, kwargs)
         result_parts = []
-        reset_ansi = self._build_reset_codes()
         
         # Process each template section
         for section in self.sections:
@@ -233,7 +232,7 @@ class TemplateFormatter:
                     new_section = handler.apply_sectional_formatting(new_section, field_value)
                 
                 # Add reset codes to parts with actual content    
-                result_parts.append(self._assemble_section_with_resets(new_section, reset_ansi))
+                result_parts.append(self._assemble_section_with_resets(new_section))
         return ''.join(result_parts)
     
     def _apply_runtime_inline_formatting(self, part: TemplatePart, field_value: Any):
@@ -268,23 +267,16 @@ class TemplateFormatter:
                 return None if field_name == '' else kwargs.get(field_name)
             return get_var
 
-    def _build_reset_codes(self):
-        """Build combined ANSI reset code from all token handlers."""
-        reset_ansi = ''
-        for token in TOKEN_REGISTRY:
-            reset_ansi += self.token_handlers[token].get_reset_ansi()
-        return reset_ansi
-
     def _get_parts(self, section: TemplateSection) -> List[TemplatePart]:
         """Get all non-None parts from a template section for iteration."""
         return [part for part in [section.prefix, section.field, section.suffix] if part is not None]
 
-    def _assemble_section_with_resets(self, section, reset_ansi):
+    def _assemble_section_with_resets(self, section):
         """Assemble section parts with proper reset codes between formatted parts."""
         result = ''
         for part in self._get_parts(section):
             if has_non_ansi(part.content):
-                part.content += reset_ansi
+                part.content += RESET_ANSI
             else:
                 part.content = ''
             result += part.content

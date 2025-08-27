@@ -28,20 +28,15 @@ class BaseTokenHandler(ABC):
         Handlers are thread-safe after initialization for concurrent formatting.
     """
     
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if not hasattr(cls, 'RESET_ANSI'):
+            raise TypeError(f"{cls.__name__} must define RESET_ANSI class attribute")
+
     def __init__(self, token: str, functions: Dict[str, Callable] = None):
         self.functions = functions or {}
         self._token = token
-        self._set_reset_ansi()
-        
-    @abstractmethod
-    def _set_reset_ansi(self):
-        """Set appropriate ANSI reset code for this token type."""
-        pass
 
-    def get_reset_ansi(self):
-        """Get ANSI reset code for this token type."""
-        return self._reset_ansi
-    
     def _call_function(self, token_value, field_value):
         """Call custom function with appropriate parameter handling."""
         if token_value not in self.functions:
@@ -82,7 +77,7 @@ class BaseTokenHandler(ABC):
                 return None
             token_value = str(self._call_function(token_value, field_value))
         
-        ansi_code = self._reset_ansi if self.is_reset_token(token_value) else self.get_ansi_code(token_value)
+        ansi_code = self.RESET_ANSI if self.is_reset_token(token_value) else self.get_ansi_code(token_value)
         return f'{ansi_code}{text[0]}', f'{ansi_code}{text[1]}', f'{ansi_code}{text[2]}'
     
     def apply_inline_formatting(self, text_segment: str, position: int, token_value: str, field_value: Any = None) -> tuple[str, bool]:
@@ -95,7 +90,7 @@ class BaseTokenHandler(ABC):
                 return text_segment, False
             token_value = str(self._call_function(token_value, field_value))
         
-        ansi_code = self._reset_ansi if self.is_reset_token(token_value) else self.get_ansi_code(token_value)
+        ansi_code = self.RESET_ANSI if self.is_reset_token(token_value) else self.get_ansi_code(token_value)
 
         if ansi_code:
             return f"{text_segment[:position]}{ansi_code}{text_segment[position:]}", True

@@ -22,10 +22,8 @@ class ColorTokenHandler(BaseTokenHandler):
         >>> handler.get_ansi_code('FF0000')  # RGB ANSI code
         >>> handler.get_ansi_code('normal')  # '\033[39m' (reset)
     """
-    
-    def _set_reset_ansi(self):
-        """Set ANSI reset code for color formatting."""
-        self._reset_ansi = '\033[39m'
+
+    RESET_ANSI = '\033[39m'
 
     def get_ansi_code(self, color_value: str) -> str:
         """
