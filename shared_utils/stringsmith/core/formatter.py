@@ -215,7 +215,6 @@ class TemplateFormatter:
                 new_section = section.copy()
                 self._apply_runtime_inline_formatting(new_section, field_value)
                 if self._finalize_section(new_section, field_value):
-                    print('add field value')
                     new_section.field.content += str(field_value)
                 
                 # Apply sectional formatting that requires runtime field values

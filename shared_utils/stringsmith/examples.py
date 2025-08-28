@@ -191,7 +191,6 @@ def fun_examples():
     def random_color(field):
         return random.choice(['red', 'green', 'blue', 'yellow', 'cyan', 'magenta'])
     
-    # Your original example - now working with inline formatting!
     rc = "{#random_color}"
     template_string = f"{{{{{rc}A{rc}B{rc}C ;{rc}field; {rc}X{rc}Y{rc}Z}}}}"
     print(f"Template: {template_string}")

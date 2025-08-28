@@ -37,6 +37,7 @@ class TemplatePart:
         )
     
     def get_inline_formatting_of_type(self, token: str) -> List[InlineFormatting]:
+        """Get all inline formatting tokens matching the specified type."""
         return [f for f in self.inline_formatting if f.type == token]
 
 @dataclass

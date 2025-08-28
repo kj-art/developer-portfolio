@@ -98,7 +98,11 @@ class BaseTokenHandler(ABC):
         raise StringSmithError(f"Error applying function '{token_value}'")
         
     def finalize(self, section: TemplateSection, field_value: Any) -> bool:
-        """Finalize template section after all formatting applied."""
+        """Finalize template section after all formatting applied.
+
+        Returns:
+            bool: Indicates whether or not field value should be appended to the end of the field part.
+        """
         # remember, if overriding this function, to use part.get_inline_formatting_of_type(self._token) on each part
         # otherwise, you will be running finalize on other tokens
         return True

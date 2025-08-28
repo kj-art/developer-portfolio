@@ -20,7 +20,7 @@ class ConditionalTokenHandler(BaseTokenHandler):
         >>> # Shows "[ERROR] " prefix only when level is 'error'
     """
 
-    RESET_ANSI = ''
+    RESET_ANSI = ''  # Conditional tokens don't produce ANSI escape codes
     
     def _apply_sectional_formatting(self, token_value: str, field_value: Any, text: tuple[str, str, str]) -> Optional[tuple]:
         """Apply conditional logic to section visibility."""
