@@ -62,7 +62,7 @@ def formatting_examples():
     print("=== Formatting Examples ===")
     
     # Color formatting
-    formatter = TemplateFormatter("{{#red;Error: ;message;}}")
+    formatter = TemplateFormatter("{{#red;Error: ;{#blue}{#red}{@bold}message;}}")
     result = formatter.format(message="Something went wrong")
     print(f"Red error: '{result}'")
     
@@ -219,18 +219,20 @@ def fun_examples():
         return f"[{'█' * num}{'░' * (10 - num)}] {val}%"
     
     formatter = TemplateFormatter(
-        "{{#get_progress_color;Progress: ;{$make_bar}status;}} Complete!",
+        "{{#get_progress_color;;{$make_bar}status;}} Complete!",
         functions={
             'get_progress_color': get_progress_color,
             'make_bar': make_bar
         }
     )
     
-    for status in [25, 50, 100]:
+    for status in [17, 61, 100]:
         result = formatter.format(status=status)
         print(f"Progress: '{result}'")
     
     print()
+    '''formatter = TemplateFormatter("{{pre{?is_bool}fi{?reset}x;field;}}", functions={'is_bool': lambda: False})
+    print(formatter.format(field='test'))'''
 
 
 def complex_example():
@@ -316,8 +318,8 @@ def escape_examples():
 
 
 if __name__ == "__main__":
-    basic_examples()
-    positional_examples() 
+    #basic_examples()
+    #positional_examples() 
     formatting_examples()
     inline_formatting_examples()
     conditional_examples()

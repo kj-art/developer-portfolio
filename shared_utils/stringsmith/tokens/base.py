@@ -5,10 +5,11 @@ Provides abstract interface and common functionality for all token handlers.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Callable, Any, Optional
-import inspect
+from typing import Dict, Callable, Any, Iterator, Tuple
+import inspect, re
+from collections import defaultdict
 
-from ..core import TemplateSection, TemplatePart
+from ..core import TemplateSection, SectionParts
 from ..exceptions import StringSmithError
 
 class BaseTokenHandler(ABC):
@@ -27,15 +28,43 @@ class BaseTokenHandler(ABC):
     Thread Safety:
         Handlers are thread-safe after initialization for concurrent formatting.
     """
-    
+    _RESET_TOKENS = ('normal', 'default', 'reset')
+
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         if not hasattr(cls, 'RESET_ANSI'):
             raise TypeError(f"{cls.__name__} must define RESET_ANSI class attribute")
 
-    def __init__(self, token: str, functions: Dict[str, Callable] = None):
+    def __init__(self, token: str, escape_char: str, functions: Dict[str, Callable] = None):
         self.functions = functions or {}
         self._token = token
+        self._escape_char = escape_char
+        self._escape_len = len(escape_char)
+
+    def find_token(self, text: str) -> Iterator[Tuple[int, int, str]]:
+        """
+        Find unescaped {token ...} sequences in text.
+        Yields (start_index, end_index, token_content)
+        Only matches if the text immediately after { matches `token`.
+        """
+        # Match anything inside braces (candidate tokens)
+        pattern = re.compile(r'\{(.*?)\}')
+
+        def is_unescaped(pos: int) -> bool:
+            count = 0
+            i = pos - self._escape_len
+            while i >= 0 and text[i:i+self._escape_len] == self._escape_char:
+                count += 1
+                i -= self._escape_len
+            return count % 2 == 0
+
+        for m in pattern.finditer(text):
+            start, end = m.start(), m.end()
+            content = m.group(1)
+            # Only consider it if unescaped and starts with the token
+            if is_unescaped(start) and is_unescaped(end - 1) and content.startswith(self._token):
+                yield start, end, content[len(self._token):]
+
 
     def _call_function(self, token_value, field_value):
         """Call custom function with appropriate parameter handling."""
@@ -49,53 +78,89 @@ class BaseTokenHandler(ABC):
             return func()
         return func(field_value)
 
-    def is_reset_token(self, value: str) -> bool:
+    def _is_reset_token(self, value: str) -> bool:
         """Check if token value is a reset token ('normal', 'default', 'reset')."""
-        return value.lower() in ('normal', 'default', 'reset')
+        return value.lower() in self._RESET_TOKENS
     
     def apply_sectional_formatting(self, section: TemplateSection, field_value: Any = None) -> TemplateSection:
         """Apply formatting to entire section (prefix, field, suffix)."""
         
         section = section.copy()
-        section_formatting = section.section_formatting[self._token]
-        text = (section.prefix.content, section.field.content, section.suffix.content, False)
+        section_formatting = section.section_formatting.get(self._token)
 
-        for f in range(len(section_formatting) - 1, -1, -1):
-            c_text = self._apply_sectional_formatting(section_formatting[f], field_value, text)
-            if c_text is not None:
-                text = c_text
-                section_formatting.pop(f)
+        if section_formatting:
+            for f in range(len(section_formatting) - 1, -1, -1):
+                if self._apply_sectional_formatting(section_formatting[f], field_value, section.parts):
+                    section_formatting.pop(f)
 
-        section.prefix.content, section.field.content, section.suffix.content, *_ = text
         return section
    
-    def _apply_sectional_formatting(self, token_value: str, field_value: Any, text: tuple[str, str, str]) -> Optional[tuple]:
+    def _apply_sectional_formatting(self, token_value: str, field_value: Any, parts: SectionParts) -> bool:
         """Apply single sectional formatting token to text parts."""
 
         if token_value in self.functions:
             if field_value is None:  # Baking phase - defer to runtime
-                return None
+                return False
             token_value = str(self._call_function(token_value, field_value))
         
-        ansi_code = self.RESET_ANSI if self.is_reset_token(token_value) else self.get_ansi_code(token_value)
-        return f'{ansi_code}{text[0]}', f'{ansi_code}{text[1]}', f'{ansi_code}{text[2]}'
+        replacement_text = self.RESET_ANSI if self._is_reset_token(token_value) else self.get_replacement_text(token_value, field_value)
+        for k, v in parts.iter_fields():
+            parts[k] = f'{replacement_text}{v}'
+        return True
     
-    def apply_inline_formatting(self, text_segment: str, position: int, token_value: str, field_value: Any = None) -> tuple[str, bool]:
+    def apply_inline_formatting(self, parts: SectionParts, field_value: Any = None) -> bool:
         """Apply formatting to specific position within text segment."""
 
         is_bake = field_value == None
+        static_bank = {}
 
-        if token_value in self.functions:
-            if is_bake:
-                return text_segment, False
-            token_value = str(self._call_function(token_value, field_value))
-        
-        ansi_code = self.RESET_ANSI if self.is_reset_token(token_value) else self.get_ansi_code(token_value)
+        for k, part in parts.iter_fields():
+            dynamic = set()
+            static = defaultdict(str)
+            for start, end, token_value in self.find_token(part):
+                if token_value in self.functions:    
+                    dynamic.add(token_value)
+                    continue
 
-        if ansi_code:
-            return f"{text_segment[:position]}{ansi_code}{text_segment[position:]}", True
-        
-        raise StringSmithError(f"Error applying function '{token_value}'")
+                # WRITE AN ERROR IF THEY TRY TO PASS A FUNCTION KEY THAT IS A RESET TOKEN
+                if self._is_reset_token(token_value):
+                    static[token_value] = self.RESET_ANSI
+                else:
+                    if token_value not in static_bank:
+                        replacement_text = self.get_replacement_text(token_value, field_value)
+                        if not replacement_text:
+                            raise StringSmithError(f"Error applying function '{token_value}'")
+                    static_bank[token_value] = static[token_value] = replacement_text
+                    
+                    
+
+            # do splits. is there a way to step inflnite loops where the user tries to get smart and return a string
+            # that looks like another enclosed token with the $ token?
+            if not is_bake:
+                parts[k] = self._replace_dynamic_tokens(parts[k], dynamic, field_value)
+            parts[k] = self._replace_static_tokens(parts[k], static)
+        return True
+
+    def _replace_dynamic_tokens(self, part: str, tokens: set[str], field_value: Any) -> str:
+        for token in tokens:
+            parts_list = part.split(self._get_token_bracket(token))
+            ansi_codes = [self.get_replacement_text(str(self._call_function(token, field_value))) for _ in range(len(parts_list) - 1)]
+            #print('|'.join(ansi_codes).encode('unicode_escape').decode())
+            result = parts_list[0]
+            for i, replacement_text in enumerate(ansi_codes):
+                result += replacement_text + parts_list[i + 1]
+            part = result
+            
+        return part
+
+    def _replace_static_tokens(self, part: str, tokens: Dict[str, str]) -> str:
+        for token, replacement_text in tokens.items():
+            token = self._get_token_bracket(token)
+            part = replacement_text.join(part.split(token))
+        return part
+
+    def _get_token_bracket(self, token_value: str):
+        return f'{{{self._token}{token_value}}}'
         
     def finalize(self, section: TemplateSection, field_value: Any) -> bool:
         """Finalize template section after all formatting applied.
@@ -108,6 +173,6 @@ class BaseTokenHandler(ABC):
         return True
     
     @abstractmethod
-    def get_ansi_code(self, token_value: str) -> str:
+    def get_replacement_text(self, token_value: str, field_value: str = None) -> str:
         """Generate ANSI code for token value. Must be implemented by subclasses."""
         pass

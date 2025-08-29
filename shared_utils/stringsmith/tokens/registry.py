@@ -23,11 +23,11 @@ RESET_ANSI = ''.join(
 # Tokens sorted by length (longest first) for parsing
 SORTED_TOKENS = sorted(TOKEN_REGISTRY.keys(), key=len, reverse=True)
 
-def create_token_handlers(functions: Dict[str, Callable] = None) -> Dict[str, BaseTokenHandler]:
+def create_token_handlers(escape_char: str, functions: Dict[str, Callable] = None) -> Dict[str, BaseTokenHandler]:
     functions = functions or {}
     handlers = {}
     for token in TOKEN_REGISTRY:
         handler_class = TOKEN_REGISTRY[token]
-        handler = handler_class(token, functions)
+        handler = handler_class(token, escape_char, functions)
         handlers[token] = handler
     return handlers

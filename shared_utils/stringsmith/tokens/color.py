@@ -18,14 +18,14 @@ class ColorTokenHandler(BaseTokenHandler):
     
     Examples:
         >>> handler = ColorTokenHandler('#', {})
-        >>> handler.get_ansi_code('red')  # '\033[31m'
-        >>> handler.get_ansi_code('FF0000')  # RGB ANSI code
-        >>> handler.get_ansi_code('normal')  # '\033[39m' (reset)
+        >>> handler.get_replacement_text('red')  # '\033[31m'
+        >>> handler.get_replacement_text('FF0000')  # RGB ANSI code
+        >>> handler.get_replacement_text('normal')  # '\033[39m' (reset)
     """
 
     RESET_ANSI = '\033[39m'
 
-    def get_ansi_code(self, color_value: str) -> str:
+    def get_replacement_text(self, color_value: str, field_value: str = None) -> str:
         """
         Generate ANSI color code for the specified color value.
         

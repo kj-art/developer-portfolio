@@ -17,15 +17,15 @@ class EmphasisTokenHandler(BaseTokenHandler):
     
     Examples:
         >>> handler = EmphasisTokenHandler('@', {})
-        >>> handler.get_ansi_code('bold')      # '\033[1m'
-        >>> handler.get_ansi_code('italic')    # '\033[3m' 
-        >>> handler.get_ansi_code('normal')    # Reset codes
+        >>> handler.get_replacement_text('bold')      # '\033[1m'
+        >>> handler.get_replacement_text('italic')    # '\033[3m' 
+        >>> handler.get_replacement_text('normal')    # Reset codes
     """
 
     RESET_ANSI = '\033[22;23;24;29m'
     
-    def __init__(self, token: str, functions: Dict[str, Callable] = None):
-        super().__init__(token, functions)
+    def __init__(self, token: str, escape_char: str, functions: Dict[str, Callable] = None):
+        super().__init__(token, escape_char, functions)
         self.emphasis_codes = {
             'bold': '\033[1m',
             'italic': '\033[3m',
@@ -34,7 +34,7 @@ class EmphasisTokenHandler(BaseTokenHandler):
             'dim': '\033[2m',
         }
     
-    def get_ansi_code(self, emphasis_value: str) -> str:
+    def get_replacement_text(self, token_value: str, field_value: str = None) -> str:
         """
         Generate ANSI code for emphasis style.
         
@@ -47,7 +47,7 @@ class EmphasisTokenHandler(BaseTokenHandler):
         Raises:
             StringSmithError: If emphasis style is not recognized.
         """
-        code = self.emphasis_codes.get(emphasis_value, None)
+        code = self.emphasis_codes.get(token_value, None)
         if code is None:
-            raise StringSmithError(f"Unknown emphasis style '{emphasis_value}'. Valid styles: bold, italic, underline, strikethrough, dim, or custom functions.")
+            raise StringSmithError(f"Unknown emphasis style '{token_value}'. Valid styles: bold, italic, underline, strikethrough, dim, or custom functions.")
         return code

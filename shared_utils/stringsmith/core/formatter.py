@@ -8,10 +8,9 @@ public interface for StringSmith's conditional template formatting capabilities.
 from typing import Dict, Callable, Optional, List, Any
 
 from .parser import TemplateParser
-from ..tokens import create_token_handlers, TOKEN_REGISTRY, RESET_ANSI
+from ..tokens import create_token_handlers, RESET_ANSI
 from ..exceptions import StringSmithError, MissingMandatoryFieldError
-from .inline_formatting import InlineFormatting
-from .ast import TemplatePart, TemplateSection
+from .ast import TemplateSection
 from ..utils import has_non_ansi
 
 
@@ -111,15 +110,15 @@ class TemplateFormatter:
         self.escape_char = escape_char
         self.functions = functions or {}
         
-        self.token_handlers = create_token_handlers(self.functions)
+        self.token_handlers = create_token_handlers(escape_char, self.functions)
 
         self.sections = TemplateParser(delimiter, escape_char).parse_template(template)
         self._bake_template()
         
-    def _update_positions(self, format_list: List[InlineFormatting], offset: int):
+    '''def _update_positions(self, format_list: List[InlineFormatting], offset: int):
         """Update position information for inline formatting tokens after text changes."""
         for fmt in format_list:
-            fmt.adjust_position(offset)
+            fmt.adjust_position(offset)'''
 
     def _bake_template(self, *args, **kwargs) -> str:
         """
@@ -131,11 +130,18 @@ class TemplateFormatter:
         """
         for s, section in enumerate(self.sections):
             # Skip literal text sections (no formatting to bake)
-            if section.suffix == None:
+            if section.parts.suffix == None:
                 continue
             
-            # Clear field content for clean formatting application
-            section.field.content = ''
+            # Apply formatting
+            for handler in self.token_handlers.values():
+                self.sections[s] = handler.apply_sectional_formatting(section)
+                handler.apply_inline_formatting(section.parts)
+            
+            # make sure you're actually applying the escape sequences when you're done
+
+            '''# Clear field content for clean formatting application
+            section.field = ''
             str_len = (len(section.prefix.content), 0, len(section.suffix.content))
 
             # Apply sectional formatting
@@ -145,9 +151,9 @@ class TemplateFormatter:
             section = self.sections[s]
             for p, part in enumerate(section.get_parts()):
                 self._update_positions(part.inline_formatting, len(part.content) - str_len[p])
-                self._bake_inline_formatting(part)
+                self._bake_inline_formatting(part)'''
 
-    def _bake_inline_formatting(self, template_part: TemplatePart):
+    '''def _bake_inline_formatting(self, template_part: TemplatePart):
         """Apply inline formatting tokens that don't require runtime data."""
         for f in range(len(template_part.inline_formatting) - 1, -1 , -1):
             fmt = template_part.inline_formatting[f]
@@ -158,7 +164,7 @@ class TemplateFormatter:
                                                                                                         )
             if replaced:
                 template_part.inline_formatting.pop(f)
-                self._update_positions(template_part.inline_formatting[f:], len(template_part.content) - str_len)
+                self._update_positions(template_part.inline_formatting[f:], len(template_part.content) - str_len)'''
     
     def format(self, *args, **kwargs) -> str:
         """
@@ -202,7 +208,7 @@ class TemplateFormatter:
         for section in self.sections:
             if section.field_name is None:
                 # Literal text section
-                result_parts.append(section.prefix.content)
+                result_parts.append(section.parts.prefix)
                 continue
             else:
                 field_value = get_var(section.field_name)
@@ -213,39 +219,33 @@ class TemplateFormatter:
                 
                 # Create working copy for this formatting operation
                 new_section = section.copy()
-                self._apply_runtime_inline_formatting(new_section, field_value)
-                if self._finalize_section(new_section, field_value):
-                    new_section.field.content += str(field_value)
+                show_field = True
+                for handler in self.token_handlers.values():
+                    new_section = handler.apply_sectional_formatting(new_section, field_value)
+                    show_field = handler.apply_inline_formatting(new_section.parts, field_value) and show_field
+                
+                if show_field:
+                    new_section.parts.field += str(field_value)
+                #self._apply_runtime_inline_formatting(new_section, field_value)
+                '''if self._finalize_section(new_section, field_value):
+                    new_section.field.content += str(field_value)'''
                 
                 # Apply sectional formatting that requires runtime field values
-                for tkn in new_section.section_formatting:
+                '''for tkn in new_section.section_formatting:
                     if not len(new_section.section_formatting[tkn]):
                         continue
                     handler = self.token_handlers[tkn]
-                    new_section = handler.apply_sectional_formatting(new_section, field_value)
+                    new_section = handler.apply_sectional_formatting(new_section, field_value)'''
                 
                 # Add reset codes to parts with actual content    
                 result_parts.append(self._assemble_section_with_resets(new_section))
         return ''.join(result_parts)
-    
-    def _apply_runtime_inline_formatting(self, section: TemplateSection, field_value: Any):
-        """Apply runtime inline formatting to a template section."""
-        for part in section.get_parts():
-            for f in range(len(part.inline_formatting) - 1, -1, -1):
-                fmt = part.inline_formatting[f]
-                part.content, applied = self.token_handlers[fmt.type].apply_inline_formatting(
-                    part.content,
-                    fmt.position,
-                    fmt.value,
-                    field_value)
-                if applied:
-                    part.inline_formatting.pop(f)
-                
-    def _finalize_section(self, section: TemplateSection, field_value: Any) -> bool:
+        
+    '''def _finalize_section(self, section: TemplateSection, field_value: Any) -> bool:
         add_suffix = True
         for f in TOKEN_REGISTRY:
             add_suffix = self.token_handlers[f].finalize(section, field_value) and add_suffix
-        return add_suffix
+        return add_suffix'''
     
     def _set_up_variable_accessor(self, args, kwargs):
         """Create variable accessor function based on argument type."""
@@ -267,12 +267,12 @@ class TemplateFormatter:
     def _assemble_section_with_resets(self, section: TemplateSection):
         """Assemble section parts with proper reset codes between formatted parts."""
         result = ''
-        for part in section.get_parts():
-            if has_non_ansi(part.content):
-                part.content += RESET_ANSI
+        for p, part in section.parts.iter_fields():
+            if has_non_ansi(part):
+                section.parts[p] += RESET_ANSI
             else:
-                part.content = ''
-            result += part.content
+                section.parts[p] = ''
+            result += section.parts[p]
             
         return result
     
@@ -301,12 +301,12 @@ class TemplateFormatter:
             'mandatory_fields': [s.field_name for s in field_sections if s.is_mandatory],
             'optional_fields': [s.field_name for s in field_sections if not s.is_mandatory],
             'has_formatting': any(s.section_formatting for s in field_sections),
-            'has_inline_formatting': any(
+            ''''has_inline_formatting': any(
                 part.inline_formatting 
                 for s in field_sections 
-                for part in s.get_parts() 
+                for part in s.parts.iter_fields() 
                 if part is not None
-            ),
+            ),'''
             'delimiter': self.delimiter,
             'escape_char': self.escape_char,
             'custom_functions': list(self.functions.keys())
