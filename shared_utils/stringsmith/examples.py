@@ -185,11 +185,30 @@ def fun_examples():
     """Demonstrate fun and creative uses."""
     print("=== Fun Examples ===")
     
-    import random
+    '''import random
     
     # Random color function
     def random_color(field):
-        return random.choice(['red', 'green', 'blue', 'yellow', 'cyan', 'magenta'])
+        return random.choice(['red', 'green', 'blue', 'yellow', 'cyan', 'magenta'])'''
+    
+    import random
+    import colorsys
+
+    def random_color():
+        # Random hue
+        h = random.random()  # 0.0–1.0
+        s = 1.0              # fully saturated
+        v = 1.0
+
+        # Convert HSV to RGB (0–1)
+        r, g, b = colorsys.hsv_to_rgb(h, s, v)
+
+        # Scale to 0–255 and format as hex
+        return f"{int(r*255):02X}{int(g*255):02X}{int(b*255):02X}"
+    '''def random_color(length=6):
+        hex = "#{:06x}".format(random.randint(0, 0xFFFFFF))
+        return hex'''
+
     
     rc = "{#random_color}"
     template_string = f"{{{{{rc}A{rc}B{rc}C ;{rc}field; {rc}X{rc}Y{rc}Z}}}}"
@@ -206,27 +225,42 @@ def fun_examples():
     results = [same_code_different_colors(), same_code_different_colors(), same_code_different_colors()]
     print(f"1. Random character colors: \n\ta. {results[0]} \n\tb. {results[1]} \n\tc. {results[2]}")
     
+    def interpolate_red_green(p: float) -> str:
+        """
+        Interpolates from red -> yellow -> green based on p in [0,1].
+        Uses HSV to pass through yellow at 50%.
+        """
+        p = max(0.0, min(1.0, p))  # clamp
+        h = (1 - p) * 0 + p * 120  # Hue in degrees
+        s = 1.0
+        v = 1.0
+
+        # colorsys uses h ∈ [0,1]
+        r, g, b = colorsys.hsv_to_rgb(h/360, s, v)
+        return f"{int(r*255):02X}{int(g*255):02X}{int(b*255):02X}"
+
     # Progress indicator
     def get_progress_color(val):
-        if val < 50:
-            return 'red'
-        if val < 100:
-            return 'yellow'
-        return 'green'
+        return interpolate_red_green(val/100)
         
     def make_bar(val):
-        num = round(val/10)
-        return f"[{'█' * num}{'░' * (10 - num)}] {val}%"
+        perc = val / 100
+        num_secs = 100
+        num = round(perc * num_secs)
+        return f"[{'█' * num}{'░' * (num_secs - num)}] {round(val, 2)}%"
     
+    template_string = "{{#get_progress_color;;{$make_bar}status;}} Complete!"
+    print(f"Template: {template_string}")
     formatter = TemplateFormatter(
-        "{{#get_progress_color;;{$make_bar}status;}} Complete!",
+        template_string,
         functions={
             'get_progress_color': get_progress_color,
             'make_bar': make_bar
         }
     )
     
-    for status in [17, 61, 100]:
+    num_graphs = 8
+    for status in sorted([random.uniform(0, 100) for _ in range(num_graphs)]):
         result = formatter.format(status=status)
         print(f"Progress: '{result}'")
     

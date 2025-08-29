@@ -25,6 +25,12 @@ class ColorTokenHandler(BaseTokenHandler):
 
     RESET_ANSI = '\033[39m'
 
+    def _hex_to_ansi(self, hex_color: str) -> str:
+        hex_color = hex_color.lstrip('#')
+        r, g, b = int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
+        return f"\033[38;2;{r};{g};{b}m"
+
+
     def get_replacement_text(self, color_value: str, field_value: str = None) -> str:
         """
         Generate ANSI color code for the specified color value.
@@ -39,10 +45,12 @@ class ColorTokenHandler(BaseTokenHandler):
             StringSmithError: If color cannot be parsed or is invalid.
         """
         try:
-            # Auto-detect hex codes and add # prefix if needed
-            if (len(color_value) == 6 and 
-                all(c.lower() in '0123456789abcdef' for c in color_value)):
-                color_value = f"#{color_value}"
+            color_value = str(color_value)
+            
+            # Auto-detect hex codes
+            if ((len(color_value) == 6 and 
+                all(c.lower() in '0123456789abcdef' for c in color_value))) or color_value.startswith('#'):
+                return self._hex_to_ansi(color_value)
 
             # Use Rich library for color parsing
             color = Color.parse(color_value)

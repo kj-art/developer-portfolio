@@ -132,7 +132,7 @@ class BaseTokenHandler(ABC):
                             raise StringSmithError(f"Error applying function '{token_value}'")
                     static_bank[token_value] = static[token_value] = replacement_text
                     
-                    
+            # make certain function keys illegal. default, reset, etc are all reserved.
 
             # do splits. is there a way to step inflnite loops where the user tries to get smart and return a string
             # that looks like another enclosed token with the $ token?
