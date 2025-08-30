@@ -300,14 +300,16 @@ class TemplateFormatter:
             'literal_sections': len(self.sections) - len(field_sections),
             'mandatory_fields': [s.field_name for s in field_sections if s.is_mandatory],
             'optional_fields': [s.field_name for s in field_sections if not s.is_mandatory],
-            'has_formatting': any(s.section_formatting for s in field_sections),
-            ''''has_inline_formatting': any(
-                part.inline_formatting 
-                for s in field_sections 
-                for part in s.parts.iter_fields() 
-                if part is not None
-            ),'''
+            'has_inline_formatting': self._has_inline_formatting(),
             'delimiter': self.delimiter,
             'escape_char': self.escape_char,
             'custom_functions': list(self.functions.keys())
         }
+    
+    def _has_inline_formatting(self) -> bool:
+        for section in self.sections:
+            if section.field_name is not None:  # Skip literal text sections
+                for handler in self.token_handlers.values():
+                    if handler.has_inline_formatting(section.parts):
+                        return True
+        return False

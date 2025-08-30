@@ -295,23 +295,7 @@ def complex_example():
             'format_timestamp': format_timestamp
         }
     )
-    
-    # Different log scenarios
-    logs = [
-        {'timestamp': '2024-01-15 10:30:00', 'level': 'ERROR', 'user': 'alice', 
-         'message': 'Database connection failed'},
-        {'timestamp': '2024-01-15 10:31:00', 'level': 'WARNING', 'user': None, 
-         'message': 'High memory usage detected'},
-        {'timestamp': '2024-01-15 10:32:00', 'level': 'INFO', 'user': 'bob', 
-         'message': 'User login successful'},
-        {'timestamp': '2024-01-15 10:33:00', 'level': 'INFO', 'user': None, 
-         'message': 'System startup complete'}
-    ]
-    
-    for log in logs:
-        result = formatter.format(**log)
-        print(f"Log: '{result}'")
-    
+        
     print()
 
 

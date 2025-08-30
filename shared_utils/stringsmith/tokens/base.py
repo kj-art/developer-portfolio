@@ -82,6 +82,13 @@ class BaseTokenHandler(ABC):
         """Check if token value is a reset token ('normal', 'default', 'reset')."""
         return value.lower() in self._RESET_TOKENS
     
+    def has_inline_formatting(self, parts: SectionParts) -> bool:
+        """Check if any inline formatting tokens exist for this handler."""
+        for part_name, part_text in parts.iter_fields():
+            for _ in self.find_token(part_text):
+                return True
+        return False
+    
     def apply_sectional_formatting(self, section: TemplateSection, field_value: Any = None) -> TemplateSection:
         """Apply formatting to entire section (prefix, field, suffix)."""
         
