@@ -11,7 +11,6 @@ from collections import defaultdict
 
 from ..core import TemplateSection, SectionParts
 from ..exceptions import StringSmithError
-
 class BaseTokenHandler(ABC):
     """
     Abstract base class for all StringSmith token handlers.
@@ -35,7 +34,7 @@ class BaseTokenHandler(ABC):
         if not hasattr(cls, 'RESET_ANSI'):
             raise TypeError(f"{cls.__name__} must define RESET_ANSI class attribute")
 
-    def __init__(self, token: str, escape_char: str, tokens: List[str], functions: Dict[str, Callable] = None):
+    def __init__(self, token: str, escape_char: str, functions: Dict[str, Callable] = None):
         if functions:
             for f in functions.keys():
                 if self._is_reset_token(f):
@@ -46,7 +45,6 @@ class BaseTokenHandler(ABC):
         
         self.functions = functions or {}
         self._token = token
-        self._tokens = tokens
         self._escape_char = escape_char
         self._escape_len = len(escape_char)
 

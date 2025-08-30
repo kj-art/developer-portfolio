@@ -270,33 +270,66 @@ def fun_examples():
 
 
 def complex_example():
-    """Demonstrate a complex real-world example."""
-    print("=== Complex Example: Log Formatter ===")
-    
-    def is_error(level):
-        return level.upper() == 'ERROR'
-    
-    def is_warning(level):
-        return level.upper() == 'WARNING'
-    
-    def has_user(user):
-        return user is not None and user.strip() != ''
-    
-    def format_timestamp(ts):
-        return f"\033[90m{ts}\033[0m"  # Dim gray
-    
-    # Simplified log entry formatter using only working syntax
-    formatter = TemplateFormatter(
-        "{{@format_timestamp;timestamp}} {{?is_error;[ERROR] ;level;}}{{?is_warning;[WARN] ;level;}}{{?has_user;User ;user;: }}{{message}}",
-        functions={
-            'is_error': is_error,
-            'is_warning': is_warning,
-            'has_user': has_user,
-            'format_timestamp': format_timestamp
-        }
-    )
-        
-    print()
+   """Demonstrate a complex real-world example."""
+   print("=== Complex Example: Log Formatter ===")
+   
+   def is_error(level):
+       return level.upper() == 'ERROR'
+   
+   def is_warning(level):
+       return level.upper() == 'WARNING'
+   
+   def has_user(user):
+       return user is not None and user.strip() != ''
+   
+   def format_timestamp(ts):
+       return f"\033[90m{ts}\033[0m"  # Dim gray
+   
+   # Simplified log entry formatter using only working syntax
+   formatter = TemplateFormatter(
+       "{{{$format_timestamp}timestamp}} {{?is_error;[ERROR] ;level;}}{{?is_warning;[WARN] ;level;}}{{?has_user;User ;user;: }}{{message}}",
+       functions={
+           'is_error': is_error,
+           'is_warning': is_warning,
+           'has_user': has_user,
+           'format_timestamp': format_timestamp
+       }
+   )
+   
+   # Sample log entries demonstrating different combinations
+   log_entries = [
+       {
+           'timestamp': '2025-01-15 10:30:15',
+           'level': 'ERROR',
+           'message': 'Database connection failed',
+           'user': 'admin'
+       },
+       {
+           'timestamp': '2025-01-15 10:31:22', 
+           'level': 'WARNING',
+           'message': 'High memory usage detected',
+           'user': None
+       },
+       {
+           'timestamp': '2025-01-15 10:32:08',
+           'level': 'INFO', 
+           'message': 'System backup completed',
+           'user': 'system'
+       },
+       {
+           'timestamp': '2025-01-15 10:33:45',
+           'level': 'ERROR',
+           'message': 'Authentication failed',
+           'user': ''
+       }
+   ]
+   
+   print("Log output examples:")
+   for entry in log_entries:
+       result = formatter.format(**entry)
+       print(f"  {result}")
+   
+   print()
 
 
 def escape_examples():
@@ -341,8 +374,8 @@ def escape_examples():
 
 
 if __name__ == "__main__":
-    #basic_examples()
-    #positional_examples() 
+    basic_examples()
+    positional_examples() 
     formatting_examples()
     inline_formatting_examples()
     conditional_examples()

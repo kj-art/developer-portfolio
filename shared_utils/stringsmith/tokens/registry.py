@@ -28,6 +28,6 @@ def create_token_handlers(escape_char: str, functions: Dict[str, Callable] = Non
     handlers = {}
     for token in TOKEN_REGISTRY:
         handler_class = TOKEN_REGISTRY[token]
-        handler = handler_class(token, escape_char, TOKEN_REGISTRY.keys(), functions)
+        handler = handler_class(token, escape_char, functions)
         handlers[token] = handler
     return handlers
