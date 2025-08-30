@@ -1,6 +1,6 @@
 """Text emphasis token handler for StringSmith."""
 
-from typing import Dict, Callable
+from typing import Dict, Callable, List
 from .base import BaseTokenHandler
 from ..exceptions import StringSmithError
 
@@ -24,8 +24,8 @@ class EmphasisTokenHandler(BaseTokenHandler):
 
     RESET_ANSI = '\033[22;23;24;29m'
     
-    def __init__(self, token: str, escape_char: str, functions: Dict[str, Callable] = None):
-        super().__init__(token, escape_char, functions)
+    def __init__(self, token: str, escape_char: str, tokens: List[str], functions: Dict[str, Callable] = None):
+        super().__init__(token, escape_char, tokens, functions)
         self.emphasis_codes = {
             'bold': '\033[1m',
             'italic': '\033[3m',

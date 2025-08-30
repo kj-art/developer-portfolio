@@ -5,7 +5,7 @@ Provides abstract interface and common functionality for all token handlers.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Callable, Any, Iterator, Tuple
+from typing import Dict, Callable, Any, Iterator, Tuple, List
 import inspect, re
 from collections import defaultdict
 
@@ -35,13 +35,22 @@ class BaseTokenHandler(ABC):
         if not hasattr(cls, 'RESET_ANSI'):
             raise TypeError(f"{cls.__name__} must define RESET_ANSI class attribute")
 
-    def __init__(self, token: str, escape_char: str, functions: Dict[str, Callable] = None):
+    def __init__(self, token: str, escape_char: str, tokens: List[str], functions: Dict[str, Callable] = None):
+        if functions:
+            for f in functions.keys():
+                if self._is_reset_token(f):
+                    raise StringSmithError("Illegal custom function name '{f}'. Reserved token keywords are not allowed for use as function names.")
+            self.functions = functions
+        else:
+            self.functions = {}
+        
         self.functions = functions or {}
         self._token = token
+        self._tokens = tokens
         self._escape_char = escape_char
         self._escape_len = len(escape_char)
 
-    def find_token(self, text: str) -> Iterator[Tuple[int, int, str]]:
+    def find_token(self, text: str, token: str = None) -> Iterator[Tuple[int, int, str]]:
         """
         Find unescaped {token ...} sequences in text.
         Yields (start_index, end_index, token_content)
@@ -49,6 +58,7 @@ class BaseTokenHandler(ABC):
         """
         # Match anything inside braces (candidate tokens)
         pattern = re.compile(r'\{(.*?)\}')
+        token = token or self._token
 
         def is_unescaped(pos: int) -> bool:
             count = 0
@@ -62,8 +72,8 @@ class BaseTokenHandler(ABC):
             start, end = m.start(), m.end()
             content = m.group(1)
             # Only consider it if unescaped and starts with the token
-            if is_unescaped(start) and is_unescaped(end - 1) and content.startswith(self._token):
-                yield start, end, content[len(self._token):]
+            if is_unescaped(start) and is_unescaped(end - 1) and content.startswith(token):
+                yield start, end, content[len(token):]
 
 
     def _call_function(self, token_value, field_value):
@@ -129,7 +139,6 @@ class BaseTokenHandler(ABC):
                     dynamic.add(token_value)
                     continue
 
-                # WRITE AN ERROR IF THEY TRY TO PASS A FUNCTION KEY THAT IS A RESET TOKEN
                 if self._is_reset_token(token_value):
                     static[token_value] = self.RESET_ANSI
                 else:
@@ -139,10 +148,6 @@ class BaseTokenHandler(ABC):
                             raise StringSmithError(f"Error applying function '{token_value}'")
                     static_bank[token_value] = static[token_value] = replacement_text
                     
-            # make certain function keys illegal. default, reset, etc are all reserved.
-
-            # do splits. is there a way to step inflnite loops where the user tries to get smart and return a string
-            # that looks like another enclosed token with the $ token?
             if not is_bake:
                 parts[k] = self._replace_dynamic_tokens(parts[k], dynamic, field_value)
             parts[k] = self._replace_static_tokens(parts[k], static)
