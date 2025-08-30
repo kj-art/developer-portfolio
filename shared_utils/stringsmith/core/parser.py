@@ -296,7 +296,7 @@ class TemplateParser:
         for match in re.finditer(self.inline_pattern, text):
             # Add text before this token
             text_before = text[last_end:match.start()]
-            unescaped_before = self._unescape_part(text_before)
+            unescaped_before = self.unescape_part(text_before)
             result += unescaped_before
             clean_position += len(unescaped_before)  # Use unescaped length for position
             
@@ -313,11 +313,11 @@ class TemplateParser:
         
         # Add remaining text
         remaining_text = text[last_end:]
-        result += self._unescape_part(remaining_text)
+        result += self.unescape_part(remaining_text)
         
         return TemplatePart(content=result, inline_formatting=inline_formatting)'''
     
-    def _unescape_part(self, part: str) -> str:
+    def unescape_part(self, part: str) -> str:
         """Remove escape sequences from text part."""
         if not part:
             return part
@@ -339,4 +339,4 @@ class TemplateParser:
     
     def _unescape_text(self, text: str) -> str:
         """Remove escape sequences from literal text."""
-        return self._unescape_part(text)
+        return self.unescape_part(text)

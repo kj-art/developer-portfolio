@@ -111,8 +111,8 @@ class TemplateFormatter:
         self.functions = functions or {}
         
         self.token_handlers = create_token_handlers(escape_char, self.functions)
-
-        self.sections = TemplateParser(delimiter, escape_char).parse_template(template)
+        self.parser = TemplateParser(delimiter, escape_char)
+        self.sections = self.parser.parse_template(template)
         self._bake_template()
         
     '''def _update_positions(self, format_list: List[InlineFormatting], offset: int):
@@ -269,7 +269,7 @@ class TemplateFormatter:
         result = ''
         for p, part in section.parts.iter_fields():
             if has_non_ansi(part):
-                section.parts[p] += RESET_ANSI
+                section.parts[p] = self.parser.unescape_part(section.parts[p]) + RESET_ANSI
             else:
                 section.parts[p] = ''
             result += section.parts[p]
