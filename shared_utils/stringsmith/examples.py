@@ -332,6 +332,11 @@ def escape_examples():
     formatter = TemplateFormatter("{{prefix~|data|variable|suffix}}", delimiter="|", escape_char="~")
     result = formatter.format(variable="test")
     print(f"Both custom: '{result}'")
+
+    # Escaping braces with default backslash
+    formatter = TemplateFormatter("Use \\{#variable\\} to define {{name}}")
+    result = formatter.format(name="templates")
+    print(f"Escaped braces: '{result}'")
     print()
 
 
