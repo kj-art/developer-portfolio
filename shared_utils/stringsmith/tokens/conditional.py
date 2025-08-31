@@ -37,6 +37,14 @@ class ConditionalTokenHandler(BaseTokenHandler):
                 parts[k] = ''
         return True
     
+    def bake_inline_formatting(self, parts: SectionParts) -> bool:
+        for p, part in parts.iter_fields():
+            for start, end, token_value in self.find_token(part):
+                if token_value in self.functions or self._is_reset_token(token_value):
+                    return True
+                else:
+                    raise StringSmithError(f"Error applying function '{token_value}'")
+        return False
 
     def apply_inline_formatting(self, parts: SectionParts, field_value: Any = None, kwargs: dict = None) -> bool:
         """
@@ -52,10 +60,7 @@ class ConditionalTokenHandler(BaseTokenHandler):
             
         Returns:
             bool: Whether the field value should be appended (True unless hidden by conditional)
-        """
-        if field_value is None: # Baking phase
-            return False
-        
+        """        
         def apply_inline_formatting_to_part(p:str) -> bool:
             found = []
 

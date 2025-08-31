@@ -154,7 +154,8 @@ class TemplateParser:
             is_mandatory=False,
             section_formatting=[],
             field_name=None,  # None indicates literal text
-            parts=SectionParts(text, '', None)
+            parts=SectionParts(text, '', None),
+            live_tokens=[]
         )
     
     def _split_unescaped(self, content: str) -> List[str]:
@@ -214,7 +215,8 @@ class TemplateParser:
                 is_mandatory=is_mandatory,
                 section_formatting=section_tokens,
                 field_name=field[0], # field name used as identifier
-                parts=SectionParts(prefix, field[1], suffix)  # the rest of the field part (formatting) left in text
+                parts=SectionParts(prefix, field[1], suffix),  # the rest of the field part (formatting) left in text
+                live_tokens=[]
             )
     
     def _extract_field_name(self, field_text: str) -> Tuple[str, str]:

@@ -133,9 +133,11 @@ class TemplateFormatter:
                 continue
             
             # Apply formatting
-            for handler in self.token_handlers.values():
+            for token, handler in self.token_handlers.items():
                 self.sections[s] = handler.apply_sectional_formatting(section)
-                handler.apply_inline_formatting(section.parts)
+                if handler.bake_inline_formatting(section.parts):
+                    self.sections[s].live_tokens.append(token)
+        
     
     def format(self, *args, **kwargs) -> str:
         """
@@ -208,9 +210,10 @@ class TemplateFormatter:
                 # This deferred approach avoids complex position tracking during baking
                 new_section = section.copy()
                 show_field = True
-                for handler in self.token_handlers.values():
+                for token, handler in self.token_handlers.items():
                     new_section = handler.apply_sectional_formatting(new_section, field_value, kwargs)
-                    show_field = handler.apply_inline_formatting(new_section.parts, field_value, kwargs) and show_field
+                    if token in new_section.live_tokens:
+                        show_field = handler.apply_inline_formatting(new_section.parts, field_value, kwargs) and show_field
                 
                 if show_field:
                     new_section.parts.field += str(field_value)

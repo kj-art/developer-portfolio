@@ -168,18 +168,14 @@ class BaseTokenHandler(ABC):
             parts[k] = f'{replacement_text}{v}'
         return True
     
-    def apply_inline_formatting(self, parts: SectionParts, field_value: Any = None, kwargs: Dict = None) -> bool:
-        """Apply formatting to specific position within text segment."""
-
-        is_bake = field_value == None
+    def bake_inline_formatting(self, parts: SectionParts) -> bool:
         static_bank = {}
-
+        has_live_tokens = False
         for k, part in parts.iter_fields():
-            dynamic = set()
             static = defaultdict(str)
             for start, end, token_value in self.find_token(part):
-                if token_value in self.functions:    
-                    dynamic.add(token_value)
+                if token_value in self.functions:
+                    has_live_tokens = True
                     continue
 
                 if self._is_reset_token(token_value):
@@ -191,9 +187,19 @@ class BaseTokenHandler(ABC):
                             raise StringSmithError(f"Error applying function '{token_value}'")
                     static_bank[token_value] = static[token_value] = replacement_text
                     
-            if not is_bake:
-                parts[k] = self._replace_dynamic_tokens(parts[k], dynamic, field_value, kwargs)
             parts[k] = self._replace_static_tokens(parts[k], static)
+        return has_live_tokens
+    
+    def apply_inline_formatting(self, parts: SectionParts, field_value: Any = None, kwargs: Dict = None) -> bool:
+        """Apply formatting to specific position within text segment."""
+        
+        for k, part in parts.iter_fields():
+            dynamic = set()
+            for start, end, token_value in self.find_token(part):
+                if token_value in self.functions:    
+                    dynamic.add(token_value)
+                    
+            parts[k] = self._replace_dynamic_tokens(parts[k], dynamic, field_value, kwargs)
         return True
 
     def _replace_dynamic_tokens(self, part: str, tokens: set[str], field_value: Any, kwargs: Dict) -> str:

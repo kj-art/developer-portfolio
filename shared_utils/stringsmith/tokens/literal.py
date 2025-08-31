@@ -15,11 +15,17 @@ class LiteralTokenHandler(BaseTokenHandler):
         """Sectional literal tokens are not supported."""
         raise StringSmithError(f"Sectional tokens can not be literal.")
     
+    def bake_inline_formatting(self, parts: SectionParts) -> bool:
+        for p, part in parts.iter_fields():
+            for start, end, token_value in self.find_token(part):
+                if token_value in self.functions or self._is_reset_token(token_value):
+                    return True
+                else:
+                    raise StringSmithError(f"Error applying function '{token_value}'")
+        return False
+
     def apply_inline_formatting(self, parts: SectionParts, field_value: Any = None, kwargs: Dict = None) -> bool:
         """Insert marker for literal function processing during finalization."""
-        if field_value is None: # Baking phase
-            return False
-
         def apply_inline_formatting_to_part(p:str) -> bool:
             nonlocal parts
             dynamic = set()

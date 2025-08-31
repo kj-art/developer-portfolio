@@ -53,6 +53,7 @@ class TemplateSection:
     section_formatting: Dict[str, List[str]]
     field_name: Optional[str]
     parts: SectionParts  # nested object
+    live_tokens: List[str]
 
     def copy(self) -> TemplateSection:
         # shallow copy for parts
@@ -60,5 +61,6 @@ class TemplateSection:
             is_mandatory=self.is_mandatory,
             section_formatting={k: v.copy() for k, v in self.section_formatting.items()},
             field_name=self.field_name,
-            parts=self.parts.copy()
+            parts=self.parts.copy(),
+            live_tokens=self.live_tokens.copy()
         )
