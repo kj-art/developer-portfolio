@@ -74,7 +74,45 @@ class BaseTokenHandler(ABC):
                 yield start, end, content[len(token):]
 
     def _call_function(self, function_name: str, field_value: Any, kwargs: Dict):
-        """Call custom function with kwargs matching or fall back to field_value."""
+        """
+        Call custom function with intelligent parameter matching.
+        
+        Matches function parameter names to format() arguments when possible,
+        enabling multi-field functions. Falls back to single field_value for
+        backward compatibility when no parameter names match.
+        
+        Parameter Matching Logic:
+            1. If function has no parameters: call with no arguments
+            2. If all function parameters match kwargs keys: call with matched values
+            3. Otherwise: call with section's field_value (backward compatibility)
+        
+        Args:
+            function_name: Name of function to call from function registry
+            field_value: Value of current section's field (fallback argument)
+            kwargs: All field values from format() call for parameter matching
+            
+        Returns:
+            Function result for use in formatting operations
+            
+        Examples:
+            # Multi-parameter function
+            def is_profitable(revenue, costs): 
+                return float(revenue) > float(costs)
+            # Called as: is_profitable(revenue=150, costs=120)
+            
+            # Single-parameter function (legacy behavior)  
+            def priority_color(level): 
+                return 'red' if int(level) > 5 else 'green'
+            # Called as: priority_color(field_value)
+            
+            # No-parameter function
+            def random_color():
+                return choice(['red', 'blue', 'green'])
+            # Called as: random_color()
+            
+        Raises:
+            StringSmithError: If function not found in registry
+        """
         if function_name not in self.functions:
             raise StringSmithError(f"Function '{function_name}' not found in function registry")
 

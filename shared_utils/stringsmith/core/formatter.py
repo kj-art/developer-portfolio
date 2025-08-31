@@ -145,6 +145,11 @@ class TemplateFormatter:
         are missing, eliminating manual null checking and conditional string building.
         Mandatory sections (prefixed with '!') throw errors when variables are missing.
         
+        Multi-Parameter Function Support:
+            Custom functions can access multiple field values through parameter name matching.
+            Function parameters with names matching format() arguments receive those values.
+            Functions with no matching parameters fall back to receiving the section's field value.
+        
         Args:
             *args: Positional arguments mapped to template fields in order.
             **kwargs: Keyword arguments mapped to template fields by name.
@@ -157,14 +162,25 @@ class TemplateFormatter:
             MissingMandatoryFieldError: If mandatory field (marked with '!') is missing.
             
         Examples:
+            Basic conditional sections:
             >>> formatter = TemplateFormatter("{{User: ;username;}} {{(ID: ;user_id;)}}")
             >>> formatter.format(username="admin")      # "User: admin "
             >>> formatter.format(user_id=123)          # " (ID: 123)"
             >>> formatter.format()                     # ""
             
+            Multi-parameter functions:
+            >>> def is_profitable(revenue, costs):
+            ...     return float(revenue) > float(costs)
+            >>> formatter = TemplateFormatter("{{?is_profitable; ✓ Profitable;revenue;}}", 
+            ...                             functions={'is_profitable': is_profitable})
+            >>> formatter.format(revenue="150", costs="100")  # " ✓ Profitable"
+            >>> formatter.format(revenue="50", costs="100")   # ""
+            
+            Positional arguments:
             >>> formatter = TemplateFormatter("{{}} + {{}} = {{}}")
             >>> formatter.format("15", "27", "42")     # "15 + 27 = 42"
             
+            Mandatory fields:
             >>> formatter = TemplateFormatter("{{!name}} logged in")
             >>> formatter.format(name="admin")         # "admin logged in"
             >>> formatter.format()                     # Raises MissingMandatoryFieldError

@@ -122,6 +122,43 @@ print(formatter.format(priority="3", message="Minor issue"))
 # Yellow "[3] Minor issue" (no urgent flag)
 ```
 
+### Multi-Parameter Functions
+Functions can access multiple fields by matching parameter names to field names:
+
+```python
+def is_profitable(revenue, costs):
+    return revenue and costs and float(revenue) > float(costs)
+
+def status_summary(status, error_count, warning_count):
+    if status == 'error':
+        return f"Failed with {error_count} errors"
+    elif warning_count > 0:
+        return f"Completed with {warning_count} warnings"
+    return "Success"
+
+formatter = TemplateFormatter(
+    "{{Company: ;company;}} {{?is_profitable; ✓ Profitable;revenue;}} {{Summary: ;status_summary;)}}", 
+    functions={'is_profitable': is_profitable, 'status_summary': status_summary}
+)
+
+# All referenced fields must be provided in format() call
+result = formatter.format(
+    company="TechCorp", 
+    revenue="150", 
+    costs="120", 
+    status="complete",
+    error_count=0,
+    warning_count=2
+)
+# Output: "Company: TechCorp ✓ Profitable Summary: Completed with 2 warnings"
+```
+
+**Parameter Matching Rules:**
+- Function parameters with names matching format() arguments receive those values
+- If no parameters match field names, the function receives the section's field value (backward compatibility)
+- All referenced field names must be provided in the format() call
+- Functions with unmatched parameter names receive `None` for those parameters
+
 ### Positional Arguments
 Use positional arguments with empty field names:
 
