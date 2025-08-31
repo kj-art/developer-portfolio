@@ -22,16 +22,19 @@ class ConditionalTokenHandler(BaseTokenHandler):
 
     RESET_ANSI = ''  # Conditional tokens don't produce ANSI escape codes
     
-    def _apply_sectional_formatting(self, token_value: str, field_value: Any, text: tuple[str, str, str]) -> Optional[tuple]:
+    def _apply_sectional_formatting(self, token_value: str, field_value: Any, parts: SectionParts) -> bool:
         """Apply conditional logic to section visibility."""
         if token_value in self.functions: # the token's value is a call to one of the custom functions
             if field_value is None: # no field provided - this is a bake pass
-                return None
+                return False
             else:
                 token_value = self._call_function(token_value, field_value)
         else:
             raise StringSmithError(f"Error applying function '{token_value}'")
-        return text if token_value else ('', '', '')
+        if not token_value:
+            for p in parts.iter_fields():
+                parts[p] = ''
+        return True
     
 
     def apply_inline_formatting(self, parts: SectionParts, field_value: Any = None) -> bool:

@@ -16,7 +16,7 @@ class LiteralTokenHandler(BaseTokenHandler):
             from .registry import TOKEN_REGISTRY
             LiteralTokenHandler._all_tokens = list(TOKEN_REGISTRY.keys())
 
-    def _apply_sectional_formatting(self, token_value: str, field_value: Any, text: tuple[str, str, str]) -> Optional[tuple]:
+    def _apply_sectional_formatting(self, token_value: str, field_value: Any, parts: SectionParts) -> bool:
         """Sectional literal tokens are not supported."""
         raise StringSmithError(f"Sectional tokens can not be literal.")
     
