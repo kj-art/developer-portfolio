@@ -275,7 +275,7 @@ def demo_creative_applications():
         perc = val / 100
         num_secs = 100
         num = round(perc * num_secs)
-        return f"[{'█' * num}{'░' * (num_secs - num)}] {round(val, 2)}%"
+        return f"[{'█' * num}{'░' * (num_secs - num)}] {val:6.2f}%"
     
     template_string = "{{#get_progress_color;;{$make_bar}status;}} Complete!"
     print(f"Template: {template_string}")
