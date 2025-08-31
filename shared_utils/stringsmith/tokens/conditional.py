@@ -32,8 +32,8 @@ class ConditionalTokenHandler(BaseTokenHandler):
         else:
             raise StringSmithError(f"Error applying function '{token_value}'")
         if not token_value:
-            for p in parts.iter_fields():
-                parts[p] = ''
+            for k, v in parts.iter_fields():
+                parts[k] = ''
         return True
     
 
