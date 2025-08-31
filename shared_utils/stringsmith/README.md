@@ -122,23 +122,21 @@ print(formatter.format(priority="3", message="Minor issue"))
 # Yellow "[3] Minor issue" (no urgent flag)
 ```
 
-### Multi-Parameter Functions
-Functions can access multiple fields by matching parameter names to field names:
+### Multi-Parameter Functions (Keyword Arguments Only)
+When using keyword arguments, functions can access multiple fields by parameter name matching:
 
 ```python
 def is_profitable(revenue, costs):
     return revenue and costs and float(revenue) > float(costs)
 
-def status_summary(status, error_count, warning_count):
-    if status == 'error':
-        return f"Failed with {error_count} errors"
-    elif warning_count > 0:
-        return f"Completed with {warning_count} warnings"
-    return "Success"
+def risk_assessment(revenue, costs, debt_ratio):
+    profit_margin = (float(revenue) - float(costs)) / float(revenue) * 100
+    risk = "high" if float(debt_ratio) > 0.6 else "medium" if profit_margin < 10 else "low"
+    return f"{risk} risk ({profit_margin:.1f}% margin)"
 
 formatter = TemplateFormatter(
-    "{{Company: ;company;}} {{?is_profitable; ✓ Profitable;revenue;}} {{Summary: ;status_summary;)}}", 
-    functions={'is_profitable': is_profitable, 'status_summary': status_summary}
+    "{{Company: ;company;}} {{(Revenue: $;revenue;M)}} {{?is_profitable; ✓ Profitable;revenue;}} {{Risk: ;risk_assessment;debt_ratio;}}", 
+    functions={'is_profitable': is_profitable, 'risk_assessment': risk_assessment}
 )
 
 # All referenced fields must be provided in format() call
@@ -146,30 +144,36 @@ result = formatter.format(
     company="TechCorp", 
     revenue="150", 
     costs="120", 
-    status="complete",
-    error_count=0,
-    warning_count=2
+    debt_ratio="0.3"
 )
-# Output: "Company: TechCorp ✓ Profitable Summary: Completed with 2 warnings"
+# Output: "Company: TechCorp (Revenue: $150M) ✓ Profitable Risk: low risk (20.0% margin)"
 ```
 
 **Parameter Matching Rules:**
-- Function parameters with names matching format() arguments receive those values
-- If no parameters match field names, the function receives the section's field value (backward compatibility)
+- Function parameters with names matching format() field names receive those values
+- If any parameters are unmatched by field names, function receives the section's field value
 - All referenced field names must be provided in the format() call
-- Functions with unmatched parameter names receive `None` for those parameters
+- Cannot mix positional and keyword arguments in the same format() call
 
 ### Positional Arguments
-Use positional arguments with empty field names:
+Use positional arguments to fill template sections in order, ignoring field names:
 
 ```python
-formatter = TemplateFormatter("{{first}} + {{second}} = {{result}}")
-result = formatter.format("15", "27", "42")  # "15 + 27 = 42"
+formatter = TemplateFormatter("{{name}} is {{age}} years old from {{city}}")
+result = formatter.format("Alice", 25, "Boston")  # "Alice is 25 years old from Boston"
 
-# Mix with mandatory fields
-formatter = TemplateFormatter("{{!}} and {{}} are {{?both_given;both;}} provided")
-result = formatter.format("Alpha", "Beta")  # "Alpha and Beta are both provided"
+# Custom functions with positional arguments receive only the section's value
+def format_name(value):
+    return value.upper()
+
+formatter = TemplateFormatter("{{@format_name;;name}} lives in {{city}}", 
+                            functions={'format_name': format_name})
+result = formatter.format("alice", "boston")  # "ALICE lives in boston"
 ```
+
+**Limitation**: Multi-parameter functions are not supported with positional arguments. 
+Custom functions only receive the individual section's value, not access to other fields.
+Use keyword arguments when functions need access to multiple field values.
 
 ## Production Use Cases
 
@@ -239,6 +243,19 @@ TemplateFormatter(
 
 **Methods:**
 - `format(*args, **kwargs) -> str`: Format template with variables
+
+**Argument Types:**
+
+- **Positional arguments** (`*args`): Fill template sections in order, ignoring field names. Custom functions receive only the individual section's value. Use for simple templates where order is predictable.
+
+- **Keyword arguments** (`**kwargs`): Enable field name matching and multi-parameter function support. Custom functions can access multiple field values through intelligent parameter matching. Use when functions need access to multiple fields or when template field order may vary.
+
+- **Mixing restriction**: Cannot use both positional and keyword arguments in the same `format()` call. Raises `StringSmithError` if attempted.
+
+**Custom Function Parameter Matching (Keyword Arguments Only):**
+- Functions with parameter names matching format() field names receive those field values
+- Functions with no matching parameter names receive the section's field value (legacy behavior)  
+- All referenced field names must be provided in the format() call for multi-parameter functions to execute correctly
 
 ### Template Section Syntax
 
