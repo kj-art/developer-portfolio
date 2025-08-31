@@ -32,6 +32,14 @@ message = formatter.format(user_name=name, user_id=uid)  # Sections auto-hide wh
 - **Extensible**: Custom formatting functions and conditional logic
 - **Professional Error Handling**: Structured exceptions with context for debugging
 
+## Design Philosophy
+
+**Deferred Inline Parsing**: StringSmith uses a hybrid parsing approach where template structure is parsed during initialization, but inline formatting tokens are resolved during format() calls. This design choice prioritizes code simplicity and maintainability over micro-optimizations, making the codebase easier to understand and extend.
+
+**Graceful Degradation**: The core innovation is automatic section hiding when variables are missing. This eliminates the need for manual null checking and conditional string building throughout your application code.
+
+**Performance Characteristics**: Templates are "baked" during initialization to validate syntax and prepare static formatting. Runtime formatting is O(m) where m is the number of template sections. For applications doing frequent formatting with the same template, create the formatter once and reuse it.
+
 ## Quick Start
 
 ```python

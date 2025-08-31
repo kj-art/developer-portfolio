@@ -152,6 +152,21 @@ class BaseTokenHandler(ABC):
         return True
 
     def _replace_dynamic_tokens(self, part: str, tokens: set[str], field_value: Any) -> str:
+        """
+        Replace dynamic tokens with function results using string splitting approach.
+        
+        Dynamic tokens require field values to resolve, so they're processed during
+        format() rather than baking. Each token is processed separately to handle
+        multiple occurrences correctly.
+        
+        Args:
+            part: Text containing dynamic tokens to replace
+            tokens: Set of dynamic token names to process
+            field_value: Runtime field value passed to token functions
+            
+        Returns:
+            Text with dynamic tokens replaced by function results
+        """
         for token in tokens:
             parts_list = part.split(self._get_token_bracket(token))
             ansi_codes = [self.get_replacement_text(str(self._call_function(token, field_value))) for _ in range(len(parts_list) - 1)]
@@ -164,6 +179,20 @@ class BaseTokenHandler(ABC):
         return part
 
     def _replace_static_tokens(self, part: str, tokens: Dict[str, str]) -> str:
+        """
+        Replace static tokens with pre-computed replacement text.
+        
+        Static tokens (colors, emphasis styles) are resolved during baking phase
+        since they don't depend on runtime field values. Uses simple string
+        replacement for efficiency.
+        
+        Args:
+            part: Text containing static tokens to replace  
+            tokens: Mapping of token names to replacement ANSI codes
+            
+        Returns:
+            Text with static tokens replaced by ANSI codes
+        """
         for token, replacement_text in tokens.items():
             token = self._get_token_bracket(token)
             part = replacement_text.join(part.split(token))
@@ -171,16 +200,6 @@ class BaseTokenHandler(ABC):
 
     def _get_token_bracket(self, token_value: str):
         return f'{{{self._token}{token_value}}}'
-        
-    def finalize(self, section: TemplateSection, field_value: Any) -> bool:
-        """Finalize template section after all formatting applied.
-
-        Returns:
-            bool: Indicates whether or not field value should be appended to the end of the field part.
-        """
-        # remember, if overriding this function, to use part.get_inline_formatting_of_type(self._token) on each part
-        # otherwise, you will be running finalize on other tokens
-        return True
     
     @abstractmethod
     def get_replacement_text(self, token_value: str, field_value: str = None) -> str:

@@ -35,6 +35,20 @@ class ConditionalTokenHandler(BaseTokenHandler):
     
 
     def apply_inline_formatting(self, parts: SectionParts, field_value: Any = None) -> bool:
+        """
+        Apply conditional logic to inline tokens, showing/hiding text segments.
+        
+        Conditional tokens evaluate user functions at runtime to determine visibility.
+        Text following conditional tokens appears only if the function returns truthy.
+        During baking phase (field_value=None), validation is deferred to runtime.
+        
+        Args:
+            parts: Section parts containing potential conditional tokens
+            field_value: Runtime field value for function evaluation, None during baking
+            
+        Returns:
+            bool: Whether the field value should be appended (True unless hidden by conditional)
+        """
         if field_value is None: # Baking phase
             return False
         
@@ -74,87 +88,6 @@ class ConditionalTokenHandler(BaseTokenHandler):
         for p in ['prefix', 'suffix']:
             apply_inline_formatting_to_part(p)
         return apply_inline_formatting_to_part('field')
-
-    '''def apply_inline_formatting(self, parts: SectionParts, field_value: Any = None) -> bool:
-        if field_value is None: # Baking phase
-            return False
-
-        def apply_inline_formatting_to_part(p:str) -> bool:
-            nonlocal parts
-            funcs = {}
-            do_reset = lambda: True
-
-            for start, end, token_value in self.find_token(parts[p]):
-                if token_value in funcs:
-                    funcs[token_value]['end'] = max(end, funcs[token_value]['end'])
-                elif token_value in self.functions:
-                    func = self.functions[token_value]
-                    funcs[token_value] = {
-                        'func': func,
-                        'needs_field_value': len(inspect.signature(func).parameters) != 0,
-                        'end': end
-                    }
-                elif self._is_reset_token(token_value):
-                    funcs[token_value] = {
-                        'func': do_reset,
-                        'needs_field_value': False,
-                        'end': end
-                    }
-                else:
-                    raise StringSmithError(f"Error applying function '{token_value}'")
-            
-            parts[p], show_field = self._replace_dynamic_tokens(parts[p], funcs, field_value)
-            return show_field
-
-        for p in ['prefix', 'suffix']:
-            apply_inline_formatting_to_part(p)
-        show_field = apply_inline_formatting_to_part('field')
-        return show_field
-    
-    def _replace_dynamic_tokens(self, part: str, func_tokens: dict, field_value: Any) -> tuple[str, bool]:
-        
-        # this doesn't work. it updates part as it goes through the loop, so it'll cut out later resets and then not see
-        
-        last_do_show = True, -1
-        for token, func in func_tokens.items():
-            print(part)
-            parts_list = part.split(self._get_token_bracket(token))
-            bools = [(func['func'](field_value) if func['needs_field_value'] else func['func'](), func['end']) for _ in range(len(parts_list) - 1)]
-            print(f'{token}|||||||{bools}')
-            result = parts_list[0]
-            for i, do_show in enumerate(bools):
-                print(do_show)
-                if do_show[1] > last_do_show[1]:
-                    last_do_show = do_show
-                if do_show[0]:
-                    result += parts_list[i + 1]
-            part = result
-            
-        return part, last_do_show[0]
-    
-    def finalize(self, section: TemplateSection, field_value: Any) -> bool:
-        """Process conditional markers and show/hide content accordingly."""
-        for part in section.get_parts():
-            part.content = self._finalize(part, field_value)
-        return True
-    
-    def _finalize(self, template_part: TemplatePart, field_value: Any) -> str:
-        template_part = template_part.copy()
-        pieces = template_part.content.split('\uE000')
-        result = pieces.pop(0)
-        inline_formatting = template_part.get_inline_formatting_of_type(self._token)
-        if len(pieces) != len(inline_formatting):
-            raise StringSmithError(f"Error finalizing text_segment '{template_part.content}': Mismatch between formatting length and number of conditional ANSI markers")
-        for i, v in enumerate(pieces):
-            token_value = inline_formatting[i].value
-            if self._is_reset_token(token_value):
-                result += v
-            elif token_value not in self.functions:
-                raise StringSmithError(f"Error applying function '{token_value}'")
-            else:
-                # Show piece only if function returns truthy value
-                result += v if self._call_function(token_value, field_value) else ''
-        return result'''
     
     def get_replacement_text(self, token_value: str, field_value: str = None) -> str:
         return ''

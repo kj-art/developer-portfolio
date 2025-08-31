@@ -114,19 +114,18 @@ class TemplateFormatter:
         self.parser = TemplateParser(delimiter, escape_char)
         self.sections = self.parser.parse_template(template)
         self._bake_template()
-        
-    '''def _update_positions(self, format_list: List[InlineFormatting], offset: int):
-        """Update position information for inline formatting tokens after text changes."""
-        for fmt in format_list:
-            fmt.adjust_position(offset)'''
 
     def _bake_template(self, *args, **kwargs) -> str:
         """
         Pre-process template sections for optimal runtime performance.
         
-        The "baking" process applies all possible formatting operations that don't
-        depend on runtime data, including token validation, ANSI code generation,
-        and position management.
+        "Baking" applies all formatting operations that don't require runtime data,
+        including token validation and static ANSI code generation. Inline token
+        parsing is deferred to format() to avoid complex position management during
+        this phase. Invalid formatting tokens are caught here rather than at runtime.
+        
+        Design Note: This approach trades some repeated parsing work for significantly
+        simpler implementation and better maintainability.
         """
         for s, section in enumerate(self.sections):
             # Skip literal text sections (no formatting to bake)
@@ -137,34 +136,6 @@ class TemplateFormatter:
             for handler in self.token_handlers.values():
                 self.sections[s] = handler.apply_sectional_formatting(section)
                 handler.apply_inline_formatting(section.parts)
-            
-            # make sure you're actually applying the escape sequences when you're done
-
-            '''# Clear field content for clean formatting application
-            section.field = ''
-            str_len = (len(section.prefix.content), 0, len(section.suffix.content))
-
-            # Apply sectional formatting
-            for tkn in section.section_formatting:
-                self.sections[s] = self.token_handlers[tkn].apply_sectional_formatting(self.sections[s])
-            
-            section = self.sections[s]
-            for p, part in enumerate(section.get_parts()):
-                self._update_positions(part.inline_formatting, len(part.content) - str_len[p])
-                self._bake_inline_formatting(part)'''
-
-    '''def _bake_inline_formatting(self, template_part: TemplatePart):
-        """Apply inline formatting tokens that don't require runtime data."""
-        for f in range(len(template_part.inline_formatting) - 1, -1 , -1):
-            fmt = template_part.inline_formatting[f]
-            str_len = len(template_part.content)
-            template_part.content, replaced = self.token_handlers[fmt.type].apply_inline_formatting(template_part.content,
-                                                                                                        fmt.position,
-                                                                                                        fmt.value
-                                                                                                        )
-            if replaced:
-                template_part.inline_formatting.pop(f)
-                self._update_positions(template_part.inline_formatting[f:], len(template_part.content) - str_len)'''
     
     def format(self, *args, **kwargs) -> str:
         """
@@ -207,7 +178,7 @@ class TemplateFormatter:
         # Process each template section
         for section in self.sections:
             if section.field_name is None:
-                # Literal text section
+                # Literal text section - no variable substitution needed
                 result_parts.append(section.parts.prefix)
                 continue
             else:
@@ -215,9 +186,10 @@ class TemplateFormatter:
                 if field_value is None: # no value provided for this section's field - skip this section
                     if section.is_mandatory:
                         raise MissingMandatoryFieldError(f"Required field '{section.field_name}' not provided")
-                    continue  # Skip optional sections with missing data
+                    continue  # Skip optional sections with missing data - core graceful degradation feature
                 
-                # Create working copy for this formatting operation
+                # Apply both sectional and inline formatting at runtime
+                # This deferred approach avoids complex position tracking during baking
                 new_section = section.copy()
                 show_field = True
                 for handler in self.token_handlers.values():
@@ -226,26 +198,10 @@ class TemplateFormatter:
                 
                 if show_field:
                     new_section.parts.field += str(field_value)
-                #self._apply_runtime_inline_formatting(new_section, field_value)
-                '''if self._finalize_section(new_section, field_value):
-                    new_section.field.content += str(field_value)'''
-                
-                # Apply sectional formatting that requires runtime field values
-                '''for tkn in new_section.section_formatting:
-                    if not len(new_section.section_formatting[tkn]):
-                        continue
-                    handler = self.token_handlers[tkn]
-                    new_section = handler.apply_sectional_formatting(new_section, field_value)'''
                 
                 # Add reset codes to parts with actual content    
                 result_parts.append(self._assemble_section_with_resets(new_section))
         return ''.join(result_parts)
-        
-    '''def _finalize_section(self, section: TemplateSection, field_value: Any) -> bool:
-        add_suffix = True
-        for f in TOKEN_REGISTRY:
-            add_suffix = self.token_handlers[f].finalize(section, field_value) and add_suffix
-        return add_suffix'''
     
     def _set_up_variable_accessor(self, args, kwargs):
         """Create variable accessor function based on argument type."""

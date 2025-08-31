@@ -205,11 +205,7 @@ def fun_examples():
 
         # Scale to 0–255 and format as hex
         return f"{int(r*255):02X}{int(g*255):02X}{int(b*255):02X}"
-    '''def random_color(length=6):
-        hex = "#{:06x}".format(random.randint(0, 0xFFFFFF))
-        return hex'''
 
-    
     rc = "{#random_color}"
     template_string = f"{{{{{rc}A{rc}B{rc}C ;{rc}field; {rc}X{rc}Y{rc}Z}}}}"
     print(f"Template: {template_string}")

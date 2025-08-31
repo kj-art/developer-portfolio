@@ -100,7 +100,23 @@ class TemplateParser:
         return count % 2 == 0
 
     def _find_matching_close_brace(self, template: str, start_pos: int) -> int:
-        """Find the matching }} for a {{ starting at start_pos, ignoring }} inside {token} constructs."""
+        """
+        Find matching }} for a {{ section, handling nested tokens and escape sequences.
+        
+        Properly handles {token} constructs inside sections by skipping over them
+        during brace counting. Respects escape sequences to avoid matching escaped braces.
+        Essential for parsing complex nested template structures correctly.
+        
+        Args:
+            template: Full template string
+            start_pos: Position after opening {{ to start search
+            
+        Returns:
+            Position of matching }} or -1 if not found
+            
+        Raises:
+            StringSmithError: If no matching }} found (handled by caller)
+        """
         section_brace_count = 1
         i = start_pos
         
@@ -202,7 +218,22 @@ class TemplateParser:
             )
     
     def _extract_field_name(self, field_text: str) -> Tuple[str, str]:
-        """Extract field name, ensuring all valid tokens precede all literal text."""
+        """
+        Extract field name from field part, separating tokens from literal field name.
+        
+        Ensures formatting tokens appear before literal text by validating token positions.
+        This maintains consistent parsing rules and prevents ambiguous field definitions.
+        
+        Args:
+            field_text: Raw field part text potentially containing tokens and field name
+            
+        Returns:
+            Tuple of (field_name, remaining_tokens) where field_name is the literal
+            identifier and remaining_tokens contains any formatting for the field itself
+            
+        Raises:
+            StringSmithError: If tokens appear after literal text (invalid format)
+        """
         result = field_text
         
         escaped_tokens = [re.escape(token) for token in TOKEN_REGISTRY.keys()]
@@ -270,53 +301,7 @@ class TemplateParser:
                 raise StringSmithError(f"Too many parts in section: {section_repr}")
 
         return prefix, field, suffix
-    
-    '''def _parse_field_part(self, text: str) -> TemplatePart:
-        """Parse field component with validation for field-specific formatting rules."""
-        formatting = self._parse_text_part(text)
 
-        # Validate that all formatting tokens are at the beginning
-        for fmt in formatting.inline_formatting:
-            if fmt.position != 0:
-                raise StringSmithError(
-                    f"Field formatting tokens must be at the beginning of the field part. "
-                    f"Found {fmt.type}{fmt.value} token at position {fmt.position} in '{text}'"
-                )
-            
-        return formatting
-
-    def _parse_text_part(self, text: str) -> TemplatePart:
-        """Parse text part extracting inline formatting tokens and calculating positions."""  
-        inline_formatting = []
-        clean_position = 0
-        result = ""
-        last_end = 0
-        
-        # Process each inline formatting token
-        for match in re.finditer(self.inline_pattern, text):
-            # Add text before this token
-            text_before = text[last_end:match.start()]
-            unescaped_before = self.unescape_part(text_before)
-            result += unescaped_before
-            clean_position += len(unescaped_before)  # Use unescaped length for position
-            
-            # Validate and process token
-            token_type = match.group(1)
-            token_value = match.group(2)
-            if '{' in token_value or '}' in token_value:
-                raise StringSmithError(f"Nested braces not allowed in token: '{{{token_type}{token_value}}}'")
-            
-            # Record token at current position
-            inline_formatting.append(InlineFormatting(clean_position, token_type, token_value))
-            
-            last_end = match.end()
-        
-        # Add remaining text
-        remaining_text = text[last_end:]
-        result += self.unescape_part(remaining_text)
-        
-        return TemplatePart(content=result, inline_formatting=inline_formatting)'''
-    
     def unescape_part(self, part: str) -> str:
         """Remove escape sequences from text part."""
         if not part:
