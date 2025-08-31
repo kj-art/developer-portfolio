@@ -13,7 +13,6 @@ def register_token_handler(token_prefix):
         
         # Store token on class
         handler_class._REGISTERED_TOKEN = token_prefix
-        print(f'{handler_class.__name__} {token_prefix}')
         
         # Register immediately when decorator runs
         TOKEN_REGISTRY[token_prefix] = handler_class
