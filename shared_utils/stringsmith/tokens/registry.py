@@ -1,33 +1,38 @@
-"""Token registry for StringSmith handlers."""
-
 from typing import Dict, Callable
 from .base import BaseTokenHandler
-from .color import ColorTokenHandler
-from .emphasis import EmphasisTokenHandler
-from .conditional import ConditionalTokenHandler
-from .literal import LiteralTokenHandler
 
-# Token registry mapping prefixes to handler classes
-TOKEN_REGISTRY = {
-    '?': ConditionalTokenHandler,
-    '#': ColorTokenHandler,
-    '@': EmphasisTokenHandler,
-    '$': LiteralTokenHandler
-}
+TOKEN_REGISTRY = {}
+SORTED_TOKENS = []
+RESET_ANSI = ''
 
-RESET_ANSI = ''.join(
-    handler_class.RESET_ANSI 
-    for handler_class in TOKEN_REGISTRY.values()
-)
+def register_token_handler(token_prefix):
+    """Decorator that registers handlers when they're defined."""
+    def decorator(handler_class):
+        if not issubclass(handler_class, BaseTokenHandler):
+            raise TypeError(f"Handler class must inherit from BaseTokenHandler")
+        
+        # Store token on class
+        handler_class._REGISTERED_TOKEN = token_prefix
+        print(f'{handler_class.__name__} {token_prefix}')
+        
+        # Register immediately when decorator runs
+        TOKEN_REGISTRY[token_prefix] = handler_class
+        
+        # Update sorted list
+        global SORTED_TOKENS
+        SORTED_TOKENS = sorted(TOKEN_REGISTRY.keys(), key=len, reverse=True)
 
-# Tokens sorted by length (longest first) for parsing
-SORTED_TOKENS = sorted(TOKEN_REGISTRY.keys(), key=len, reverse=True)
+        global RESET_ANSI
+        RESET_ANSI += handler_class.RESET_ANSI
+        
+        return handler_class
+    return decorator
 
 def create_token_handlers(escape_char: str, functions: Dict[str, Callable] = None) -> Dict[str, BaseTokenHandler]:
     functions = functions or {}
     handlers = {}
-    for token in TOKEN_REGISTRY:
-        handler_class = TOKEN_REGISTRY[token]
-        handler = handler_class(token, escape_char, functions)
+    for token, handler_class in TOKEN_REGISTRY.items():
+        # No need to pass token - decorator already set it on the class
+        handler = handler_class(escape_char, functions)
         handlers[token] = handler
     return handlers

@@ -5,7 +5,7 @@ Provides abstract interface and common functionality for all token handlers.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Callable, Any, Iterator, Tuple, List
+from typing import Dict, Callable, Any, Iterator, Tuple
 import inspect, re
 from collections import defaultdict
 
@@ -34,7 +34,7 @@ class BaseTokenHandler(ABC):
         if not hasattr(cls, 'RESET_ANSI'):
             raise TypeError(f"{cls.__name__} must define RESET_ANSI class attribute")
 
-    def __init__(self, token: str, escape_char: str, functions: Dict[str, Callable] = None):
+    def __init__(self, escape_char: str, functions: Dict[str, Callable] = None):
         if functions:
             for f in functions.keys():
                 if self._is_reset_token(f):
@@ -44,7 +44,6 @@ class BaseTokenHandler(ABC):
             self.functions = {}
         
         self.functions = functions or {}
-        self._token = token
         self._escape_char = escape_char
         self._escape_len = len(escape_char)
 
@@ -56,7 +55,7 @@ class BaseTokenHandler(ABC):
         """
         # Match anything inside braces (candidate tokens)
         pattern = re.compile(r'\{(.*?)\}')
-        token = token or self._token
+        token = token or self.get_token()
 
         def is_unescaped(pos: int) -> bool:
             count = 0
@@ -147,7 +146,7 @@ class BaseTokenHandler(ABC):
         """Apply formatting to entire section (prefix, field, suffix)."""
         
         section = section.copy()
-        section_formatting = section.section_formatting.get(self._token)
+        section_formatting = section.section_formatting.get(self.get_token())
 
         if section_formatting:
             for f in range(len(section_formatting) - 1, -1, -1):
@@ -245,7 +244,11 @@ class BaseTokenHandler(ABC):
         return part
 
     def _get_token_bracket(self, token_value: str):
-        return f'{{{self._token}{token_value}}}'
+        return f'{{{self.get_token()}{token_value}}}'
+    
+    def get_token(self) -> str:
+        if hasattr(self.__class__, '_REGISTERED_TOKEN'):
+            return self.__class__._REGISTERED_TOKEN
     
     @abstractmethod
     def get_replacement_text(self, token_value: str) -> str:

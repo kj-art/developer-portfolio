@@ -29,7 +29,7 @@ message = formatter.format(user_name=name, user_id=uid)  # Sections auto-hide wh
 - **Rich Formatting**: ANSI colors, text emphasis, and custom styling functions
 - **Performance Optimized**: Templates parsed once, formatted many times efficiently
 - **Thread Safe**: Immutable formatters safe for concurrent use
-- **Extensible**: Custom formatting functions and conditional logic
+- **Extensible**: Custom formatting functions, conditional logic, and token handlers
 - **Professional Error Handling**: Structured exceptions with context for debugging
 
 ## Design Philosophy
@@ -175,6 +175,48 @@ result = formatter.format("alice", "boston")  # "ALICE lives in boston"
 Custom functions only receive the individual section's value, not access to other fields.
 Use keyword arguments when functions need access to multiple field values.
 
+## Extensibility
+
+### Built-in Token Types
+StringSmith includes these formatting token types:
+- `#` - Color tokens (red, blue, #FF0000, custom functions)
+- `@` - Emphasis tokens (bold, italic, underline, etc.)
+- `?` - Conditional tokens (custom boolean functions)
+- `$` - Literal tokens (custom text transformation functions)
+
+### Custom Token Handlers
+Extend StringSmith with custom token types using the registration decorator:
+
+```python
+from stringsmith.tokens import register_token_handler, BaseTokenHandler
+
+@register_token_handler('%')
+class CurrencyTokenHandler(BaseTokenHandler):
+    """Handle currency formatting tokens like {%USD}."""
+    
+    RESET_ANSI = ''  # No ANSI codes for this token type
+    
+    def get_replacement_text(self, token_value: str) -> str:
+        currency_symbols = {
+            'USD': '$',
+            'EUR': '€', 
+            'GBP': '£',
+            'JPY': '¥'
+        }
+        return currency_symbols.get(token_value.upper(), token_value)
+
+# Now use in templates
+formatter = TemplateFormatter("Price: {{%USD;amount;}}")
+result = formatter.format(amount="99.99")  # "Price: $99.99"
+```
+
+**Custom Token Handler Requirements:**
+- Must inherit from `BaseTokenHandler`
+- Must define `RESET_ANSI` class attribute (empty string if no ANSI codes)
+- Must implement `get_replacement_text(token_value: str) -> str` method
+- Use `@register_token_handler(prefix)` decorator with single-character prefix
+- Avoid conflicts with built-in prefixes (`#`, `@`, `?`, `$`)
+
 ## Production Use Cases
 
 ### Application Logging
@@ -267,6 +309,7 @@ TemplateFormatter(
 - `#color`: Apply color (matplotlib colors, hex codes, or custom functions)
 - `@emphasis`: Apply text styling (bold, italic, underline, strikethrough, dim)
 - `?function`: Apply conditional function (section appears only if function returns True)
+- `$function`: Apply literal transformation function (replace with function result)
 
 **Field modifiers:**
 - `!field`: Mandatory field (raises error if missing)

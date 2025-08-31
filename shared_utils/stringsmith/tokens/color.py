@@ -3,7 +3,8 @@
 from rich.color import Color
 from .base import BaseTokenHandler
 from ..exceptions import StringSmithError
-
+from .registry import register_token_handler
+@register_token_handler('#')
 class ColorTokenHandler(BaseTokenHandler):
     """
     Handles color formatting tokens (#red, #blue, #FF0000, etc.).

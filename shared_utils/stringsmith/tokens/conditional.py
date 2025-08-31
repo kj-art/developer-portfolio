@@ -4,7 +4,8 @@ from typing import Any, Optional
 from .base import BaseTokenHandler
 from ..exceptions import StringSmithError
 from ..core import SectionParts
-import inspect
+from .registry import register_token_handler
+@register_token_handler('?')
 class ConditionalTokenHandler(BaseTokenHandler):
     """
     Handles conditional tokens (?function_name) that show/hide sections.
