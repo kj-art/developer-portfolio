@@ -5,7 +5,7 @@ This module contains the main TemplateFormatter class which provides the primary
 public interface for StringSmith's conditional template formatting capabilities.
 """
 
-from typing import Dict, Callable, Optional, List, Any
+from typing import Dict, Callable, Optional
 
 from .parser import TemplateParser
 from ..tokens import create_token_handlers, RESET_ANSI

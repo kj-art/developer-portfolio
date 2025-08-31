@@ -1,6 +1,6 @@
 """Conditional token handler for StringSmith."""
 
-from typing import Any, Optional
+from typing import Any
 from .base import BaseTokenHandler
 from ..exceptions import StringSmithError
 from ..core import SectionParts

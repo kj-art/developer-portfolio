@@ -31,7 +31,6 @@ def create_token_handlers(escape_char: str, functions: Dict[str, Callable] = Non
     functions = functions or {}
     handlers = {}
     for token, handler_class in TOKEN_REGISTRY.items():
-        # No need to pass token - decorator already set it on the class
         handler = handler_class(escape_char, functions)
         handlers[token] = handler
     return handlers

@@ -157,7 +157,7 @@ def demo_professional_logging():
     def is_error_level(level):
         return level.upper() == 'ERROR'
     
-    # Build log formatter with conditional context - fixed section structure
+    # Build log formatter with conditional context
     formatter = TemplateFormatter(
         "{{#level_color;[;level;]}} {{timestamp}} {{module}} {{?has_user;(User: ;user_id;)}} {{message}}{{?is_error_level; - ALERT;level;}}", 
         functions={
@@ -195,7 +195,6 @@ def demo_performance_scenario():
     def spaces(status):
         return max(0, 9 - len(status)) * ' '
 
-    # Fixed section structure - split complex section into multiple simple sections
     formatter = TemplateFormatter(
         "{{#blue;[;batch_id;]}} Record {{#record_color;;status;{$spaces}}}: {{record_id}} - {{description}}", 
         functions={'record_color': record_color,
@@ -320,9 +319,9 @@ def demo_data_reporting():
         rev = float(revenue)
         return "green" if rev > 100 else "yellow" if rev > 50 else "red"
     
-    # Business report formatter - fixed section structure
+    # Business report formatter
     formatter = TemplateFormatter(
-        "{{Company: ;company;}} {{#performance_indicator;(Revenue: $;revenue;M)}} {{?is_profitable; ✓ Profitable;revenue;}} {{?has_notes;[Notes: ;notes;] notes}}", 
+        "{{Company: ;company;}} {{#performance_indicator;(Revenue: $;revenue;M)}} {{?is_profitable; ✓ Profitable ;revenue;}} {{?has_notes;[Notes: ;notes;]}}", 
         functions={
             'is_profitable': is_profitable,
             'has_notes': has_notes,
