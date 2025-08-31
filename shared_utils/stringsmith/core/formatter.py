@@ -193,8 +193,8 @@ class TemplateFormatter:
                 new_section = section.copy()
                 show_field = True
                 for handler in self.token_handlers.values():
-                    new_section = handler.apply_sectional_formatting(new_section, field_value)
-                    show_field = handler.apply_inline_formatting(new_section.parts, field_value) and show_field
+                    new_section = handler.apply_sectional_formatting(new_section, field_value, kwargs)
+                    show_field = handler.apply_inline_formatting(new_section.parts, field_value, kwargs) and show_field
                 
                 if show_field:
                     new_section.parts.field += str(field_value)

@@ -73,18 +73,26 @@ class BaseTokenHandler(ABC):
             if is_unescaped(start) and is_unescaped(end - 1) and content.startswith(token):
                 yield start, end, content[len(token):]
 
+    def _call_function(self, function_name: str, field_value: Any, kwargs: Dict):
+        """Call custom function with kwargs matching or fall back to field_value."""
+        if function_name not in self.functions:
+            raise StringSmithError(f"Function '{function_name}' not found in function registry")
 
-    def _call_function(self, token_value, field_value):
-        """Call custom function with appropriate parameter handling."""
-        if token_value not in self.functions:
-            raise StringSmithError(f"Function '{token_value}' not found in function registry")
-        
-        func = self.functions[token_value]
+        func = self.functions[function_name]
         sig = inspect.signature(func)
+        params = sig.parameters
 
-        if len(sig.parameters) == 0:
+        # Case 1: function has no parameters → call with nothing
+        if not params:
             return func()
+
+        # Case 2: all parameters match keys in kwargs → call with those
+        if all(name in kwargs for name in params):
+            return func(**{name: kwargs[name] for name in params})
+
+        # Case 3: fall back to old behavior → pass field_value
         return func(field_value)
+
 
     def _is_reset_token(self, value: str) -> bool:
         """Check if token value is a reset token ('normal', 'default', 'reset')."""
@@ -97,7 +105,7 @@ class BaseTokenHandler(ABC):
                 return True
         return False
     
-    def apply_sectional_formatting(self, section: TemplateSection, field_value: Any = None) -> TemplateSection:
+    def apply_sectional_formatting(self, section: TemplateSection, field_value: Any = None, kwargs: Dict = None) -> TemplateSection:
         """Apply formatting to entire section (prefix, field, suffix)."""
         
         section = section.copy()
@@ -105,25 +113,25 @@ class BaseTokenHandler(ABC):
 
         if section_formatting:
             for f in range(len(section_formatting) - 1, -1, -1):
-                if self._apply_sectional_formatting(section_formatting[f], field_value, section.parts):
+                if self._apply_sectional_formatting(section_formatting[f], section.parts, field_value, kwargs):
                     section_formatting.pop(f)
 
         return section
    
-    def _apply_sectional_formatting(self, token_value: str, field_value: Any, parts: SectionParts) -> bool:
+    def _apply_sectional_formatting(self, token_value: str, parts: SectionParts, field_value: Any = None, kwargs: Dict = None) -> bool:
         """Apply single sectional formatting token to text parts."""
 
         if token_value in self.functions:
             if field_value is None:  # Baking phase - defer to runtime
                 return False
-            token_value = str(self._call_function(token_value, field_value))
+            token_value = str(self._call_function(token_value, field_value, kwargs))
         
-        replacement_text = self.RESET_ANSI if self._is_reset_token(token_value) else self.get_replacement_text(token_value, field_value)
+        replacement_text = self.RESET_ANSI if self._is_reset_token(token_value) else self.get_replacement_text(token_value)
         for k, v in parts.iter_fields():
             parts[k] = f'{replacement_text}{v}'
         return True
     
-    def apply_inline_formatting(self, parts: SectionParts, field_value: Any = None) -> bool:
+    def apply_inline_formatting(self, parts: SectionParts, field_value: Any = None, kwargs: Dict = None) -> bool:
         """Apply formatting to specific position within text segment."""
 
         is_bake = field_value == None
@@ -141,17 +149,17 @@ class BaseTokenHandler(ABC):
                     static[token_value] = self.RESET_ANSI
                 else:
                     if token_value not in static_bank:
-                        replacement_text = self.get_replacement_text(token_value, field_value)
+                        replacement_text = self.get_replacement_text(token_value)
                         if not replacement_text:
                             raise StringSmithError(f"Error applying function '{token_value}'")
                     static_bank[token_value] = static[token_value] = replacement_text
                     
             if not is_bake:
-                parts[k] = self._replace_dynamic_tokens(parts[k], dynamic, field_value)
+                parts[k] = self._replace_dynamic_tokens(parts[k], dynamic, field_value, kwargs)
             parts[k] = self._replace_static_tokens(parts[k], static)
         return True
 
-    def _replace_dynamic_tokens(self, part: str, tokens: set[str], field_value: Any) -> str:
+    def _replace_dynamic_tokens(self, part: str, tokens: set[str], field_value: Any, kwargs: Dict) -> str:
         """
         Replace dynamic tokens with function results using string splitting approach.
         
@@ -169,7 +177,7 @@ class BaseTokenHandler(ABC):
         """
         for token in tokens:
             parts_list = part.split(self._get_token_bracket(token))
-            ansi_codes = [self.get_replacement_text(str(self._call_function(token, field_value))) for _ in range(len(parts_list) - 1)]
+            ansi_codes = [self.get_replacement_text(str(self._call_function(token, field_value, kwargs))) for _ in range(len(parts_list) - 1)]
             #print('|'.join(ansi_codes).encode('unicode_escape').decode())
             result = parts_list[0]
             for i, replacement_text in enumerate(ansi_codes):
@@ -202,6 +210,6 @@ class BaseTokenHandler(ABC):
         return f'{{{self._token}{token_value}}}'
     
     @abstractmethod
-    def get_replacement_text(self, token_value: str, field_value: str = None) -> str:
+    def get_replacement_text(self, token_value: str) -> str:
         """Generate ANSI code for token value. Must be implemented by subclasses."""
         pass

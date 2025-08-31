@@ -16,11 +16,11 @@ class LiteralTokenHandler(BaseTokenHandler):
             from .registry import TOKEN_REGISTRY
             LiteralTokenHandler._all_tokens = list(TOKEN_REGISTRY.keys())
 
-    def _apply_sectional_formatting(self, token_value: str, field_value: Any, parts: SectionParts) -> bool:
+    def _apply_sectional_formatting(self, token_value: str, parts: SectionParts, field_value: Any = None, kwargs: Dict = None) -> bool:
         """Sectional literal tokens are not supported."""
         raise StringSmithError(f"Sectional tokens can not be literal.")
     
-    def apply_inline_formatting(self, parts: SectionParts, field_value: Any = None) -> bool:
+    def apply_inline_formatting(self, parts: SectionParts, field_value: Any = None, kwargs: Dict = None) -> bool:
         """Insert marker for literal function processing during finalization."""
         if field_value is None: # Baking phase
             return False
@@ -35,14 +35,14 @@ class LiteralTokenHandler(BaseTokenHandler):
 
                 raise StringSmithError(f"Error applying function '{token_value}'")
                     
-            parts[p] = self._replace_dynamic_tokens(parts[p], dynamic, field_value)
+            parts[p] = self._replace_dynamic_tokens(parts[p], dynamic, field_value, kwargs)
             return len(dynamic) == 0
 
         for p in ['prefix', 'suffix']:
             apply_inline_formatting_to_part(p)
         return apply_inline_formatting_to_part('field')
 
-    def get_replacement_text(self, token_value: str, field_value: str = None) -> str:
+    def get_replacement_text(self, token_value: str) -> str:
         # prevent an infinite loop if the user tries to pass back a token that will then be found by find_token again
         for token in LiteralTokenHandler._all_tokens:
             for _ in self.find_token(token_value, token):

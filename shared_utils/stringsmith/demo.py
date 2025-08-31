@@ -301,7 +301,9 @@ def demo_data_reporting():
     print("BUSINESS DATA REPORTING")
     print("=" * 60)
     
-    def is_profitable(revenue, costs):
+    def is_profitable(revenue, costs=None):
+        if costs is None:
+            return False
         return revenue and costs and float(revenue) > float(costs)
     
     def has_notes(notes):

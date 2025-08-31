@@ -34,7 +34,7 @@ class EmphasisTokenHandler(BaseTokenHandler):
             'dim': '\033[2m',
         }
     
-    def get_replacement_text(self, token_value: str, field_value: str = None) -> str:
+    def get_replacement_text(self, token_value: str) -> str:
         """
         Generate ANSI code for emphasis style.
         

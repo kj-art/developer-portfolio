@@ -22,13 +22,13 @@ class ConditionalTokenHandler(BaseTokenHandler):
 
     RESET_ANSI = ''  # Conditional tokens don't produce ANSI escape codes
     
-    def _apply_sectional_formatting(self, token_value: str, field_value: Any, parts: SectionParts) -> bool:
+    def _apply_sectional_formatting(self, token_value: str, parts: SectionParts, field_value: Any = None, kwargs: dict = None) -> bool:
         """Apply conditional logic to section visibility."""
         if token_value in self.functions: # the token's value is a call to one of the custom functions
             if field_value is None: # no field provided - this is a bake pass
                 return False
             else:
-                token_value = self._call_function(token_value, field_value)
+                token_value = self._call_function(token_value, field_value, kwargs)
         else:
             raise StringSmithError(f"Error applying function '{token_value}'")
         if not token_value:
@@ -37,7 +37,7 @@ class ConditionalTokenHandler(BaseTokenHandler):
         return True
     
 
-    def apply_inline_formatting(self, parts: SectionParts, field_value: Any = None) -> bool:
+    def apply_inline_formatting(self, parts: SectionParts, field_value: Any = None, kwargs: dict = None) -> bool:
         """
         Apply conditional logic to inline tokens, showing/hiding text segments.
         
@@ -61,7 +61,7 @@ class ConditionalTokenHandler(BaseTokenHandler):
             for start, end, token_value in self.find_token(parts[p]):
                 if token_value in self.functions:
                     obj = {
-                        'show': self._call_function(token_value, field_value),
+                        'show': self._call_function(token_value, field_value, kwargs),
                         'start': start,
                         'end': end
                     }
@@ -92,5 +92,5 @@ class ConditionalTokenHandler(BaseTokenHandler):
             apply_inline_formatting_to_part(p)
         return apply_inline_formatting_to_part('field')
     
-    def get_replacement_text(self, token_value: str, field_value: str = None) -> str:
+    def get_replacement_text(self, token_value: str) -> str:
         return ''

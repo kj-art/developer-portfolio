@@ -31,7 +31,7 @@ class ColorTokenHandler(BaseTokenHandler):
         return f"\033[38;2;{r};{g};{b}m"
 
 
-    def get_replacement_text(self, color_value: str, field_value: str = None) -> str:
+    def get_replacement_text(self, color_value: str) -> str:
         """
         Generate ANSI color code for the specified color value.
         
