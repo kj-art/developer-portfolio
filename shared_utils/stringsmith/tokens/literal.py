@@ -16,6 +16,24 @@ class LiteralTokenHandler(BaseTokenHandler):
         raise StringSmithError(f"Sectional tokens can not be literal.")
     
     def bake_inline_formatting(self, parts: SectionParts) -> bool:
+        """
+        Validate literal function names during baking phase.
+        
+        Scans for literal transformation tokens and validates that referenced 
+        functions exist. Since literal tokens replace content with function
+        results using runtime data, all processing is deferred to format phase.
+        
+        Args:
+            parts: Section parts to scan for literal tokens
+            
+        Returns:
+            bool: True if any literal tokens found (format phase needed),
+                False if no literal tokens exist in this section
+                
+        Raises:
+            StringSmithError: If literal token references unknown function or
+                            if function result would contain nested tokens
+        """
         for p, part in parts.iter_fields():
             for start, end, token_value in self.find_token(part):
                 if token_value in self.functions or self._is_reset_token(token_value):
@@ -25,7 +43,25 @@ class LiteralTokenHandler(BaseTokenHandler):
         return False
 
     def apply_inline_formatting(self, parts: SectionParts, field_value: Any = None, kwargs: Dict = None) -> bool:
-        """Insert marker for literal function processing during finalization."""
+        """
+        Replace literal tokens with custom function results during format phase.
+        
+        Calls user-defined functions and replaces token positions with the
+        returned values. Function results are validated to prevent nested
+        token creation that could cause infinite processing loops.
+        
+        Args:
+            parts: Section parts containing literal tokens to process  
+            field_value: Runtime field value passed to literal functions
+            kwargs: All format() arguments for multi-parameter function support
+            
+        Returns:
+            bool: Always True (literal tokens don't affect field visibility)
+            
+        Raises:
+            StringSmithError: If function result contains token syntax that
+                            would be processed in subsequent formatting passes
+        """
         def apply_inline_formatting_to_part(p:str) -> bool:
             nonlocal parts
             dynamic = set()

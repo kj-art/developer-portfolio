@@ -38,6 +38,23 @@ class ConditionalTokenHandler(BaseTokenHandler):
         return True
     
     def bake_inline_formatting(self, parts: SectionParts) -> bool:
+        """
+        Validate conditional function names during baking phase.
+        
+        Scans for conditional tokens and validates that referenced functions exist
+        in the function registry. Since conditional logic depends on runtime field
+        values, no tokens are processed during baking - all are deferred to format.
+        
+        Args:
+            parts: Section parts to scan for conditional tokens
+            
+        Returns:
+            bool: True if any conditional tokens found (format phase needed),
+                False if no conditional tokens exist in this section
+                
+        Raises:
+            StringSmithError: If conditional token references unknown function
+        """
         for p, part in parts.iter_fields():
             for start, end, token_value in self.find_token(part):
                 if token_value in self.functions or self._is_reset_token(token_value):
@@ -48,19 +65,25 @@ class ConditionalTokenHandler(BaseTokenHandler):
 
     def apply_inline_formatting(self, parts: SectionParts, field_value: Any = None, kwargs: dict = None) -> bool:
         """
-        Apply conditional logic to inline tokens, showing/hiding text segments.
+        Apply conditional logic to inline tokens, controlling text segment visibility.
         
-        Conditional tokens evaluate user functions at runtime to determine visibility.
-        Text following conditional tokens appears only if the function returns truthy.
-        During baking phase (field_value=None), validation is deferred to runtime.
+        Evaluates conditional functions with runtime data to determine which text
+        segments should appear. Text following conditional tokens is shown only
+        if the function returns a truthy value.
         
         Args:
-            parts: Section parts containing potential conditional tokens
-            field_value: Runtime field value for function evaluation, None during baking
+            parts: Section parts containing conditional tokens
+            field_value: Runtime field value passed to conditional functions
+            kwargs: All format() arguments for multi-parameter function support
             
         Returns:
-            bool: Whether the field value should be appended (True unless hidden by conditional)
-        """        
+            bool: False if any conditional determined the field should be hidden,
+                True if field should be included in output
+                
+        Processing:
+            Conditional tokens are processed right-to-left, with the rightmost
+            token determining final field visibility.
+        """
         def apply_inline_formatting_to_part(p:str) -> bool:
             found = []
 

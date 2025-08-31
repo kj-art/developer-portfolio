@@ -169,6 +169,25 @@ class BaseTokenHandler(ABC):
         return True
     
     def bake_inline_formatting(self, parts: SectionParts) -> bool:
+        """
+        Pre-process static inline formatting tokens during template baking phase.
+        
+        Finds and applies all static formatting tokens (colors, emphasis styles) that
+        don't require runtime data. Static tokens are resolved to ANSI codes and
+        removed from the text, while dynamic tokens (custom functions) are left
+        untouched for the format phase.
+        
+        Args:
+            parts: Section parts containing potential inline tokens
+            
+        Returns:
+            bool: True if any dynamic/live tokens remain and format phase is needed,
+                False if all tokens were static and fully processed during baking
+                
+        Performance Note:
+            This method optimizes runtime formatting by pre-processing everything
+            possible during template initialization, reducing format() overhead.
+        """
         static_bank = {}
         has_live_tokens = False
         for k, part in parts.iter_fields():
@@ -191,7 +210,26 @@ class BaseTokenHandler(ABC):
         return has_live_tokens
     
     def apply_inline_formatting(self, parts: SectionParts, field_value: Any = None, kwargs: Dict = None) -> bool:
-        """Apply formatting to specific position within text segment."""
+        """
+    Apply dynamic inline formatting tokens during format phase with runtime data.
+    
+    Processes only the dynamic tokens (custom functions) that were deferred during
+    baking. This method is only called if bake_inline_formatting() returned True,
+    ensuring no unnecessary work for sections with only static tokens.
+    
+    Args:
+        parts: Section parts containing dynamic tokens to process
+        field_value: Runtime field value for function evaluation
+        kwargs: All format() arguments for multi-parameter function support
+        
+    Returns:
+        bool: True if the field value should be included in output,
+              False if conditional tokens determined it should be hidden
+              
+    Note:
+        This method assumes bake_inline_formatting() was already called and
+        only dynamic tokens remain in the text.
+    """
         
         for k, part in parts.iter_fields():
             dynamic = set()
