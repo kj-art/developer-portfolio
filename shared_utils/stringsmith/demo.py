@@ -192,10 +192,14 @@ def demo_performance_scenario():
     def record_color(field):
         return "green" if field == "processed" else "yellow" if field == "pending" else "red"
     
+    def spaces(status):
+        return max(0, 9 - len(status)) * ' '
+
     # Fixed section structure - split complex section into multiple simple sections
     formatter = TemplateFormatter(
-        "{{#blue;[;batch_id;]}} Record {{#record_color;;status;}}: {{record_id}} - {{description}}", 
-        functions={'record_color': record_color}
+        "{{#blue;[;batch_id;]}} Record {{#record_color;;status;{$spaces}}}: {{record_id}} - {{description}}", 
+        functions={'record_color': record_color,
+                   'spaces': spaces}
     )
     
     # Simulate processing many records
@@ -348,8 +352,8 @@ def demo_escape_sequences():
     print("=" * 60)
     
     # Escaping braces
-    formatter = TemplateFormatter("Use \\{variable\\} to define {{name}}")
-    result = formatter.format(name="templates")
+    formatter = TemplateFormatter("Use \\{#variable\\} to define {{name}}")
+    result = formatter.format(name="templates", variable="error")
     print(f"Escaped braces: '{result}'")
     
     # Escaping delimiters
