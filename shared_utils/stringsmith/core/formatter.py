@@ -113,8 +113,8 @@ class TemplateFormatter:
         self.token_handlers = {}
         self.flat_token_handlers = {}
         for handler_list in handler_passes:
-            pass_regex = self.parser.create_token_regex(*[cls.get_token() for cls in handler_list])
-            handlers = {inst.get_token(): inst for inst in handler_list}
+            pass_regex = self.parser.create_token_regex(*[cls.token for cls in handler_list])
+            handlers = {inst.token: inst for inst in handler_list}
             self.token_handlers[pass_regex] = handlers
             self.flat_token_handlers.update(handlers)
         self.sections = self.parser.parse_template(template)
@@ -156,6 +156,7 @@ class TemplateFormatter:
                 if not part:
                     continue
                 for regex, handlers_dict in self.token_handlers.items():
+                    print(regex)
                     split_part = self.parser.split_tokens(section.parts[p], regex)
                     result = ''
                     while len(split_part):

@@ -22,7 +22,7 @@ class ConditionalTokenHandler(BaseTokenHandler):
     """
 
     def apply_section_formatting(self, section: TemplateSection, field_value: Any = None, kwargs: dict = None) -> bool:
-        for fmt in section.section_formatting.get(self.get_token()):
+        for fmt in section.section_formatting.get(self.token):
             if not self._call_function(fmt, field_value, kwargs):
                 for k, v in section.parts.iter_fields():
                     section.parts[k] = ''
@@ -55,7 +55,7 @@ class ConditionalTokenHandler(BaseTokenHandler):
     ) -> list[list[str | tuple[str, str]] | str]:
         groups: list[list[str | tuple[str, str]] | str] = []
         current: list[str | tuple[str, str]] = []
-        token = self.get_token()
+        token = self.token
 
         for part in split_part:
             if isinstance(part, str) or part[0] != token:

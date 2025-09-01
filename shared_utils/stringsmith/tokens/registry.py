@@ -57,9 +57,8 @@ def create_token_handlers(functions: Dict[str, Callable] = None) -> List[List[Ba
     functions = functions or {}
     grouped_handlers = []
     
-    # Sort priority keys as integers (lowest first)
-    sorted_priority_keys = sorted(TOKEN_REGISTRY.keys(), key=int)
-    
+    # Sort priority keys as integers (highest first)
+    sorted_priority_keys = sorted(TOKEN_REGISTRY.keys(), key=int, reverse=True)
     for priority_key in sorted_priority_keys:
         priority_handlers = []
         token_dict = TOKEN_REGISTRY[priority_key]

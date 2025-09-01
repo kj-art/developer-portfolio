@@ -188,59 +188,6 @@ class TemplateParser:
 
         return result
     
-    def find_token(self, text: str, token: Union[str, re.Pattern] = None) -> Iterator[Tuple[int, int, str]]:
-        """
-        Find unescaped {token ...} sequences in text using string token or pre-compiled regex.
-        
-        Args:
-            text: Text to search for tokens
-            token: Either a string token prefix (e.g., '#') or a pre-compiled regex pattern
-                If string: creates regex using create_token_regex() 
-                If Pattern: uses the provided regex directly
-                If None: uses self.get_token() for backward compatibility
-        
-        Yields:
-            Tuple[int, int, str, str]: (start_index, end_index, token_content, token_prefix)
-            
-        Examples:
-            # Single token string
-            for start, end, content in self.find_token(text, '#'):
-                # Finds {#red}, {#blue}, etc.
-                
-            # Pre-compiled pattern for multiple tokens
-            pattern = create_token_regex('#', '@', '?')
-            for start, end, content in self.find_token(text, pattern):
-                # Finds {#red}, {@bold}, {?show}, etc. in single pass
-        """
-        escape_len = len(self._escape_char)
-        def is_unescaped(pos: int) -> bool:
-            count = 0
-            i = pos - escape_len
-            while i >= 0 and text[i:i+escape_len] == self._escape_char:
-                count += 1
-                i -= escape_len
-            return count % 2 == 0
-        
-        # Determine pattern based on token parameter type
-        pattern = token if isinstance(token, re.Pattern) else self.create_token_regex(token)
-        
-        # Common logic for all pattern types
-        for match in pattern.finditer(text):
-            start, end = match.start(), match.end()
-            groups = match.groups()
-            
-            # Extract token content (after the prefix)
-            if len(groups) >= 3:
-                full_content, token_prefix, token_content = groups
-            else:
-                # Fallback for simpler patterns or single-token case
-                full_content = groups[0]
-                token_content = full_content
-
-            # Check if unescaped and yield
-            if is_unescaped(start) and is_unescaped(end - 1):
-                yield start, end, token_content, token_prefix
-
     def parse_template(self, template: str) -> List[TemplateSection]:
         sections = []
         i = 0

@@ -12,6 +12,7 @@ class LiteralTokenHandler(BaseTokenHandler):
         super().__init__(functions)
         from ..core import TemplateParser
         self._parser = TemplateParser()
+        self._token_regex = self._parser.create_token_regex(*SORTED_TOKENS)
 
     def apply_inline_formatting(
             self,
@@ -20,7 +21,7 @@ class LiteralTokenHandler(BaseTokenHandler):
             field_value: Any,
             kwargs: Dict = None
             ) -> tuple[list[str | tuple[str, str]], bool]:
-        token = self.get_token()
+        token = self.token
         formatting_found = False
         for i, value in enumerate(split_part):
             if isinstance(value, str):
@@ -38,7 +39,7 @@ class LiteralTokenHandler(BaseTokenHandler):
 
     def get_replacement_text(self, token_value: str) -> str:
         # prevent an infinite loop if the user tries to pass back a token that will then be found by find_token again
-        for token in SORTED_TOKENS:
-            for _ in self._parser.find_token(token_value, token):
-                raise StringSmithError(f"Invalid literal token value '{token_value}'. Literal values cannot contain tokens.")
+        split_tokens = self._parser.split_tokens(token_value, self._token_regex)
+        if any(isinstance(x, tuple) for x in split_tokens):
+            raise StringSmithError(f"Invalid literal token value '{token_value}'. Literal values cannot contain token syntax. Please consider using escape characters.")
         return token_value
