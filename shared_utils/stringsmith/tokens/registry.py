@@ -2,10 +2,43 @@ from typing import Dict, Callable, List
 from .base import BaseTokenHandler
 from collections import defaultdict
 
-TOKEN_REGISTRY = defaultdict(dict)
+_TOKEN_REGISTRY = defaultdict(dict)
+TOKEN_REGISTRY = {}
 SORTED_TOKENS = []
 
-def register_token_handler(token_prefix: str, reset_ansi: str = '', pass_priority: int = 0):
+def _build_sorted_registries(registry: dict):
+    nested_sorted = {}
+    flattened_items = []
+
+    for pass_priority, token_map in registry.items():
+        # --- Nested version ---
+        sorted_inner = sorted(
+            token_map.items(),
+            key=lambda item: (-item[1][1][0], -item[1][1][1])  # length desc, sub_priority desc
+        )
+        nested_sorted[pass_priority] = {
+            token_prefix: handler_class
+            for token_prefix, (handler_class, _) in sorted_inner
+        }
+
+        # --- Collect for flattened ---
+        for token_prefix, (handler_class, (tok_len, sub_priority)) in token_map.items():
+            flattened_items.append(
+                (token_prefix, handler_class, tok_len, int(pass_priority), sub_priority)
+            )
+
+    # --- Flattened version (SORTED_TOKENS should be a list) ---
+    flattened_sorted = [
+        token_prefix
+        for token_prefix, handler_class, *_ in sorted(
+            flattened_items,
+            key=lambda x: (-x[2], -x[3], -x[4])  # length desc, pass_priority desc, sub_priority desc
+        )
+    ]
+
+    return nested_sorted, flattened_sorted
+
+def register_token_handler(token_prefix: str, reset_ansi: str = '', pass_priority: int = 0, sub_priority: int = 0):
     """Decorator that registers handlers when they're defined."""
     def decorator(handler_class):
         if not issubclass(handler_class, BaseTokenHandler):
@@ -13,13 +46,11 @@ def register_token_handler(token_prefix: str, reset_ansi: str = '', pass_priorit
         
         handler_class._REGISTERED_TOKEN = token_prefix
         handler_class._RESET_ANSI = reset_ansi
+
+        _TOKEN_REGISTRY[str(pass_priority)][token_prefix] = (handler_class, (len(token_prefix), sub_priority))
         
-        # Register immediately when decorator runs
-        TOKEN_REGISTRY[str(pass_priority)][token_prefix] = handler_class
-        
-        # Update sorted list
-        global SORTED_TOKENS
-        SORTED_TOKENS = sorted(SORTED_TOKENS + [token_prefix], key=len, reverse=True)
+        global TOKEN_REGISTRY, SORTED_TOKENS
+        TOKEN_REGISTRY, SORTED_TOKENS = _build_sorted_registries(_TOKEN_REGISTRY)
         
         return handler_class
     return decorator
@@ -29,11 +60,10 @@ def create_token_handlers(functions: Dict[str, Callable] = None) -> List[List[Ba
     Create token handlers grouped by processing priority.
     
     Maintains the same structure as TOKEN_REGISTRY but instantiates handlers:
-    - First dimension: Processing passes (sorted by priority, lowest first)
-    - Second dimension: Handlers within each pass
+    - First dimension: Processing passes (sorted by priority, highest first)
+    - Second dimension: Handlers within each pass (sorted by token length desc, then sub_priority desc)
     
     Args:
-        escape_char: Character used for escape sequences
         functions: Custom functions for token handlers
         
     Returns:
@@ -42,16 +72,14 @@ def create_token_handlers(functions: Dict[str, Callable] = None) -> List[List[Ba
     Example:
         TOKEN_REGISTRY structure:
         {
-            '-10': {'?': ConditionalHandler},
-            '0': {'#': ColorHandler, '@': EmphasisHandler}, 
-            '10': {'$': LiteralHandler}
+            '0': {'?': ConditionalHandler(sub_priority=1), '#': ColorHandler(sub_priority=0)},
+            '-10': {'$': LiteralHandler}
         }
         
         Returns:
         [
-            [ConditionalHandler()],                    # Priority -10
-            [ColorHandler(), EmphasisHandler()],       # Priority 0  
-            [LiteralHandler()]                         # Priority 10
+            [ConditionalHandler(), ColorHandler()],    # Priority 0 (? first due to higher sub_priority)
+            [LiteralHandler()]                         # Priority -10
         ]
     """
     functions = functions or {}
@@ -63,7 +91,7 @@ def create_token_handlers(functions: Dict[str, Callable] = None) -> List[List[Ba
         priority_handlers = []
         token_dict = TOKEN_REGISTRY[priority_key]
         
-        # Instantiate all handlers in this priority group
+        # Handlers are already sorted within each pass by _build_sorted_registries
         for token, handler_class in token_dict.items():
             handler = handler_class(functions)
             priority_handlers.append(handler)

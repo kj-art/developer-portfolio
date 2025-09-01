@@ -156,7 +156,6 @@ class TemplateFormatter:
                 if not part:
                     continue
                 for regex, handlers_dict in self.token_handlers.items():
-                    print(regex)
                     split_part = self.parser.split_tokens(section.parts[p], regex)
                     result = ''
                     while len(split_part):
@@ -252,12 +251,13 @@ class TemplateFormatter:
             show_field = True
             for regex, handlers_dict in self.token_handlers.items():
                 for token, handler in handlers_dict.items():
+                    # apply section formatting
                     if new_section.section_formatting and len(new_section.section_formatting[token]):
                         show_field = handler.apply_section_formatting(new_section, field_value, kwargs) and show_field
                 for p, part in new_section.parts.iter_fields():
                     if not part:
                         continue
-                    # apply static inline formatting
+                    # apply inline formatting
                     split_part = self.parser.split_tokens(part, regex)
                     for token, handler in handlers_dict.items():
                         split_part, c_show_field = handler.apply_inline_formatting(split_part, p, field_value, kwargs)
