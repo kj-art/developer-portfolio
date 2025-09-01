@@ -5,7 +5,7 @@ from .base import BaseTokenHandler
 from ..exceptions import StringSmithError
 from .registry import register_token_handler
 
-@register_token_handler('@')
+@register_token_handler('@', '\033[22;23;24;29m')
 class EmphasisTokenHandler(BaseTokenHandler):
     """
     Handles text emphasis tokens (@bold, @italic, @underline, etc.).
@@ -23,11 +23,9 @@ class EmphasisTokenHandler(BaseTokenHandler):
         >>> handler.get_replacement_text('italic')    # '\033[3m' 
         >>> handler.get_replacement_text('normal')    # Reset codes
     """
-
-    RESET_ANSI = '\033[22;23;24;29m'
     
-    def __init__(self, escape_char: str, functions: Dict[str, Callable] = None):
-        super().__init__(escape_char, functions)
+    def __init__(self, functions: Dict[str, Callable] = None):
+        super().__init__(functions)
         self.emphasis_codes = {
             'bold': '\033[1m',
             'italic': '\033[3m',

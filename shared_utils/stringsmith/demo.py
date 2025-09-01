@@ -397,4 +397,35 @@ def main():
 
 
 if __name__ == "__main__":
+    '''print('\033[39m')
+    print('\033[22;23;24;29m')
+        # Create formatter once, reuse many times (efficient pattern)
+    def record_color(field):
+        return "green" if field == "processed" else "yellow" if field == "pending" else "red"
+    
+    def spaces(status):
+        return max(0, 9 - len(status)) * ' '
+
+    formatter = TemplateFormatter(
+        "{{#blue;[;batch_id;]}} Record {{#record_color;;status;{@bold}{#red}{$spaces}add}}: {{record_id}} - {{description}}", 
+        functions={'record_color': record_color,
+                   'spaces': spaces}
+    )
+    
+    # Simulate processing many records
+    print("Processing batch of records:")
+    statuses = ["processed", "pending", "failed"]
+    
+    for i in range(8):
+        status = random.choice(statuses)
+        result = formatter.format(
+            batch_id=f"BTH{1000 + i // 3}",
+            status=status,
+            record_id=f"REC{10000 + i}",
+            description=f"Sample record {i + 1}"
+        )
+        print(f"  {result}")'''
+
+
+
     main()

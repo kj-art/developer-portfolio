@@ -6,13 +6,12 @@ public interface for StringSmith's conditional template formatting capabilities.
 """
 
 from typing import Dict, Callable, Optional
-
+from re import Pattern
 from .parser import TemplateParser
-from ..tokens import create_token_handlers, RESET_ANSI
+from ..tokens import create_token_handlers
 from ..exceptions import StringSmithError, MissingMandatoryFieldError
 from .ast import TemplateSection
 from ..utils import has_non_ansi
-
 
 class TemplateFormatter:
     """
@@ -109,10 +108,17 @@ class TemplateFormatter:
         self.delimiter = delimiter
         self.escape_char = escape_char
         self.functions = functions or {}
-        
-        self.token_handlers = create_token_handlers(escape_char, self.functions)
         self.parser = TemplateParser(delimiter, escape_char)
+        handler_passes = create_token_handlers(self.functions)
+        self.token_handlers = {}
+        self.flat_token_handlers = {}
+        for handler_list in handler_passes:
+            pass_regex = self.parser.create_token_regex(*[cls.get_token() for cls in handler_list])
+            handlers = {inst.get_token(): inst for inst in handler_list}
+            self.token_handlers[pass_regex] = handlers
+            self.flat_token_handlers.update(handlers)
         self.sections = self.parser.parse_template(template)
+        self._has_inline_formatting = False
         self._bake_template()
 
     def _bake_template(self, *args, **kwargs) -> str:
@@ -127,18 +133,54 @@ class TemplateFormatter:
         Design Note: This approach trades some repeated parsing work for significantly
         simpler implementation and better maintainability.
         """
+        tokens_used = set()
         for s, section in enumerate(self.sections):
             # Skip literal text sections (no formatting to bake)
             if section.parts.suffix == None:
                 continue
+
+            part_prefix = ''
+
+            # apply static section formatting
+            for token, values in section.section_formatting.items():
+                tokens_used.add(token)
+                for v in range(len(values) - 1, -1, -1):
+                    replacement_text = self.flat_token_handlers[token].get_static_formatting(values[v])
+                    if not replacement_text:
+                        continue
+                    part_prefix += replacement_text
+                    values.pop(v)
             
-            # Apply formatting
-            for token, handler in self.token_handlers.items():
-                self.sections[s] = handler.apply_sectional_formatting(section)
-                if handler.bake_inline_formatting(section.parts):
-                    self.sections[s].live_tokens.append(token)
-        
+            # apply static inline formatting
+            for p, part in section.parts.iter_fields():
+                if not part:
+                    continue
+                for regex, handlers_dict in self.token_handlers.items():
+                    split_part = self.parser.split_tokens(section.parts[p], regex)
+                    result = ''
+                    while len(split_part):
+                        part_fragment = split_part.pop(0)
+                        if isinstance(part_fragment, str):
+                            result += part_fragment
+                            continue
+                        self._has_inline_formatting = True
+                        token, token_value = part_fragment
+                        tokens_used.add(token)
+                        replacement_text = handlers_dict[token].get_static_formatting(token_value)
+                        result += f'{{{token}{token_value}}}' if replacement_text is None else replacement_text
+                    section.parts[p] = result
+
+                # add section formatting prefix    
+                section.parts[p] = part_prefix + section.parts[p]
+
+        self._construct_reset_suffix(tokens_used)
     
+    def _construct_reset_suffix(self, tokens_used: set[str]):
+        reset_ansis = []
+        for token in tokens_used:
+            reset_ansis.append(self.flat_token_handlers[token].reset_ansi)
+        self._reset_ansi = ''.join(reset_ansis)
+
     def format(self, *args, **kwargs) -> str:
         """
         Format template with provided variables using conditional section logic.
@@ -199,27 +241,33 @@ class TemplateFormatter:
                 # Literal text section - no variable substitution needed
                 result_parts.append(section.parts.prefix)
                 continue
-            else:
-                field_value = get_var(section.field_name)
-                if field_value is None: # no value provided for this section's field - skip this section
-                    if section.is_mandatory:
-                        raise MissingMandatoryFieldError(f"Required field '{section.field_name}' not provided")
-                    continue  # Skip optional sections with missing data - core graceful degradation feature
-                
-                # Apply both sectional and inline formatting at runtime
-                # This deferred approach avoids complex position tracking during baking
-                new_section = section.copy()
-                show_field = True
-                for token, handler in self.token_handlers.items():
-                    new_section = handler.apply_sectional_formatting(new_section, field_value, kwargs)
-                    if token in new_section.live_tokens:
-                        show_field = handler.apply_inline_formatting(new_section.parts, field_value, kwargs) and show_field
-                
-                if show_field:
-                    new_section.parts.field += str(field_value)
-                
-                # Add reset codes to parts with actual content    
-                result_parts.append(self._assemble_section_with_resets(new_section))
+            field_value = get_var(section.field_name)
+            if field_value is None: # no value provided for this section's field - skip this section
+                if section.is_mandatory:
+                    raise MissingMandatoryFieldError(f"Required field '{section.field_name}' not provided")
+                continue  # Skip optional sections with missing data - core graceful degradation feature
+            
+            new_section = section.copy()
+            show_field = True
+            for regex, handlers_dict in self.token_handlers.items():
+                for token, handler in handlers_dict.items():
+                    if new_section.section_formatting and len(new_section.section_formatting[token]):
+                        show_field = handler.apply_section_formatting(new_section, field_value, kwargs) and show_field
+                for p, part in new_section.parts.iter_fields():
+                    if not part:
+                        continue
+                    # apply static inline formatting
+                    split_part = self.parser.split_tokens(part, regex)
+                    for token, handler in handlers_dict.items():
+                        split_part, c_show_field = handler.apply_inline_formatting(split_part, p, field_value, kwargs)
+                        show_field = show_field and c_show_field
+                    new_section.parts[p] = ''.join(split_part)
+
+            if show_field:
+                new_section.parts.field += str(field_value)
+            
+            # Add reset codes to parts with actual content
+            result_parts.append(self._assemble_section_with_resets(new_section))
         return ''.join(result_parts)
     
     def _set_up_variable_accessor(self, args, kwargs):
@@ -244,7 +292,7 @@ class TemplateFormatter:
         result = ''
         for p, part in section.parts.iter_fields():
             if has_non_ansi(part):
-                section.parts[p] = self.parser.unescape_part(section.parts[p]) + RESET_ANSI
+                section.parts[p] = self.parser.unescape_part(section.parts[p]) + self._reset_ansi
             else:
                 section.parts[p] = ''
             result += section.parts[p]
@@ -275,16 +323,8 @@ class TemplateFormatter:
             'literal_sections': len(self.sections) - len(field_sections),
             'mandatory_fields': [s.field_name for s in field_sections if s.is_mandatory],
             'optional_fields': [s.field_name for s in field_sections if not s.is_mandatory],
-            'has_inline_formatting': self._has_inline_formatting(),
+            'has_inline_formatting': self._has_inline_formatting,
             'delimiter': self.delimiter,
             'escape_char': self.escape_char,
             'custom_functions': list(self.functions.keys())
         }
-    
-    def _has_inline_formatting(self) -> bool:
-        for section in self.sections:
-            if section.field_name is not None:  # Skip literal text sections
-                for handler in self.token_handlers.values():
-                    if handler.has_inline_formatting(section.parts):
-                        return True
-        return False

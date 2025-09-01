@@ -4,7 +4,7 @@ from rich.color import Color
 from .base import BaseTokenHandler
 from ..exceptions import StringSmithError
 from .registry import register_token_handler
-@register_token_handler('#')
+@register_token_handler('#', '\033[39m')
 class ColorTokenHandler(BaseTokenHandler):
     """
     Handles color formatting tokens (#red, #blue, #FF0000, etc.).
@@ -23,8 +23,6 @@ class ColorTokenHandler(BaseTokenHandler):
         >>> handler.get_replacement_text('FF0000')  # RGB ANSI code
         >>> handler.get_replacement_text('normal')  # '\033[39m' (reset)
     """
-
-    RESET_ANSI = '\033[39m'
 
     def _hex_to_ansi(self, hex_color: str) -> str:
         hex_color = hex_color.lstrip('#')

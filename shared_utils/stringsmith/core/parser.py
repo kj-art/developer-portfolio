@@ -8,11 +8,11 @@ custom delimiters.
 """
 
 import re
-from typing import List, Optional, Dict, Tuple
+from typing import List, Optional, Dict, Tuple, Iterator, Union
 
 
 from ..exceptions import StringSmithError
-from ..tokens import TOKEN_REGISTRY, SORTED_TOKENS
+from ..tokens import SORTED_TOKENS
 from . import TemplateSection, SectionParts
 
 class TemplateParser:
@@ -37,19 +37,209 @@ class TemplateParser:
         >>> sections = parser.parse_template("{{Hello|name|!}}")
     """
     
-    def __init__(self, delimiter: str = ";", escape_char: str = "\\"):
-        """Initialize parser with configurable syntax options."""
-        self.delimiter = delimiter
-        self.escape_char = escape_char
-        
-        # Pre-compile regex patterns for efficient parsing
-        self.section_pattern = re.compile(r'\{\{(.*?)\}\}')
+    _instance = None
+    
+    def __new__(cls, delimiter=';', escape_char='\\'):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+    
+    def __init__(self, delimiter=';', escape_char='\\'):
+        if not self._initialized:
+            self.delimiter = delimiter
+            self.escape_char = escape_char
+
+            # Pre-compile regex patterns for efficient parsing
+            self.section_pattern = re.compile(r'\{\{(.*?)\}\}')
+            self._initialized = True
+
+    @property
+    def delimiter(self):
+        return self._delimiter
+
+    @delimiter.setter
+    def delimiter(self, value):
+        self._delimiter = value
+
+    @property
+    def escape_char(self):
+        return self._escape_char
+
+    @escape_char.setter
+    def escape_char(self, value):
+        self._escape_char = value
         
         # Inline formatting pattern with escape handling
         escaped_tokens = [re.escape(token) for token in SORTED_TOKENS]
         token_pattern = '|'.join(escaped_tokens)
-        esc = re.escape(escape_char)  # "\\" becomes "\\\\"
+        esc = re.escape(value)  # "\\" becomes "\\\\"
         self.inline_pattern = re.compile(f'(?<!{esc})(?:{esc}{esc})*\\{{({token_pattern})([^}}]*)\\}}')
+
+    def create_token_regex(self, *tokens: str) -> re.Pattern:
+        """
+        Create a compiled regex pattern that matches {token...} sequences for specified tokens.
+        
+        Builds an optimized regex that finds brace sequences starting with any of the
+        provided token prefixes. The regex uses alternation with longest-first matching
+        to handle overlapping token prefixes correctly.
+        
+        Args:
+            *tokens: Variable number of token prefix strings to match (e.g., '#', '@', '?', '$')
+            
+        Returns:
+            re.Pattern: Compiled regex that matches {token_content} where token_content
+                    starts with any of the provided token prefixes
+                    
+        Examples:
+            >>> pattern = create_token_regex('#', '@', '?')
+            >>> # Matches: {#red}, {@bold}, {?show_errors}, etc.
+            >>> # Doesn't match: {$literal}, {unknown}, etc.
+            
+            >>> pattern = create_token_regex('?')  
+            >>> # Matches only: {?function_name}
+            
+            >>> for match in pattern.finditer("text {#red}colored{@bold}bold text"):
+            ...     print(match.groups())
+            ('red', '#')
+            ('bold', '@')
+        
+        Pattern Details:
+            - Uses non-greedy matching (.*?) to handle nested braces correctly
+            - Sorts tokens by length (longest first) to prevent partial matches
+            - Uses capturing groups to extract both content and token type
+            - Handles empty token list gracefully (returns pattern that matches nothing)
+            
+        Performance:
+            - Compiled regex is much faster than multiple sequential searches
+            - Single pass through text finds all relevant tokens
+            - Longest-first ordering prevents incorrect partial matches
+        """
+        if not tokens:
+            # Return pattern that matches nothing if no tokens provided
+            return re.compile(r'(?!)')
+        
+        # Sort tokens by length (longest first) to prevent partial matches
+        # Example: if tokens are ['#', '##'], we want '##' to match before '#'
+        sorted_tokens = sorted(tokens, key=len, reverse=True)
+        
+        # Escape special regex characters in token prefixes
+        escaped_tokens = [re.escape(token) for token in sorted_tokens]
+        
+        # Create alternation pattern: (#|@|\?) 
+        token_alternation = '|'.join(escaped_tokens)
+        
+        # Full pattern: \{(content_starting_with_token)\}
+        # Capturing groups: (content, token_type)
+        # (?=...) is a positive lookahead to capture which token matched
+        pattern = rf'\{{(({token_alternation})(.*?))\}}'
+        
+        return re.compile(pattern)
+    
+    def split_tokens(
+        self,
+        text: str,
+        token: Union[str, List[str], re.Pattern]
+    ) -> List[Union[str, Tuple[str, str]]]:
+        """
+        Split `text` on tokenized sections, keeping prefix/content info.
+
+        Args:
+            text: The string to split.
+            token: Single token string, list of token strings, or precompiled regex.
+
+        Returns:
+            List of segments: plain strings or tuples (token_prefix, token_content)
+        """
+        # Determine regex pattern
+        if isinstance(token, re.Pattern):
+            pattern = token
+        else:
+            # Normalize to list
+            tokens = [token] if isinstance(token, str) else token
+            pattern = self.create_token_regex(*tokens)
+
+        result = []
+        last_end = 0
+
+        for match in pattern.finditer(text):
+            start, end = match.start(), match.end()
+            groups = match.groups()
+
+            # Expecting groups: full_content, token_prefix, token_content
+            if len(groups) >= 3:
+                full_content, token_prefix, token_content = groups
+            else:
+                full_content = groups[0]
+                token_prefix = ''
+                token_content = full_content
+
+            # Append text before the token
+            if start > last_end:
+                result.append(text[last_end:start])
+
+            # Append token as tuple
+            result.append((token_prefix, token_content))
+            last_end = end
+
+        # Append remaining text
+        if last_end < len(text):
+            result.append(text[last_end:])
+
+        return result
+    
+    def find_token(self, text: str, token: Union[str, re.Pattern] = None) -> Iterator[Tuple[int, int, str]]:
+        """
+        Find unescaped {token ...} sequences in text using string token or pre-compiled regex.
+        
+        Args:
+            text: Text to search for tokens
+            token: Either a string token prefix (e.g., '#') or a pre-compiled regex pattern
+                If string: creates regex using create_token_regex() 
+                If Pattern: uses the provided regex directly
+                If None: uses self.get_token() for backward compatibility
+        
+        Yields:
+            Tuple[int, int, str, str]: (start_index, end_index, token_content, token_prefix)
+            
+        Examples:
+            # Single token string
+            for start, end, content in self.find_token(text, '#'):
+                # Finds {#red}, {#blue}, etc.
+                
+            # Pre-compiled pattern for multiple tokens
+            pattern = create_token_regex('#', '@', '?')
+            for start, end, content in self.find_token(text, pattern):
+                # Finds {#red}, {@bold}, {?show}, etc. in single pass
+        """
+        escape_len = len(self._escape_char)
+        def is_unescaped(pos: int) -> bool:
+            count = 0
+            i = pos - escape_len
+            while i >= 0 and text[i:i+escape_len] == self._escape_char:
+                count += 1
+                i -= escape_len
+            return count % 2 == 0
+        
+        # Determine pattern based on token parameter type
+        pattern = token if isinstance(token, re.Pattern) else self.create_token_regex(token)
+        
+        # Common logic for all pattern types
+        for match in pattern.finditer(text):
+            start, end = match.start(), match.end()
+            groups = match.groups()
+            
+            # Extract token content (after the prefix)
+            if len(groups) >= 3:
+                full_content, token_prefix, token_content = groups
+            else:
+                # Fallback for simpler patterns or single-token case
+                full_content = groups[0]
+                token_content = full_content
+
+            # Check if unescaped and yield
+            if is_unescaped(start) and is_unescaped(end - 1):
+                yield start, end, token_content, token_prefix
 
     def parse_template(self, template: str) -> List[TemplateSection]:
         sections = []
@@ -88,13 +278,13 @@ class TemplateParser:
     
     def _is_position_unescaped(self, text: str, pos: int) -> bool:
         """Check if position is unescaped using the same logic as find_token."""
-        escape_len = len(self.escape_char)
+        escape_len = len(self._escape_char)
         if pos < escape_len:
             return True
         
         count = 0
         i = pos - escape_len
-        while i >= 0 and text[i:i + escape_len] == self.escape_char:
+        while i >= 0 and text[i:i + escape_len] == self._escape_char:
             count += 1
             i -= escape_len
         return count % 2 == 0
@@ -163,8 +353,8 @@ class TemplateParser:
         # Match: (even number of escape chars)(delimiter)
         # (?<!\\) ensures we're not in the middle of escape sequence
         # (\\\\)* matches zero or more pairs of escapes (even count)
-        esc = re.escape(self.escape_char)
-        delim = re.escape(self.delimiter)
+        esc = re.escape(self._escape_char)
+        delim = re.escape(self._delimiter)
         pattern = f"(?<!{esc})(?:{esc}{esc})*{delim}"
         
         return re.split(pattern, content)
@@ -238,7 +428,7 @@ class TemplateParser:
         """
         result = field_text
         
-        escaped_tokens = [re.escape(token) for token in TOKEN_REGISTRY.keys()]
+        escaped_tokens = [re.escape(token) for token in SORTED_TOKENS]
         token_pattern = '|'.join(escaped_tokens)
         valid_token_pattern = f'^\\{{({token_pattern})[^}}]*\\}}'
         
@@ -278,7 +468,7 @@ class TemplateParser:
         first_token, _ = self._extract_starting_token(parts[0])
         if first_token:
             format_part = parts.pop(0)
-            section_tokens = self.split_by_substrings(format_part, TOKEN_REGISTRY.keys())
+            section_tokens = self.split_by_substrings(format_part, SORTED_TOKENS)
             return section_tokens, parts
         
         return {}, parts
@@ -299,7 +489,7 @@ class TemplateParser:
             case 3: 
                 prefix, field, suffix = parts
             case _: 
-                section_repr = f"{{{{{self.delimiter.join(parts)}}}}}"
+                section_repr = f"{{{{{self._delimiter.join(parts)}}}}}"
                 raise StringSmithError(f"Too many parts in section: {section_repr}")
 
         return prefix, field, suffix
@@ -313,7 +503,7 @@ class TemplateParser:
         i = 0
         while i < len(part):
             char = part[i]
-            if char == self.escape_char and i + 1 < len(part):
+            if char == self._escape_char and i + 1 < len(part):
                 # Escaped character - add next character literally
                 result += part[i + 1]
                 i += 2

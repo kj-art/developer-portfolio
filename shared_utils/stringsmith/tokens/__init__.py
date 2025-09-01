@@ -5,7 +5,7 @@ from .color import ColorTokenHandler
 from .emphasis import EmphasisTokenHandler
 from .conditional import ConditionalTokenHandler
 from .literal import LiteralTokenHandler
-from .registry import TOKEN_REGISTRY, SORTED_TOKENS, create_token_handlers, RESET_ANSI
+from .registry import TOKEN_REGISTRY, SORTED_TOKENS, create_token_handlers
 
 __all__ = [
     'BaseTokenHandler',
@@ -15,6 +15,5 @@ __all__ = [
     'LiteralTokenHandler',
     'TOKEN_REGISTRY',
     'SORTED_TOKENS',
-    'create_token_handlers',
-    'RESET_ANSI'
+    'create_token_handlers'
 ]

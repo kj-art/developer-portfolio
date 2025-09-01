@@ -5,9 +5,8 @@ Provides abstract interface and common functionality for all token handlers.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Callable, Any, Iterator, Tuple
-import inspect, re
-from collections import defaultdict
+from typing import Dict, Callable, Any, Optional
+import inspect
 
 from ..core import TemplateSection, SectionParts
 from ..exceptions import StringSmithError
@@ -29,12 +28,8 @@ class BaseTokenHandler(ABC):
     """
     _RESET_TOKENS = ('normal', 'default', 'reset')
 
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-        if not hasattr(cls, 'RESET_ANSI'):
-            raise TypeError(f"{cls.__name__} must define RESET_ANSI class attribute")
-
-    def __init__(self, escape_char: str, functions: Dict[str, Callable] = None):
+    def __init__(self, functions: Dict[str, Callable] = None):
+        self._static_cache = {}
         if functions:
             for f in functions.keys():
                 if self._is_reset_token(f):
@@ -44,33 +39,6 @@ class BaseTokenHandler(ABC):
             self.functions = {}
         
         self.functions = functions or {}
-        self._escape_char = escape_char
-        self._escape_len = len(escape_char)
-
-    def find_token(self, text: str, token: str = None) -> Iterator[Tuple[int, int, str]]:
-        """
-        Find unescaped {token ...} sequences in text.
-        Yields (start_index, end_index, token_content)
-        Only matches if the text immediately after { matches `token`.
-        """
-        # Match anything inside braces (candidate tokens)
-        pattern = re.compile(r'\{(.*?)\}')
-        token = token or self.get_token()
-
-        def is_unescaped(pos: int) -> bool:
-            count = 0
-            i = pos - self._escape_len
-            while i >= 0 and text[i:i+self._escape_len] == self._escape_char:
-                count += 1
-                i -= self._escape_len
-            return count % 2 == 0
-
-        for m in pattern.finditer(text):
-            start, end = m.start(), m.end()
-            content = m.group(1)
-            # Only consider it if unescaped and starts with the token
-            if is_unescaped(start) and is_unescaped(end - 1) and content.startswith(token):
-                yield start, end, content[len(token):]
 
     def _call_function(self, function_name: str, field_value: Any, kwargs: Dict):
         """
@@ -135,40 +103,49 @@ class BaseTokenHandler(ABC):
         """Check if token value is a reset token ('normal', 'default', 'reset')."""
         return value.lower() in self._RESET_TOKENS
     
-    def has_inline_formatting(self, parts: SectionParts) -> bool:
-        """Check if any inline formatting tokens exist for this handler."""
-        for part_name, part_text in parts.iter_fields():
-            for _ in self.find_token(part_text):
-                return True
-        return False
-    
-    def apply_sectional_formatting(self, section: TemplateSection, field_value: Any = None, kwargs: Dict = None) -> TemplateSection:
+    def apply_section_formatting(self, section: TemplateSection, field_value: Any, kwargs: Dict = None) -> bool:
         """Apply formatting to entire section (prefix, field, suffix)."""
         
-        section = section.copy()
-        section_formatting = section.section_formatting.get(self.get_token())
+        for fmt in section.section_formatting.get(self.get_token()):
+            token_value = self._call_function(fmt, field_value, kwargs)
+            replacement_text = self.get_replacement_text(token_value)
+            for k, v in section.parts.iter_fields():
+                section.parts[k] = f'{replacement_text}{v}'
 
-        if section_formatting:
-            for f in range(len(section_formatting) - 1, -1, -1):
-                if self._apply_sectional_formatting(section_formatting[f], section.parts, field_value, kwargs):
-                    section_formatting.pop(f)
-
-        return section
-   
-    def _apply_sectional_formatting(self, token_value: str, parts: SectionParts, field_value: Any = None, kwargs: Dict = None) -> bool:
-        """Apply single sectional formatting token to text parts."""
-
-        if token_value in self.functions:
-            if field_value is None:  # Baking phase - defer to runtime
-                return False
-            token_value = str(self._call_function(token_value, field_value, kwargs))
-        
-        replacement_text = self.RESET_ANSI if self._is_reset_token(token_value) else self.get_replacement_text(token_value)
-        for k, v in parts.iter_fields():
-            parts[k] = f'{replacement_text}{v}'
         return True
     
-    def bake_inline_formatting(self, parts: SectionParts) -> bool:
+    def apply_inline_formatting(
+            self,
+            split_part: list[str | tuple[str, str]],
+            part_type: str,
+            field_value: Any,
+            kwargs: Dict = None
+            ) -> tuple[list[str | tuple[str, str]], bool]:
+        token = self.get_token()
+        for i, value in enumerate(split_part):
+            if isinstance(value, str):
+                continue
+            part_token, token_value = value
+            if token != part_token:
+                continue
+            token_value = self.get_replacement_text(self._call_function(token_value, field_value, kwargs))
+            split_part[i] = token_value
+        return split_part, True
+
+    def get_static_formatting(self, token_value: str) -> Optional[str]:
+        if token_value in self._static_cache:
+            return self._static_cache[token_value]
+        if token_value in self.functions:
+            return None
+        if self._is_reset_token(token_value):
+            return self.reset_ansi
+        replacement_text = self.get_replacement_text(token_value)
+        if not replacement_text:
+            raise StringSmithError(f"Error applying function '{token_value}'")
+        self._static_cache[token_value] = replacement_text
+        return replacement_text
+
+    '''def bake_inline_formatting(self, parts: SectionParts) -> bool:
         """
         Pre-process static inline formatting tokens during template baking phase.
         
@@ -289,10 +266,14 @@ class BaseTokenHandler(ABC):
 
     def _get_token_bracket(self, token_value: str):
         return f'{{{self.get_token()}{token_value}}}'
-    
+    '''
     def get_token(self) -> str:
         if hasattr(self.__class__, '_REGISTERED_TOKEN'):
             return self.__class__._REGISTERED_TOKEN
+        
+    @property
+    def reset_ansi(self):
+        return self.__class__._RESET_ANSI
     
     @abstractmethod
     def get_replacement_text(self, token_value: str) -> str:

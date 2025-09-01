@@ -6,17 +6,8 @@ for efficient conditional evaluation and formatting during runtime operations.
 """
 
 from __future__ import annotations
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Iterator
 from dataclasses import dataclass
-
-from dataclasses import dataclass
-from typing import Optional, Iterator
-
-from dataclasses import dataclass
-from typing import Optional, Iterator
-
-from dataclasses import dataclass
-from typing import Optional
 
 @dataclass
 class SectionParts:
