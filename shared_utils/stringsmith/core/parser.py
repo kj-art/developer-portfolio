@@ -10,7 +10,6 @@ custom delimiters.
 import re
 from typing import List, Optional, Dict, Tuple, Iterator, Union
 
-
 from ..exceptions import StringSmithError
 from ..tokens import SORTED_TOKENS
 from . import TemplateSection, SectionParts
@@ -24,114 +23,121 @@ class TemplateParser:
     complexity of StringSmith template syntax including formatting tokens, escape
     sequences, and custom delimiters.
     
-    Args:
-        delimiter (str, optional): Character(s) separating components within template
-                                 sections. Defaults to ';'.
-        escape_char (str, optional): Character(s) for escape sequences. Defaults to '\\'.
+    Uses a singleton pattern with updatable configuration to provide shared access
+    for token handlers while allowing per-template customization of delimiters
+    and escape characters through property setters.
+    
+    Configuration must be set explicitly using property setters after instantiation:
+        parser = TemplateParser()
+        parser.delimiter = '|'
+        parser.escape_char = '~'
         
     Examples:
         >>> parser = TemplateParser()
+        >>> parser.delimiter = ';'
+        >>> parser.escape_char = '\\'
         >>> sections = parser.parse_template("{{Hello ;name;}}")
         
-        >>> parser = TemplateParser(delimiter='|')
+        >>> parser.delimiter = '|'
         >>> sections = parser.parse_template("{{Hello|name|!}}")
     """
     
     _instance = None
     
-    def __new__(cls, delimiter=';', escape_char='\\'):
+    def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialized = False
         return cls._instance
     
-    def __init__(self, delimiter=';', escape_char='\\'):
+    def __init__(self):
         if not self._initialized:
-            self.delimiter = delimiter
-            self.escape_char = escape_char
-
+            # Initialize with default configuration
+            self._delimiter = ';'
+            self._escape_char = '\\'
+            
             # Pre-compile regex patterns for efficient parsing
             self.section_pattern = re.compile(r'\{\{(.*?)\}\}')
+            self._update_inline_pattern()
             self._initialized = True
 
     @property
     def delimiter(self):
+        """Get the current delimiter setting."""
         return self._delimiter
 
     @delimiter.setter
     def delimiter(self, value):
+        """Set delimiter and update dependent patterns."""
         self._delimiter = value
 
     @property
     def escape_char(self):
+        """Get the current escape character setting."""
         return self._escape_char
 
     @escape_char.setter
     def escape_char(self, value):
+        """Set escape character and update dependent patterns."""
         self._escape_char = value
-        
-        # Inline formatting pattern with escape handling
+        self._update_inline_pattern()
+    
+    def _update_inline_pattern(self):
+        """Update inline formatting pattern based on current escape character."""
         escaped_tokens = [re.escape(token) for token in SORTED_TOKENS]
         token_pattern = '|'.join(escaped_tokens)
-        esc = re.escape(value)  # "\\" becomes "\\\\"
+        esc = re.escape(self._escape_char)
         self.inline_pattern = re.compile(f'(?<!{esc})(?:{esc}{esc})*\\{{({token_pattern})([^}}]*)\\}}')
 
     def create_token_regex(self, *tokens: str) -> re.Pattern:
         """
-        Create a compiled regex pattern that matches {token...} sequences for specified tokens.
+        Create optimized regex pattern for matching token sequences in template text.
         
-        Builds an optimized regex that finds brace sequences starting with any of the
-        provided token prefixes. The regex uses alternation with longest-first matching
-        to handle overlapping token prefixes correctly.
+        Builds a compiled regex that efficiently finds brace sequences starting with any of
+        the provided token prefixes. Uses longest-first matching to handle overlapping
+        token prefixes correctly and prevent incorrect partial matches.
         
         Args:
-            *tokens: Variable number of token prefix strings to match (e.g., '#', '@', '?', '$')
+            *tokens: Token prefix strings to match (e.g., '#', '@', '?', '$')
             
         Returns:
             re.Pattern: Compiled regex that matches {token_content} where token_content
                     starts with any of the provided token prefixes
                     
         Examples:
-            >>> pattern = create_token_regex('#', '@', '?')
-            >>> # Matches: {#red}, {@bold}, {?show_errors}, etc.
-            >>> # Doesn't match: {$literal}, {unknown}, etc.
+            >>> pattern = parser.create_token_regex('#', '@', '?')
+            >>> # Matches: {#red}, {@bold}, {?show_errors}
+            >>> # Doesn't match: {$literal}, {unknown}
             
-            >>> pattern = create_token_regex('?')  
-            >>> # Matches only: {?function_name}
-            
-            >>> for match in pattern.finditer("text {#red}colored{@bold}bold text"):
+            >>> for match in pattern.finditer("text {#red}colored{@bold}bold"):
             ...     print(match.groups())
             ('red', '#')
             ('bold', '@')
         
-        Pattern Details:
-            - Uses non-greedy matching (.*?) to handle nested braces correctly
+        Pattern Structure:
+            - Uses non-greedy matching (.*?) for proper brace handling
             - Sorts tokens by length (longest first) to prevent partial matches
-            - Uses capturing groups to extract both content and token type
-            - Handles empty token list gracefully (returns pattern that matches nothing)
+            - Captures both full content and token type for processing
+            - Returns no-match pattern for empty token list
             
         Performance:
-            - Compiled regex is much faster than multiple sequential searches
-            - Single pass through text finds all relevant tokens
-            - Longest-first ordering prevents incorrect partial matches
+            - Single compiled regex is faster than multiple sequential searches
+            - One pass through text finds all relevant tokens
+            - Longest-first ordering prevents incorrect matches
         """
         if not tokens:
-            # Return pattern that matches nothing if no tokens provided
             return re.compile(r'(?!)')
         
         # Sort tokens by length (longest first) to prevent partial matches
-        # Example: if tokens are ['#', '##'], we want '##' to match before '#'
         sorted_tokens = sorted(tokens, key=len, reverse=True)
         
         # Escape special regex characters in token prefixes
         escaped_tokens = [re.escape(token) for token in sorted_tokens]
         
-        # Create alternation pattern: (#|@|\?) 
+        # Create alternation pattern for token matching
         token_alternation = '|'.join(escaped_tokens)
         
-        # Full pattern: \{(content_starting_with_token)\}
-        # Capturing groups: (content, token_type)
-        # (?=...) is a positive lookahead to capture which token matched
+        # Full pattern captures: (full_content, token_prefix, token_body)
         pattern = rf'\{{(({token_alternation})(.*?))\}}'
         
         return re.compile(pattern)
@@ -142,31 +148,45 @@ class TemplateParser:
         token: Union[str, List[str], re.Pattern]
     ) -> List[Union[str, Tuple[str, str]]]:
         """
-        Split `text` on tokenized sections, keeping prefix/content info.
+        Split text on tokenized sections while preserving token information.
+        
+        Intelligently separates plain text from token sequences, maintaining
+        both the token type and content for downstream processing. Handles
+        multiple token types efficiently through regex compilation.
 
         Args:
-            text: The string to split.
-            token: Single token string, list of token strings, or precompiled regex.
+            text: String to split and analyze
+            token: Single token string, list of tokens, or pre-compiled regex pattern
 
         Returns:
-            List of segments: plain strings or tuples (token_prefix, token_content)
+            List of mixed elements:
+            - str: Plain text segments
+            - Tuple[str, str]: Token segments as (token_prefix, token_content)
+            
+        Examples:
+            >>> parser.split_tokens("Hello {#red}world{@bold}!", ['#', '@'])
+            ['Hello ', ('#', 'red'), 'world', ('@', 'bold'), '!']
+            
+            >>> parser.split_tokens("No tokens here", ['#'])
+            ['No tokens here']
         """
         # Determine regex pattern
         if isinstance(token, re.Pattern):
             pattern = token
         else:
-            # Normalize to list
+            # Normalize to list and create pattern
             tokens = [token] if isinstance(token, str) else token
             pattern = self.create_token_regex(*tokens)
 
         result = []
         last_end = 0
 
+        # Process each token match in sequence
         for match in pattern.finditer(text):
             start, end = match.start(), match.end()
             groups = match.groups()
 
-            # Expecting groups: full_content, token_prefix, token_content
+            # Extract token components from regex groups
             if len(groups) >= 3:
                 full_content, token_prefix, token_content = groups
             else:
@@ -174,21 +194,37 @@ class TemplateParser:
                 token_prefix = ''
                 token_content = full_content
 
-            # Append text before the token
+            # Add text before the token
             if start > last_end:
                 result.append(text[last_end:start])
 
-            # Append token as tuple
+            # Add token as tuple (prefix, content)
             result.append((token_prefix, token_content))
             last_end = end
 
-        # Append remaining text
+        # Add remaining text after last token
         if last_end < len(text):
             result.append(text[last_end:])
 
         return result
     
     def parse_template(self, template: str) -> List[TemplateSection]:
+        """
+        Parse template string into structured AST sections.
+        
+        Converts a template string into a list of TemplateSection objects that
+        can be efficiently processed during formatting operations. Handles
+        nested braces, escape sequences, and complex token structures.
+        
+        Args:
+            template: Template string to parse
+            
+        Returns:
+            List[TemplateSection]: Parsed template sections ready for formatting
+            
+        Raises:
+            StringSmithError: If template contains unclosed sections or invalid syntax
+        """
         sections = []
         i = 0
         
@@ -224,7 +260,20 @@ class TemplateParser:
         return sections
     
     def _is_position_unescaped(self, text: str, pos: int) -> bool:
-        """Check if position is unescaped using the same logic as find_token."""
+        """
+        Check if position is unescaped by counting preceding escape characters.
+        
+        Determines if a character at a given position is escaped by counting
+        the number of consecutive escape characters before it. Even counts
+        indicate unescaped positions.
+        
+        Args:
+            text: Text to analyze
+            pos: Position to check
+            
+        Returns:
+            bool: True if position is unescaped
+        """
         escape_len = len(self._escape_char)
         if pos < escape_len:
             return True
@@ -250,9 +299,6 @@ class TemplateParser:
             
         Returns:
             Position of matching }} or -1 if not found
-            
-        Raises:
-            StringSmithError: If no matching }} found (handled by caller)
         """
         section_brace_count = 1
         i = start_pos
@@ -289,17 +335,13 @@ class TemplateParser:
         """Create a TemplateSection for literal text (no variables)."""
         return TemplateSection(
             is_mandatory=False,
-            section_formatting=[],
+            section_formatting={},
             field_name=None,  # None indicates literal text
-            parts=SectionParts(text, '', None),
-            live_tokens=[]
+            parts=SectionParts(text, '', None)
         )
     
     def _split_unescaped(self, content: str) -> List[str]:
         """Split content on delimiter characters that are not escaped."""
-        # Match: (even number of escape chars)(delimiter)
-        # (?<!\\) ensures we're not in the middle of escape sequence
-        # (\\\\)* matches zero or more pairs of escapes (even count)
         esc = re.escape(self._escape_char)
         delim = re.escape(self._delimiter)
         pattern = f"(?<!{esc})(?:{esc}{esc})*{delim}"
@@ -352,8 +394,7 @@ class TemplateParser:
                 is_mandatory=is_mandatory,
                 section_formatting=section_tokens,
                 field_name=field[0], # field name used as identifier
-                parts=SectionParts(prefix, field[1], suffix),  # the rest of the field part (formatting) left in text
-                live_tokens=[]
+                parts=SectionParts(prefix, field[1], suffix)  # the rest of the field part (formatting) left in text
             )
     
     def _extract_field_name(self, field_text: str) -> Tuple[str, str]:

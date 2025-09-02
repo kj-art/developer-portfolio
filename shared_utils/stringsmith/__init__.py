@@ -1,17 +1,19 @@
 """
-StringSmith - Advanced template formatting with conditional sections and inline formatting.
+StringSmith - Professional template formatting with conditional sections and rich styling.
 
-StringSmith provides f-string-like functionality with conditional sections that automatically
-disappear when variables aren't provided, plus rich formatting options including colors
-and text emphasis. It eliminates manual null checking and conditional string building.
+StringSmith provides advanced template formatting capabilities that eliminate manual null
+checking and conditional string building. Templates automatically adapt based on available
+data, with rich formatting options including colors, text emphasis, and custom functions.
 
 Core Features:
     - **Conditional Sections**: Template sections disappear when variables are missing
     - **Mandatory Field Validation**: Required fields (marked with `!`) enforce data presence  
-    - **Rich Formatting**: ANSI colors, text emphasis, and custom styling functions
+    - **Rich Formatting**: ANSI colors, text emphasis, hex codes, and custom styling
+    - **Custom Functions**: User-defined functions for dynamic formatting and conditionals
+    - **Multi-Parameter Functions**: Functions can access multiple template fields
     - **Performance Optimized**: Templates parsed once, formatted many times efficiently
     - **Thread Safe**: Immutable formatters safe for concurrent use
-    - **Extensible**: Custom formatting functions and conditional logic
+    - **Extensible**: Custom token handlers for specialized formatting needs
 
 Quick Start:
     Basic conditional formatting:
@@ -34,16 +36,27 @@ Quick Start:
     >>> formatter.format(priority=8, message="Critical")  # Red "Level 8: Critical"
 
 Professional Use Cases:
-    - Application logging with conditional context that varies by log level
-    - Data reporting with sparse or missing datasets
+    - Application logging with context that varies by log level
+    - Data reporting with sparse or missing datasets  
     - CLI interfaces with dynamic status messages
     - Business intelligence with formatted reports
-    - Monitoring systems with context-sensitive formatting
+    - Monitoring systems with context-sensitive alerts
+
+Token Types:
+    - #: Colors (named, hex codes, or custom functions)
+    - @: Text emphasis (bold, italic, underline, etc.)
+    - ?: Conditionals (section shown only if function returns True)
+    - $: Literal transforms (replace content with function result)
 
 Thread Safety:
     All StringSmith components are thread-safe after initialization.
     TemplateFormatter instances are immutable and can be used safely
-    across multiple concurrent threads.
+    across multiple concurrent threads without synchronization.
+
+Performance:
+    Templates are parsed and optimized during initialization for fast
+    runtime formatting. Recommended usage is to create formatters once
+    and reuse them for multiple format operations.
 
 Author: Krishna R Jain <krishna@krishnajain.com>
 License: MIT
@@ -62,14 +75,14 @@ __version__ = "0.1.0"
 __author__ = "Krishna R Jain"
 __email__ = "krishna@krishnajain.com"
 __license__ = "MIT"
-__description__ = "Advanced template formatting with conditional sections and inline formatting"
+__description__ = "Professional template formatting with conditional sections and rich styling"
 
-# Public API - these are the main classes/functions users should import
+# Public API - main classes and functions for user import
 __all__ = [
-    # Main formatter class
+    # Core formatter class
     "TemplateFormatter",
     
-    # Exception hierarchy
+    # Exception hierarchy for error handling
     "StringSmithError",
     "MissingMandatoryFieldError", 
     "ParseError",
@@ -83,22 +96,23 @@ __all__ = [
     "__description__",
 ]
 
-# Optional Rich integration check
 def _check_rich_available() -> bool:
-    """Check if Rich is available for extended color support."""
+    """Check if Rich library is available for extended color support."""
     try:
         import rich
         return True
     except ImportError:
         return False
 
-# Package-level configuration
+# Package-level feature detection
 HAS_RICH = _check_rich_available()
 
-# Convenience function for checking capabilities
 def get_capabilities() -> dict:
     """
     Get StringSmith capabilities and feature availability.
+    
+    Returns comprehensive information about available features, performance
+    characteristics, and optional dependencies for system integration.
     
     Returns:
         dict: Dictionary of available features and their status
@@ -107,6 +121,7 @@ def get_capabilities() -> dict:
         >>> from stringsmith import get_capabilities
         >>> caps = get_capabilities()
         >>> print(f"Rich colors available: {caps['rich_colors']}")
+        >>> print(f"Version: {caps['version']}")
     """
     import sys
     return {
@@ -117,6 +132,9 @@ def get_capabilities() -> dict:
         "text_emphasis": True,
         "conditional_sections": True,
         "custom_functions": True,
+        "multi_parameter_functions": True,
         "positional_args": True,
         "thread_safe": True,
+        "performance_optimized": True,
+        "extensible_tokens": True,
     }

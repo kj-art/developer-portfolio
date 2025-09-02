@@ -1,73 +1,60 @@
-# **StringSmith: Professional Template Formatting**
+# StringSmith: Professional Template Formatting
 
-Advanced Python library for conditional template formatting with rich styling. Automatically hides template sections when data is missing, eliminating manual null checks and verbose conditional logic.
+Advanced Python library for conditional template formatting with rich styling and dynamic content control. Templates automatically adapt based on available data, eliminating manual null checks and conditional logic.
 
----
-
-## **Quick Example**
+## Quick Start
 
 ```python
 from stringsmith import TemplateFormatter
 
-# Basic conditional sections
-formatter = TemplateFormatter("Hello {{name}}!")
-print(formatter.format(name="World"))  # "Hello World!"
-print(formatter.format())               # "Hello !" (section empty)
+# Basic conditional formatting
+formatter = TemplateFormatter("{{Hello ;name;}}")
+print(formatter.format(name="World"))  # "Hello World"
+print(formatter.format())               # "" (section disappears when data missing)
 
-# Sections with prefix/suffix disappear when variable is missing
-formatter = TemplateFormatter("{{User: ;name;}} {{(Level ;level;)}}")
-print(formatter.format(name="admin", level=5))  # "User: admin (Level 5)"
-print(formatter.format(name="admin"))           # "User: admin " (level section gone)
-print(formatter.format())                       # "" (both sections gone)
-```
-
----
-
-## **Core Features**
-
-### 1. **Conditional Sections**
-
-Sections automatically hide if the variable is missing.
-
-```python
-formatter = TemplateFormatter("{{Welcome ;name;}}{{, you have ;count; messages}}")
-formatter.format(name="Alice", count=5)  # "Welcome Alice, you have 5 messages"
-formatter.format(name="Alice")           # "Welcome Alice"
-formatter.format()                       # "" (entire template hidden)
-```
-
-### 2. **Mandatory Fields**
-
-Use `!` to require a variable.
-
-```python
-formatter = TemplateFormatter("{{!name}} logged in {{at ;timestamp;}}")
-formatter.format(name="admin", timestamp="10:30")  # "admin logged in at 10:30"
-# Missing mandatory field raises MissingMandatoryFieldError
-```
-
-### 3. **Rich Formatting**
-
-Supports ANSI colors, text emphasis, combined styles, and hex codes.
-
-```python
+# Rich formatting with colors and emphasis
 formatter = TemplateFormatter("{{#red@bold;Error: ;message;}}")
 print(formatter.format(message="Failed"))  # Bold red "Error: Failed"
-
-formatter = TemplateFormatter("{{#FF5733@italic;Status: ;status;}}")
-print(formatter.format(status="Active"))  # Orange italic "Status: Active"
 ```
 
-### 4. **Custom Functions**
+## Key Features
 
-Use keyword-argument functions for dynamic formatting and conditionals.
+### Conditional Sections
+Template sections automatically disappear when their data is missing, enabling clean output without manual checks.
 
 ```python
-def priority_color(level): return 'red' if int(level) > 5 else 'yellow' if int(level) > 2 else 'green'
-def is_urgent(level): return int(level) > 7
+formatter = TemplateFormatter("{{User: ;name;}} {{(Level ;level;)}}")
+formatter.format(name="admin", level=5)  # "User: admin (Level 5)"
+formatter.format(name="admin")           # "User: admin " (level section gone)
+formatter.format()                       # "" (both sections gone)
+```
+
+### Rich Formatting
+Full support for ANSI colors, text emphasis, and hex color codes.
+
+```python
+# Named colors and emphasis
+formatter = TemplateFormatter("{{#red@bold;Critical: ;message;}}")
+
+# Hex colors  
+formatter = TemplateFormatter("{{#FF5733@italic;Status: ;status;}}")
+
+# Combined styles
+formatter = TemplateFormatter("{{#blue@underline;Info: ;details;}}")
+```
+
+### Custom Functions
+Dynamic formatting and conditional logic through user-defined functions.
+
+```python
+def priority_color(level):
+    return 'red' if int(level) > 5 else 'yellow' if int(level) > 2 else 'green'
+
+def is_urgent(priority):
+    return int(priority) > 7
 
 formatter = TemplateFormatter(
-    "{{#priority_color;[;priority;];}} {{?is_urgent;🚨 URGENT 🚨 ;}} {{message}}",
+    "{{#priority_color;[;priority;]}} {{?is_urgent;🚨 URGENT 🚨 ;}} {{message}}",
     functions={'priority_color': priority_color, 'is_urgent': is_urgent}
 )
 
@@ -75,96 +62,189 @@ print(formatter.format(priority="9", message="Server down"))
 # Red "[9] 🚨 URGENT 🚨 Server down"
 ```
 
-* Multi-field functions supported via keyword arguments.
-* Positional arguments only fill the section’s value (no multi-field access).
-* Cannot mix positional and keyword arguments in one call.
-
-### 5. **Token Types**
-
-* `#` → Color (named, hex, or function)
-* `@` → Text emphasis (bold, italic, underline, etc.)
-* `?` → Conditional (section shown only if function returns True)
-* `$` → Literal transformation (function replaces section content)
-
-Custom tokens can be added via `BaseTokenHandler` and `@register_token_handler`.
-
----
-
-## **Advanced Use Cases**
-
-### **Application Logging**
+### Multi-Parameter Functions
+Functions can access multiple template fields through parameter name matching.
 
 ```python
-def level_color(level):
-    return {'ERROR':'red','WARNING':'yellow','INFO':'blue','DEBUG':'dim'}.get(level.upper(), 'white')
-def has_user(user_id): return user_id is not None
+def is_profitable(revenue, costs):
+    return revenue and costs and float(revenue) > float(costs)
 
-log_fmt = TemplateFormatter(
-    "{{#level_color;[;level;];}} {{timestamp}} {{module}} {{?has_user;(User: ;user_id;) ;}} {{message}}",
-    functions={'level_color': level_color, 'has_user': has_user}
-)
-
-print(log_fmt.format(level="INFO", timestamp="10:30", module="auth", message="Login attempt"))
-print(log_fmt.format(level="INFO", timestamp="10:30", module="auth", user_id=123, message="Login successful"))
-```
-
-### **Data Reporting**
-
-```python
-def is_profitable(revenue, costs): return revenue and costs and float(revenue) > float(costs)
-
-report_fmt = TemplateFormatter(
-    "{{Company: ;company;}} {{(Revenue: $;revenue;M)}} {{?is_profitable; ✓ Profitable;}} {{[Notes: ;notes;]}}",
+formatter = TemplateFormatter(
+    "{{Company: ;company;}} {{?is_profitable; ✓ Profitable;revenue;}}",
     functions={'is_profitable': is_profitable}
 )
 
-companies = [
-    {'company': 'TechCorp', 'revenue': '150', 'costs': '120', 'notes': 'Strong growth'},
-    {'company': 'StartupXYZ', 'revenue': '50'},  
-    {'company': 'MegaCorp', 'revenue': '500', 'costs': '600'}
-]
-
-for company in companies:
-    print(report_fmt.format(**company))
+formatter.format(company="TechCorp", revenue="150", costs="100")
+# "TechCorp ✓ Profitable"
 ```
 
----
+### Mandatory Fields
+Enforce required data with the `!` prefix.
 
-## **Performance & Production Features**
+```python
+formatter = TemplateFormatter("{{!username}} logged in {{at ;timestamp;}}")
+formatter.format(username="admin", timestamp="10:30")  # "admin logged in at 10:30"
+formatter.format(username="admin")                     # "admin logged in "
+# formatter.format() raises MissingMandatoryFieldError
+```
 
-* **Efficient:** Templates parsed once, reusable for bulk formatting.
-* **Thread safe:** Immutable, safe for concurrent use.
-* **Extensible:** Custom token types, functions, and conditional logic.
-* **Error handling:** Structured exceptions with context.
+## Token Types
 
----
+| Token | Purpose | Examples |
+|-------|---------|----------|
+| `#` | Colors | `#red`, `#FF0000`, custom color functions |
+| `@` | Text emphasis | `@bold`, `@italic`, `@underline` |
+| `?` | Conditionals | Show section only if function returns True |
+| `$` | Literal transforms | Replace content with function result |
 
-## **Installation**
+## Professional Use Cases
+
+### Application Logging
+
+```python
+def level_color(level):
+    return {'ERROR': 'red', 'WARNING': 'yellow', 'INFO': 'blue'}.get(level.upper(), 'white')
+
+def has_user(user_id):
+    return user_id is not None and str(user_id).strip()
+
+log_formatter = TemplateFormatter(
+    "{{#level_color;[;level;]}} {{timestamp}} {{module}} {{?has_user;(User: ;user_id;) }}{{message}}",
+    functions={'level_color': level_color, 'has_user': has_user}
+)
+
+# Produces contextual log entries:
+# [ERROR] 10:30 auth (User: 123) Login failed
+# [INFO] 10:31 system Backup completed
+```
+
+### Business Reporting
+
+```python
+def performance_color(revenue):
+    rev = float(revenue) if revenue else 0
+    return 'green' if rev > 100 else 'yellow' if rev > 50 else 'red'
+
+def has_notes(notes):
+    return notes and notes.strip()
+
+report_formatter = TemplateFormatter(
+    "{{Company: ;company;}} {{#performance_color;(Revenue: $;revenue;M)}} {{?has_notes;[Notes: ;notes;]}}",
+    functions={'performance_color': performance_color, 'has_notes': has_notes}
+)
+```
+
+### CLI Status Messages
+
+```python
+def status_icon(status):
+    return {'running': '⏳', 'complete': '✅', 'failed': '❌'}.get(status, '❓')
+
+def progress_color(percent):
+    return 'green' if percent > 75 else 'yellow' if percent > 25 else 'red'
+
+status_formatter = TemplateFormatter(
+    "{{$status_icon;status}} {{task}} {{#progress_color;[;progress;%]}} {{?has_eta;ETA: ;eta;}}",
+    functions={'status_icon': status_icon, 'progress_color': progress_color, 'has_eta': lambda eta: eta}
+)
+```
+
+## Advanced Features
+
+### Positional Arguments
+Use empty field names for ordered data input.
+
+```python
+formatter = TemplateFormatter("{{}} + {{}} = {{}}")
+formatter.format("15", "27", "42")  # "15 + 27 = 42"
+```
+
+### Custom Delimiters and Escaping
+
+```python
+# Custom delimiter
+formatter = TemplateFormatter("{{prefix|field|suffix}}", delimiter="|")
+
+# Escape sequences
+formatter = TemplateFormatter("Use \\{name\\} for {{name}}")
+formatter.format(name="variables")  # "Use {name} for variables"
+
+# Custom escape character
+formatter = TemplateFormatter("Use ~{name~} for {{name}}", escape_char="~")
+```
+
+### Inline Formatting
+Apply formatting to specific text spans within template parts.
+
+```python
+formatter = TemplateFormatter("{{Status: {#green}OK{#normal} ;message;}}")
+formatter.format(message="All systems operational")
+```
+
+## Performance
+
+- **Template Parsing**: Done once during initialization for fast formatting
+- **Runtime Complexity**: O(n) where n is the number of template sections
+- **Thread Safety**: Immutable after creation, safe for concurrent use
+- **Memory Efficient**: Minimal overhead, suitable for high-frequency formatting
+
+## Installation
 
 ```bash
-pip install -e .
-pip install -e ".[colors]"  # Optional color support
-pip install -e ".[dev]"     # Development tools
+pip install stringsmith
+pip install "stringsmith[colors]"  # Extended color support via Rich
 ```
 
-**Requirements:** Python 3.7+, optional `rich>=10.0.0` for color support.
+**Requirements**: Python 3.7+
 
----
+## API Reference
 
-## **API Reference**
+### TemplateFormatter
 
 ```python
 TemplateFormatter(
     template: str,
     delimiter: str = ";",
-    escape_char: str = "\\",
+    escape_char: str = "\\", 
     functions: Optional[Dict[str, Callable]] = None
 )
-
-# Formatting
-format(*args, **kwargs) -> str
 ```
 
-* `*args` → positional section values, simple usage.
-* `**kwargs` → keyword-matched values for multi-field functions.
-* Mixing `*args` and `**kwargs` in a call raises `StringSmithError`.
+**Methods:**
+- `format(*args, **kwargs) -> str`: Format template with provided data
+- `get_template_info() -> Dict`: Get template structure information
+
+**Arguments:**
+- Use `*args` for positional field values (simple cases)
+- Use `**kwargs` for named field values (enables multi-parameter functions)
+- Cannot mix positional and keyword arguments in a single call
+
+## Error Handling
+
+```python
+from stringsmith import StringSmithError, MissingMandatoryFieldError
+
+try:
+    result = formatter.format(**data)
+except MissingMandatoryFieldError as e:
+    print(f"Required field missing: {e}")
+except StringSmithError as e:
+    print(f"Template error: {e}")
+```
+
+## Extension System
+
+Create custom token handlers for specialized formatting needs:
+
+```python
+from stringsmith.tokens import BaseTokenHandler, register_token_handler
+
+@register_token_handler('%', reset_ansi='')
+class CurrencyTokenHandler(BaseTokenHandler):
+    def get_replacement_text(self, token_value: str) -> str:
+        return f"${token_value}" if token_value == "USD" else token_value
+```
+
+---
+
+**StringSmith** eliminates the complexity of conditional string formatting while providing professional-grade styling capabilities. Perfect for logging systems, CLI applications, business reporting, and any scenario where clean, adaptive text output is essential.
