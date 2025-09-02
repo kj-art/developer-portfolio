@@ -1,7 +1,7 @@
 data_pipeline.log
 data_pipeline.log.json
 formatting_test_output.txt
-shared_utils/__pycache__/
+__pycache__/
 *.pyc
 *.pyo
 *.pyd

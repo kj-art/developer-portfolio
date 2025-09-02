@@ -206,7 +206,7 @@ TemplateFormatter(
     template: str,
     delimiter: str = ";",
     escape_char: str = "\\", 
-    functions: Optional[Dict[str, Callable]] = None
+    functions: list[Callable] | dict[str, Callable] | None = None
 )
 ```
 

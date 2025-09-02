@@ -160,11 +160,7 @@ def demo_professional_logging():
     # Build log formatter with conditional context
     formatter = TemplateFormatter(
         "{{#level_color;[;level;]}} {{timestamp}} {{module}} {{?has_user;(User: ;user_id;)}} {{message}}{{?is_error_level; - ALERT;level;}}", 
-        functions={
-            'level_color': level_color,
-            'has_user': has_user,
-            'is_error_level': is_error_level
-        }
+        functions=[level_color, has_user, is_error_level]
     )
     
     # Sample log entries

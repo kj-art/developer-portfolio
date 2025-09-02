@@ -6,7 +6,6 @@ public interface for StringSmith's conditional template formatting capabilities.
 """
 
 from typing import Dict, Callable, Optional
-from re import Pattern
 from .parser import TemplateParser
 from ..tokens import create_token_handlers
 from ..exceptions import StringSmithError, MissingMandatoryFieldError
@@ -16,12 +15,12 @@ from ..utils import has_non_ansi
 class TemplateFormatter:
     """
     Professional template formatter with conditional sections and rich formatting.
-    
+
     TemplateFormatter provides f-string-like functionality with conditional sections
     that automatically disappear when variables are missing, plus rich formatting
     options including colors and text emphasis. Templates are optimized during
     initialization for efficient runtime formatting operations.
-    
+
     Core Features:
         - **Conditional Sections**: Sections disappear when variables are missing
         - **Mandatory Validation**: Required fields (prefixed with '!') enforce data presence
@@ -31,7 +30,7 @@ class TemplateFormatter:
         - **Flexible Arguments**: Support for both positional and keyword arguments
         - **Performance Optimized**: Template parsing done once, formatting is fast
         - **Thread Safe**: Immutable after creation, safe for concurrent use
-    
+
     Template Syntax:
         Templates use double-brace sections with optional formatting and delimiters:
         
@@ -62,7 +61,7 @@ class TemplateFormatter:
         ...     return 'red' if int(level) > 5 else 'yellow'
         >>> formatter = TemplateFormatter(
         ...     "{{#priority_color;Level ;priority;: ;message;}}", 
-        ...     functions={'priority_color': priority_color}
+        ...     functions=[priority_color]
         ... )
         >>> formatter.format(priority=8, message="Critical")  # Red "Level 8: Critical"
         
@@ -70,7 +69,7 @@ class TemplateFormatter:
         >>> def is_profitable(revenue, costs):
         ...     return float(revenue) > float(costs)
         >>> formatter = TemplateFormatter("{{?is_profitable; ✓ Profitable;revenue;}}", 
-        ...                             functions={'is_profitable': is_profitable})
+        ...                             functions=[is_profitable])
         >>> formatter.format(revenue="150", costs="100")  # " ✓ Profitable"
         
         Mandatory fields with validation:
@@ -93,7 +92,7 @@ class TemplateFormatter:
                  template: str, 
                  delimiter: str = ';', 
                  escape_char: str = '\\', 
-                 functions: Optional[Dict[str, Callable]] = None):
+                 functions: list[Callable] | dict[str, Callable] | None = None):
         """
         Initialize a template formatter with conditional sections and rich formatting.
         
@@ -117,7 +116,13 @@ class TemplateFormatter:
         self.template = template
         self.delimiter = delimiter
         self.escape_char = escape_char
-        self.functions = functions or {}
+        if functions is None:
+            self._functions = {}
+        elif isinstance(functions, list):
+            self._functions = {f.__name__: f for f in functions}
+        else:
+            self._functions = functions
+
 
         # Initialize parser with template-specific settings
         self.parser = TemplateParser()
@@ -125,7 +130,7 @@ class TemplateFormatter:
         self.parser.escape_char = escape_char
 
         # Create token handlers organized by processing priority
-        handler_passes = create_token_handlers(self.functions)
+        handler_passes = create_token_handlers(self._functions)
         self.token_handlers = {}
         self.flat_token_handlers = {}
 
@@ -420,5 +425,5 @@ class TemplateFormatter:
             'has_inline_formatting': self._has_inline_formatting,
             'delimiter': self.delimiter,
             'escape_char': self.escape_char,
-            'custom_functions': list(self.functions.keys())
+            'custom_functions': list(self._functions.keys())
         }
