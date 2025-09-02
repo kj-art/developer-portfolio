@@ -1,24 +1,26 @@
 """
-Enterprise-grade logging system for portfolio projects
+Professional logging system powered by StringSmith template formatting
 
-This module provides comprehensive logging capabilities including:
-- Family-based dynamic formatting with color and text formatting families
-- Colored console output with proper reset handling
-- JSON structured logging
-- Performance monitoring
-- Progress bar integration
-- Context management
-- Log rotation and filtering
+This module provides enterprise-grade logging capabilities with StringSmith's
+conditional formatting system, delivering rich visual output with automatic
+graceful degradation for missing data.
+
+StringSmith Integration Features:
+- Conditional sections that disappear when data is missing
+- Rich ANSI formatting with colors and text emphasis  
+- Multi-parameter functions for complex conditional logic
+- High-performance template caching for production workloads
+- Thread-safe formatters for concurrent logging operations
 
 Usage:
     from shared_utils.logger import set_up_logging, get_logger, log_performance
     
-    set_up_logging(level='INFO', log_file='app.log', enable_json=True)
+    set_up_logging(level='INFO', log_file='app.log', enable_colors=True)
     logger = get_logger(__name__)
     
     with log_performance("file_processing"):
         logger.info("Processing files", file_count=100, duration=2.5)
-        # Output: "Processing files (100 files) in 2.5s"
+        # Output: "[INFO] Processing files (100 files) in 2.50s"
 """
 
 import logging
@@ -39,11 +41,219 @@ try:
 except ImportError:
     psutil = None
 
-from .dynamic_formatting import DynamicLoggingFormatter, DynamicFormattingError
+from .stringsmith import TemplateFormatter
+
+
+class PerformanceTracker:
+    """Thread-safe performance monitoring with StringSmith-powered reporting"""
+    
+    def __init__(self):
+        self.metrics = {}
+        self.lock = threading.Lock()
+        
+    def start_operation(self, operation_name: str) -> str:
+        """Start tracking an operation with unique ID"""
+        operation_id = f"{operation_name}_{int(time.time() * 1000)}"
+        with self.lock:
+            self.metrics[operation_id] = {
+                'name': operation_name,
+                'start_time': time.time(),
+                'start_memory': self._get_memory_usage(),
+            }
+        return operation_id
+        
+    def end_operation(self, operation_id: str, **extra_metrics):
+        """End tracking and return metrics"""
+        with self.lock:
+            if operation_id not in self.metrics:
+                return None
+                
+            start_data = self.metrics[operation_id]
+            duration = time.time() - start_data['start_time']
+            memory_delta = self._get_memory_usage() - start_data['start_memory']
+            
+            metrics = {
+                'operation': start_data['name'],
+                'duration': duration,
+                'memory_delta_mb': memory_delta,
+                **extra_metrics
+            }
+            
+            # Log performance metrics
+            perf_logger = logging.getLogger('performance')
+            perf_logger.info(f"Operation completed: {start_data['name']}", 
+                           extra={'extra_data': metrics})
+            
+            del self.metrics[operation_id]
+            return metrics
+    
+    def _get_memory_usage(self) -> float:
+        """Get current memory usage in MB"""
+        if psutil is None:
+            return 0.0
+        try:
+            process = psutil.Process()
+            return process.memory_info().rss / 1024 / 1024
+        except Exception:
+            return 0.0
+
+
+# Global performance tracker
+_performance_tracker = PerformanceTracker()
+
+
+class StringSmithLoggingFormatter(logging.Formatter):
+    """
+    Logging formatter powered by StringSmith conditional templating
+    
+    Automatically handles missing log fields using StringSmith's graceful degradation.
+    Sections disappear when their data is missing, eliminating manual null checking.
+    """
+    
+    def __init__(self, template: str = None, enable_colors: bool = True):
+        super().__init__()
+        
+        # Default professional log template showcasing StringSmith features
+        if template is None:
+            template = (
+                "{{#level_color;[;levelname;]}} {{asctime}} {{name}} "
+                "{{?has_user_context;(User: ;user_id;) }}"
+                "{{?has_request_id;[Req: ;request_id;] }}"
+                "{{message}}"
+                "{{?has_duration; in ;duration;$format_duration}}"
+                "{{?has_file_count; (;file_count; files)}}"
+                "{{?has_error_count; - ;error_count;$format_errors}}"
+                "{{?has_memory_usage; [;memory_usage_mb;MB]}}"
+                "{{?is_slow_operation; ⚠️ SLOW ;duration;}}"
+            )
+        
+        # StringSmith functions for dynamic log formatting
+        def level_color(level):
+            """Map log levels to colors"""
+            colors = {
+                'DEBUG': 'dim',
+                'INFO': 'blue', 
+                'WARNING': 'yellow',
+                'ERROR': 'red',
+                'CRITICAL': 'magenta'
+            }
+            return colors.get(level, 'white')
+        
+        def format_duration(duration_val):
+            """Format duration with appropriate units"""
+            if isinstance(duration_val, str):
+                try:
+                    duration_val = float(duration_val)
+                except ValueError:
+                    return duration_val
+                    
+            if duration_val < 0.001:
+                return f"{duration_val*1000000:.0f}μs"
+            elif duration_val < 1:
+                return f"{duration_val*1000:.1f}ms"
+            elif duration_val < 60:
+                return f"{duration_val:.2f}s"
+            else:
+                minutes = int(duration_val // 60)
+                seconds = duration_val % 60
+                return f"{minutes}m{seconds:.1f}s"
+        
+        def format_errors(error_count):
+            """Format error count with appropriate emphasis"""
+            try:
+                count = int(error_count)
+                if count == 1:
+                    return "1 error"
+                else:
+                    return f"{count} errors"
+            except (ValueError, TypeError):
+                return str(error_count)
+        
+        # Conditional functions
+        def has_user_context(user_id):
+            return user_id is not None and str(user_id).strip() != ''
+        
+        def has_request_id(request_id):
+            return request_id is not None and str(request_id).strip() != ''
+            
+        def has_duration(duration):
+            return duration is not None
+            
+        def has_file_count(file_count):
+            return file_count is not None and file_count > 0
+            
+        def has_error_count(error_count):
+            return error_count is not None and error_count > 0
+            
+        def has_memory_usage(memory_usage_mb):
+            return memory_usage_mb is not None
+            
+        def is_slow_operation(duration):
+            try:
+                return duration is not None and float(duration) > 5.0
+            except (ValueError, TypeError):
+                return False
+        
+        # Create StringSmith formatter with logging functions
+        functions = [
+            level_color,
+            format_duration,
+            format_errors,
+            has_user_context,
+            has_request_id,
+            has_duration,
+            has_file_count,
+            has_error_count,
+            has_memory_usage,
+            is_slow_operation
+        ]
+        
+        try:
+            self.formatter = TemplateFormatter(template, functions=functions)
+            self.fallback_formatter = None
+        except Exception as e:
+            # Fallback to basic formatting if StringSmith setup fails
+            logging.getLogger(__name__).error(f"StringSmith formatter setup failed: {e}")
+            self.formatter = None
+            self.fallback_formatter = logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            )
+    
+    def format(self, record: logging.LogRecord) -> str:
+        """Format log record using StringSmith conditional templating"""
+        # Fallback to basic formatting if StringSmith failed to initialize
+        if self.formatter is None:
+            return self.fallback_formatter.format(record)
+        
+        # Build comprehensive log data dictionary
+        log_data = {
+            'message': record.getMessage(),
+            'levelname': record.levelname,
+            'name': record.name,
+            'funcName': record.funcName,
+            'lineno': record.lineno,
+            'asctime': self.formatTime(record),
+        }
+        
+        # Add extra data if present
+        if hasattr(record, 'extra_data'):
+            log_data.update(record.extra_data)
+        
+        # Add other record attributes (excluding private/system ones)
+        for key, value in record.__dict__.items():
+            if key not in log_data and not key.startswith('_') and key not in ('msg', 'args'):
+                log_data[key] = value
+        
+        try:
+            # StringSmith handles missing fields gracefully - sections disappear automatically
+            return self.formatter.format(**log_data)
+        except Exception as e:
+            # Robust fallback preserves logging functionality
+            return self.fallback_formatter.format(record) + f" [STRINGSMITH ERROR: {e}]"
 
 
 class JSONFormatter(logging.Formatter):
-    """Formatter that outputs structured JSON logs"""
+    """Standard JSON formatter for structured logging"""
     
     def format(self, record):
         log_entry = {
@@ -71,91 +281,8 @@ class JSONFormatter(logging.Formatter):
         return json.dumps(log_entry, default=str)
 
 
-class ProgressAwareHandler(logging.StreamHandler):
-    """Handler that doesn't interfere with progress bars"""
-    
-    def emit(self, record):
-        try:
-            # Check if tqdm is available and active
-            try:
-                import tqdm
-                if tqdm.tqdm._instances:
-                    # Clear progress bars, emit log, redraw progress bars
-                    for instance in tqdm.tqdm._instances:
-                        instance.clear()
-                    super().emit(record)
-                    for instance in tqdm.tqdm._instances:
-                        instance.refresh()
-                    return
-            except ImportError:
-                pass
-                
-            # Normal emission if no progress bars
-            super().emit(record)
-        except Exception:
-            self.handleError(record)
-
-
-class PerformanceTracker:
-    """Tracks performance metrics and logs statistics"""
-    
-    def __init__(self):
-        self.metrics = {}
-        self.lock = threading.Lock()
-        
-    def start_operation(self, operation_name: str) -> str:
-        """Start tracking an operation"""
-        operation_id = f"{operation_name}_{int(time.time() * 1000)}"
-        with self.lock:
-            self.metrics[operation_id] = {
-                'name': operation_name,
-                'start_time': time.time(),
-                'start_memory': self._get_memory_usage(),
-            }
-        return operation_id
-        
-    def end_operation(self, operation_id: str, **extra_metrics):
-        """End tracking an operation and log results"""
-        with self.lock:
-            if operation_id not in self.metrics:
-                return
-                
-            start_data = self.metrics[operation_id]
-            duration = time.time() - start_data['start_time']
-            memory_delta = self._get_memory_usage() - start_data['start_memory']
-            
-            metrics = {
-                'operation': start_data['name'],
-                'duration_seconds': round(duration, 3),
-                'memory_delta_mb': round(memory_delta, 2),
-                **extra_metrics
-            }
-            
-            # Log performance metrics
-            logger = logging.getLogger('performance')
-            logger.info(f"Operation completed: {start_data['name']}", 
-                       extra={'extra_data': metrics})
-            
-            del self.metrics[operation_id]
-            return metrics
-    
-    def _get_memory_usage(self) -> float:
-        """Get current memory usage in MB"""
-        if psutil is None:
-            return 0.0
-        try:
-            process = psutil.Process()
-            return process.memory_info().rss / 1024 / 1024
-        except Exception:
-            return 0.0
-
-
-# Global performance tracker
-_performance_tracker = PerformanceTracker()
-
-
 class EnterpriseLogger:
-    """Main logger class with enterprise features"""
+    """Enhanced logger with StringSmith-powered formatting"""
     
     def __init__(self, name: str):
         self.logger = logging.getLogger(name)
@@ -179,12 +306,12 @@ class EnterpriseLogger:
         self._log(logging.CRITICAL, message, **kwargs)
         
     def _log(self, level: int, message: str, **kwargs):
-        """Internal logging method with extra data handling"""
+        """Internal logging with StringSmith extra data support"""
         extra_data = {k: v for k, v in kwargs.items() 
                      if k not in ['exc_info', 'stack_info', 'stacklevel']}
         
         if extra_data:
-            # Create a LogRecord with extra data
+            # Create LogRecord with StringSmith-compatible extra data
             record = self.logger.makeRecord(
                 self.logger.name, level, '', 0, message, (), 
                 kwargs.get('exc_info'), extra={'extra_data': extra_data}
@@ -194,126 +321,32 @@ class EnterpriseLogger:
             self.logger.log(level, message, **kwargs)
 
 
-def create_default_format_functions() -> Dict[str, Callable]:
-    """Create default formatting functions for family-based logging scenarios"""
-    
-    def duration_format(seconds):
-        """Format duration with appropriate units"""
-        if seconds < 0.001:
-            return f"{seconds*1000000:.0f}μs"
-        elif seconds < 1:
-            return f"{seconds*1000:.1f}ms"
-        elif seconds < 60:
-            return f"{seconds:.2f}s"
-        else:
-            minutes = int(seconds // 60)
-            secs = seconds % 60
-            return f"{minutes}m{secs:.1f}s"
-    
-    def file_size_format(size_bytes):
-        """Format file size with appropriate units"""
-        if size_bytes < 1024:
-            return f"{size_bytes}B"
-        elif size_bytes < 1024**2:
-            return f"{size_bytes/1024:.1f}KB"
-        elif size_bytes < 1024**3:
-            return f"{size_bytes/(1024**2):.1f}MB"
-        else:
-            return f"{size_bytes/(1024**3):.2f}GB"
-    
-    def performance_indicator(duration):
-        """Add performance indicators based on duration"""
-        if duration < 0.1:
-            return "⚡"
-        elif duration < 1.0:
-            return "✓"
-        elif duration < 5.0:
-            return "⏳"
-        else:
-            return "🐌"
-    
-    def error_severity(error_code):
-        """Format error severity based on error code"""
-        if isinstance(error_code, str):
-            if error_code.startswith('E0'):
-                return "CRITICAL"
-            elif error_code.startswith('W'):
-                return "WARNING"
-            else:
-                return "ERROR"
-        return "ERROR"
-    
-    def level_color_map(level_name):
-        """Map log levels to colors for family-based formatting"""
-        color_map = {
-            'DEBUG': 'cyan',
-            'INFO': 'green', 
-            'WARNING': 'yellow',
-            'ERROR': 'red',
-            'CRITICAL': 'magenta'
-        }
-        return color_map.get(level_name, 'white')
-    
-    def has_items(count):
-        """Check if count is greater than 0 (for conditional formatting)"""
-        return count > 0
-    
-    def is_slow(duration):
-        """Check if operation is slow (for conditional formatting)"""
-        return duration > 5.0
-    
-    def has_errors(error_count):
-        """Check if there are errors (for conditional formatting)"""
-        return error_count > 0
-    
-    return {
-        'duration_format': duration_format,
-        'file_size_format': file_size_format,
-        'performance_indicator': performance_indicator,
-        'error_severity': error_severity,
-        'level_color_map': level_color_map,
-        'has_items': has_items,
-        'is_slow': is_slow,
-        'has_errors': has_errors,
-    }
-
-
 def set_up_logging(
     level: str = 'INFO',
     log_file: Optional[str] = None,
     json_file: Optional[str] = None,
     enable_colors: bool = True,
-    enable_performance: bool = True,
     max_file_size: str = '10MB',
     backup_count: int = 5,
-    console_format: Optional[str] = None,
-    file_format: Optional[str] = None,
-    format_functions: Optional[Dict[str, Callable]] = None
+    console_template: Optional[str] = None,
+    file_template: Optional[str] = None,
 ):
     """
-    Set up enterprise logging configuration with family-based dynamic formatting
+    Setup enterprise logging with StringSmith-powered formatting
     
     Args:
         level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-        log_file: Path to text log file
+        log_file: Path to text log file  
         json_file: Path to JSON log file for structured logging
-        enable_colors: Whether to use colored console output
-        enable_performance: Whether to enable performance tracking
+        enable_colors: Whether to use colored console output via StringSmith
         max_file_size: Maximum size of log files before rotation
         backup_count: Number of backup files to keep
-        console_format: Custom console log format string (family-based formatting syntax)
-        file_format: Custom file log format string (family-based formatting syntax)
-        format_functions: Custom formatting functions for dynamic formatting
+        console_template: Custom StringSmith template for console output
+        file_template: Custom StringSmith template for file output
         
-    Family-Based Format Examples:
-        # Level-based coloring with function fallback
-        "{{#level_color_map@bold;Level: ;levelname}} - {{message}}"
-        
-        # Conditional sections with function fallback
-        "{{$has_items;(;file_count; files)}}{{ in ;duration;$duration_format}}"
-        
-        # Complex formatting with inline spans
-        "{{message}}{{ with {#blue}important{#normal} data}}"
+    StringSmith Template Examples:
+        Basic: "{{#level_color;[;levelname;]}} {{message}}"
+        Rich: "{{#level_color;[;levelname;]}} {{message}}{{?has_duration; in ;duration;$format_duration}}{{?has_errors; (;error_count; errors)}}"
     """
     root_logger = logging.getLogger()
     root_logger.setLevel(getattr(logging, level.upper()))
@@ -321,44 +354,36 @@ def set_up_logging(
     # Clear existing handlers
     root_logger.handlers.clear()
     
-    # Merge default format functions with custom ones
-    default_functions = create_default_format_functions()
-    if format_functions:
-        default_functions.update(format_functions)
-    
-    # Default console format using family-based dynamic formatting with function fallback
-    if console_format is None:
-        console_format = ('{{#level_color_map@bold;[;levelname;]}} {{message}}'
-                         '{{$has_items; (;file_count; files)}}'
-                         '{{ in ;duration;$duration_format}}'
-                         '{{$has_errors; [;error_count; errors]}}')
-    
-    # Console handler with family-based formatting
-    console_handler = ProgressAwareHandler(sys.stdout)
-    console_formatter = DynamicLoggingFormatter(
-        console_format, 
-        functions=default_functions, 
-        output_mode='console' if enable_colors else 'file'
+    # Console handler with StringSmith formatting
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_formatter = StringSmithLoggingFormatter(
+        template=console_template,
+        enable_colors=enable_colors
     )
     console_handler.setFormatter(console_formatter)
     root_logger.addHandler(console_handler)
     
-    # File handler with detailed info but no colors
+    # File handler with detailed StringSmith template (no colors for files)
     if log_file:
-        if file_format is None:
-            file_format = ('{{asctime}} - {{name}} - {{levelname}} - {{funcName}}:{{lineno}} - {{message}}'
-                          '{{ (;file_count; files)}}'
-                          '{{ duration: ;duration;$duration_format}}'
-                          '{{ size: ;file_size;$file_size_format}}'
-                          '{{ error: ;error_code}}'
-                          '{{ memory: ;memory_delta_mb;MB}}')
+        if file_template is None:
+            # Rich file template showcasing StringSmith conditional sections
+            file_template = (
+                "{{asctime}} - {{name}} - {{levelname}} - {{funcName}}:{{lineno}} - {{message}}"
+                "{{ (;file_count; files)}}"
+                "{{ - duration: ;duration;$format_duration}}"  
+                "{{ - size: ;file_size_mb;MB}}"
+                "{{ - error: ;error_code;}}"
+                "{{ - memory: ;memory_delta_mb;MB}}"
+            )
         
         file_handler = logging.handlers.RotatingFileHandler(
             log_file,
             maxBytes=_parse_file_size(max_file_size),
             backupCount=backup_count
         )
-        file_formatter = DynamicLoggingFormatter(file_format, functions=default_functions, output_mode='file')
+        
+        # File formatter without colors but with rich conditional sections
+        file_formatter = StringSmithLoggingFormatter(file_template, enable_colors=False)
         file_handler.setFormatter(file_formatter)
         root_logger.addHandler(file_handler)
     
@@ -371,15 +396,10 @@ def set_up_logging(
         )
         json_handler.setFormatter(JSONFormatter())
         root_logger.addHandler(json_handler)
-    
-    # Performance logger
-    if enable_performance:
-        perf_logger = logging.getLogger('performance')
-        perf_logger.setLevel(logging.INFO)
 
 
 def get_logger(name: Optional[str] = None) -> EnterpriseLogger:
-    """Get an enterprise logger instance"""
+    """Get an enhanced logger with StringSmith formatting capabilities"""
     if name is None:
         # Get the calling module's name
         import inspect
@@ -391,7 +411,7 @@ def get_logger(name: Optional[str] = None) -> EnterpriseLogger:
 
 @contextmanager
 def log_performance(operation_name: str, logger: Optional[EnterpriseLogger] = None, **extra_metrics):
-    """Context manager for automatic performance logging"""
+    """Context manager for automatic performance logging with StringSmith formatting"""
     if logger is None:
         logger = get_logger('performance')
     
@@ -401,46 +421,39 @@ def log_performance(operation_name: str, logger: Optional[EnterpriseLogger] = No
     try:
         yield
         metrics = _performance_tracker.end_operation(operation_id, **extra_metrics)
-        logger.info(f"Operation successful: {operation_name}", **metrics)
+        if metrics:
+            logger.info(f"Operation successful: {operation_name}", **metrics)
     except Exception as e:
         _performance_tracker.end_operation(operation_id, success=False, error=str(e))
         logger.error(f"Operation failed: {operation_name}", exception=e, **extra_metrics)
         raise
 
 
-def log_function_performance(func):
-    """Decorator for automatic function performance logging"""
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        logger = get_logger(func.__module__)
-        with log_performance(f"{func.__name__}", logger):
-            return func(*args, **kwargs)
-    return wrapper
-
-
 def log_processing_stats(
     operation: str,
     files_processed: int,
-    rows_processed: int,
-    duration: float,
+    rows_processed: int = 0,
+    duration: float = 0,
     errors: int = 0,
     **extra_stats
 ):
-    """Log standardized processing statistics using family-based dynamic formatting"""
-    logger = get_logger('stats')
+    """Log standardized processing statistics"""
+    # Calculate derived statistics
+    files_per_second = files_processed / duration if duration > 0 else 0
+    success_rate = ((files_processed - errors) / files_processed * 100) if files_processed > 0 else 0
     
     stats = {
         'operation': operation,
         'files_processed': files_processed,
         'rows_processed': rows_processed,
         'duration': duration,
-        'files_per_second': round(files_processed / duration, 2) if duration > 0 else 0,
-        'rows_per_second': round(rows_processed / duration, 2) if duration > 0 else 0,
+        'files_per_second': files_per_second,
+        'success_rate': success_rate,
         'errors': errors,
-        'success_rate': round((files_processed - errors) / files_processed * 100, 1) if files_processed > 0 else 0,
         **extra_stats
     }
     
+    logger = get_logger('stats')
     logger.info(f"Processing complete: {operation}", **stats)
     return stats
 
@@ -459,61 +472,11 @@ def _parse_file_size(size_str: str) -> int:
 
 
 # Convenience function for quick setup
-def quick_setup(level='INFO', log_file=None):
-    """Quick logging setup for simple use cases"""
+def quick_setup(level='INFO', log_file=None, enable_colors=True):
+    """Quick logging setup showcasing StringSmith's capabilities"""
     set_up_logging(
         level=level,
         log_file=log_file,
         json_file=f"{log_file}.json" if log_file else None,
-        enable_colors=True,
-        enable_performance=True
+        enable_colors=enable_colors
     )
-
-
-# Example usage demonstrating family-based dynamic formatting
-if __name__ == "__main__":
-    print("=== Enterprise Logger with Function Fallback Demo ===")
-    
-    # Set up logging with corrected format syntax
-    set_up_logging(
-        level='DEBUG',
-        log_file='demo.log',
-        console_format=('{{#level_color_map@bold;[;levelname;]}} {{message}}'
-                       '{{$has_items; (;file_count; files)}}'
-                       '{{ in ;duration;$duration_format}}'
-                       '{{$has_errors; [;error_count; ERRORS]}}')
-    )
-    
-    logger = get_logger('demo')
-    
-    # Demonstrate various logging scenarios
-    logger.info("Application started")
-    
-    logger.info("Processing files", file_count=150, duration=2.45)
-    
-    logger.warning("Slow operation detected", duration=8.2)
-    
-    logger.error("Processing failed", error_count=5, file_count=100)
-    
-    # Demonstrate performance logging
-    with log_performance("demo_operation"):
-        import time
-        time.sleep(0.1)  # Simulate work
-        logger.info("Work completed", file_count=1000, duration=0.095)
-    
-    # Demonstrate processing stats
-    log_processing_stats(
-        operation="batch_process",
-        files_processed=100,
-        rows_processed=50000,
-        duration=12.5,
-        errors=2
-    )
-    
-    print("\n✅ Function fallback integration complete!")
-    print("Features now working:")
-    print("• Color functions: #level_color_map maps levels to colors")
-    print("• Conditional functions: $has_items shows/hides sections")
-    print("• Format functions: $duration_format for time display")
-    print("• Proper formatting isolation and resets")
-    print("\nCheck demo.log and console output for results!")

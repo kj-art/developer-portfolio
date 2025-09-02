@@ -1,0 +1,16 @@
+first_name,last_name,age,city,sheet_name,extra_column
+JosÃ©,Canseco,25.0,New York,,
+BjÃ¶rk,,30.0,Chicago,,
+Bob,,22.0,Boston,,
+Madonna,,25.0,New York,test_simple,
+Jane,,30.0,Chicago,test_simple,
+Bob,,22.0,Boston,test_simple,
+Jason,,25.0,New York,employees,
+Jane,,30.0,Chicago,employees,
+John,Doe,25.0,New York,,
+Jane,Smith,,Chicago,,some data
+Bob,Johnson,22.0,"Boston, MA",,
+,,,Los Angeles,,
+John,Doe,25.0,New York,,
+Jane,,30.0,Chicago,,
+Bob,,22.0,Boston,,

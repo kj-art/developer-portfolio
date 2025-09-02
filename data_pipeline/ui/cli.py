@@ -3,7 +3,7 @@
 import argparse
 import sys
 from pathlib import Path
-from shared_utils.logger import quick_setup, get_logger
+from shared_utils.logger import set_up_logging, get_logger
 from data_pipeline.core.processor import DataProcessor
 from data_pipeline.core.processing_config import ProcessingConfig
 
@@ -249,8 +249,18 @@ def main():
         print(f"Error: {e}")
         sys.exit(1)
 
-    # Set up logging after argument parsing is complete
-    quick_setup(level='INFO', log_file='data_pipeline.log')
+    # Set up logging after argument parsing is complete with StringSmith templates
+    set_up_logging(
+        level='INFO', 
+        log_file='data_pipeline.log',
+        enable_colors=True,
+        console_template=(
+            "{{#level_color;[;levelname;]}} {{message}}"
+            "{{?has_file_count; (;file_count; files)}}"
+            "{{ in ;duration;{$format_duration}}}"
+            "{{?has_error_count; - ;error_count; errors}}"
+        )
+    )
     logger = get_logger('data_pipeline.cli')
     
     logger.info("Data pipeline started", input_folder=args.input_folder)
