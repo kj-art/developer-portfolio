@@ -6,8 +6,6 @@ from ..exceptions import StringSmithError
 from ..core import SectionParts, TemplateSection
 from .registry import register_token_handler
 
-# NO! A DIFFERENT PASS PRIORITY MEANS IT GETS PROCESSED SEPARATELY AS A SEPARATE REGEX.
-# IT NEEDS TO BE WITHIN THE SAME PASS, BUT AT THE TOP OF THE ORDER WITHIN IT
 @register_token_handler('?', sub_priority=10)
 class ConditionalTokenHandler(BaseTokenHandler):
     """
