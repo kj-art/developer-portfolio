@@ -3,13 +3,16 @@ import gc
 from pathlib import Path
 import pandas as pd
 from . import handlers
-from .utils import merge_dataframes, normalize_columns
+from .dataframe_utils import merge_dataframes, normalize_columns, ProcessingResult
 from .config import SCHEMA_MAP, ALLOWED_EXTENSIONS
 from .processing_config import ProcessingConfig
+from .file_utils import get_files_iterator, merge_kwargs
 from shared_utils.logger import get_logger, log_performance
+import processors.readers as readers
+import processors.writers as writers
 
 class DataProcessor:
-    def __init__(self, read_kwargs=None, write_kwargs=None):
+    def __init__(self, read_kwargs: dict = None, write_kwargs: dict = None):
         """
         Initialize DataProcessor with default file reading and writing options
         
@@ -17,9 +20,18 @@ class DataProcessor:
             read_kwargs (dict, optional): Default file reading options (e.g. sep=';', encoding='utf-8')
             write_kwargs (dict, optional): Default file writing options (e.g. sep=';', na_rep='NULL')
         """
-        self.read_options = read_kwargs or {}
-        self.write_options = write_kwargs or {}
-        self.logger = get_logger('data_pipeline.processor')
+        self._read_options = read_kwargs or {}
+        self._write_options = write_kwargs or {}
+        self._logger = get_logger('data_pipeline.processor')
+
+    def run(self, config: ProcessingConfig) -> ProcessingResult:
+        output_is_csv = config.output_file and config.output_file.lower().endswith('.csv')
+        writer_class = writers.StreamingWriter if output_is_csv else writers.InMemoryWriter 
+        read_options = merge_kwargs(self._read_options, config.read_options)
+        write_options = merge_kwargs(self._write_options, config.write_options)
+        
+        file_iterator = get_files_iterator(config.input_folder, config.recursive, config.filetype)
+        #return processor_class().run(config)
 
     def process_folder(self, config):
         """
@@ -35,7 +47,7 @@ class DataProcessor:
                            input_folder=config.input_folder, 
                            recursive=config.recursive):
             
-            self.logger.info("Starting in-memory processing", 
+            self._logger.info("Starting in-memory processing", 
                            input_folder=config.input_folder,
                            recursive=config.recursive,
                            file_types=config.filetype)
@@ -48,7 +60,7 @@ class DataProcessor:
             files_processed = 0
             
             # Merge constructor options with config options
-            merged_read_kwargs = {**self.read_options, **config.read_options}
+            merged_read_kwargs = {**self._read_options, **config.read_options}
             
             for file_path in files:
                 if file_path.is_file():
@@ -62,7 +74,7 @@ class DataProcessor:
                     files_processed += 1
 
             result = merge_dataframes(dataframes, schema_map, config.to_lower, config.spaces_to_underscores)
-            self.logger.info("In-memory processing complete", 
+            self._logger.info("In-memory processing complete", 
                            files_processed=files_processed, 
                            total_rows=len(result), 
                            columns=len(result.columns))
@@ -86,13 +98,13 @@ class DataProcessor:
                            output_file=config.output_file,
                            file_types=config.filetype):
             
-            self.logger.info("Starting streaming processing", 
+            self._logger.info("Starting streaming processing", 
                            input_folder=config.input_folder,
                            output_file=config.output_file)
             
             # Merge constructor defaults with config options
-            merged_read_kwargs = {**self.read_options, **config.read_options}
-            merged_write_kwargs = {**self.write_options, **config.write_options}
+            merged_read_kwargs = {**self._read_options, **config.read_options}
+            merged_write_kwargs = {**self._write_options, **config.write_options}
             
             # Get CSV handler to filter both read and write kwargs
             csv_handler = self._get_handler_for_extension('csv')
@@ -105,7 +117,7 @@ class DataProcessor:
                 config.to_lower, config.spaces_to_underscores, **filtered_read_kwargs
             )
             
-            self.logger.info("Schema detection complete", 
+            self._logger.info("Schema detection complete", 
                            columns=len(schema_info['dtypes']),
                            files_sampled=schema_info['files_processed'])
             
@@ -115,7 +127,7 @@ class DataProcessor:
             try:
                 # Step 3: Handle first file (with headers)
                 first_file_path = next(file_iterator)
-                self.logger.info("Processing first file", file_name=first_file_path.name)
+                self._logger.info("Processing first file", file_name=first_file_path.name)
                 
                 first_df = self._process_single_file(
                     first_file_path, schema_info, config.schema_map, 
@@ -125,17 +137,17 @@ class DataProcessor:
                 if first_df is not None:
                     first_df.to_csv(config.output_file, index=False, mode='w', **filtered_write_kwargs)
                     total_rows = len(first_df)
-                    self.logger.info("First file written", rows=total_rows)
+                    self._logger.info("First file written", rows=total_rows)
                     del first_df
                 else:
-                    self.logger.error("Failed to process first file", file_name=first_file_path.name)
+                    self._logger.error("Failed to process first file", file_name=first_file_path.name)
                     return None
                     
                 # Step 4: Stream remaining files
                 files_processed = 1
                 
                 for file_path in file_iterator:
-                    self.logger.info("Processing file", 
+                    self._logger.info("Processing file", 
                                    file_name=file_path.name, 
                                    file_number=files_processed + 1)
                     
@@ -151,7 +163,7 @@ class DataProcessor:
                         
                     files_processed += 1
                 
-                self.logger.info("Streaming processing complete", 
+                self._logger.info("Streaming processing complete", 
                                files_processed=files_processed,
                                total_rows=total_rows,
                                output_file=config.output_file)
@@ -164,8 +176,17 @@ class DataProcessor:
                 }
                 
             except StopIteration:
-                self.logger.warning("No files found to process", input_folder=config.input_folder)
+                self._logger.warning("No files found to process", input_folder=config.input_folder)
                 return None
+
+    def _get_source_file_path(self, file_path):
+        """Extract source file path relative to input folder"""
+        rel_path = os.path.relpath(str(file_path))
+        path_parts = Path(rel_path).parts
+        if len(path_parts) > 1:
+            return str(Path(*path_parts[1:]))
+        else:
+            return path_parts[0]
 
     def _determine_schema(self, input_folder, recursive=False, filetype=None, 
                          schema_map=None, to_lower=True, spaces_to_underscores=True, 
@@ -173,7 +194,7 @@ class DataProcessor:
         """
         Determine unified schema across all files by sampling headers and data types
         """
-        self.logger.info("Starting schema detection", 
+        self._logger.info("Starting schema detection", 
                         input_folder=input_folder, 
                         sample_rows=sample_rows)
         
@@ -187,6 +208,10 @@ class DataProcessor:
         for file_path in file_iterator:
             try:
                 sample_df = self._read_file_sample(file_path, sample_rows, **kwargs)
+
+                # Add source_file column during schema detection
+                sample_df['source_file'] = self._get_source_file_path(file_path)
+
                 if sample_df is None or sample_df.empty:
                     continue
                 
@@ -205,7 +230,7 @@ class DataProcessor:
                 del sample_df, normalized_df
                 
             except Exception as e:
-                self.logger.warning("Could not sample file", 
+                self._logger.warning("Could not sample file", 
                                   file_name=file_path.name, 
                                   error=str(e))
                 continue
@@ -219,7 +244,7 @@ class DataProcessor:
         
         return schema_info
 
-    def _get_files_iterator(self, input_folder, recursive=False, filetype=None):
+    '''def _get_files_iterator(self, input_folder, recursive=False, filetype=None):
         """Memory-efficient file iterator that yields valid files one at a time"""
         path = Path(input_folder)
         files = path.rglob('*') if recursive else path.iterdir()
@@ -229,7 +254,7 @@ class DataProcessor:
             if file_path.is_file():
                 extension = file_path.suffix.lower()[1:]
                 if extension in valid_extensions:
-                    yield file_path
+                    yield file_path'''
 
     def _process_single_file(self, file_path, schema_info, schema_map=None, 
                            to_lower=True, spaces_to_underscores=True, **kwargs):
@@ -250,7 +275,7 @@ class DataProcessor:
             return normalized_df
             
         except Exception as e:
-            self.logger.error("Error processing file", 
+            self._logger.error("Error processing file", 
                             file_name=file_path.name, 
                             error=str(e))
             return None
@@ -290,7 +315,7 @@ class DataProcessor:
                         normalized_df[col] = normalized_df[col].astype(target_dtype, errors='ignore')
                         
         except Exception as e:
-            self.logger.warning("Type casting failed for some columns", error=str(e))
+            self._logger.warning("Type casting failed for some columns", error=str(e))
         
         return normalized_df
 
@@ -300,7 +325,7 @@ class DataProcessor:
         handler = self._get_handler_for_extension(extension)
         
         try:
-            sample_kwargs = {**self.read_options, **kwargs}
+            sample_kwargs = {**self._read_options, **kwargs}
             if extension in ['csv', 'xlsx']:
                 sample_kwargs['nrows'] = sample_rows
             
@@ -310,7 +335,7 @@ class DataProcessor:
         except Exception:
             # Fallback: try reading without nrows
             try:
-                result = handler.read(str(file_path), **self.read_options)
+                result = handler.read(str(file_path), **self._read_options)
                 if len(result.dataframe) > sample_rows:
                     return result.dataframe.head(sample_rows)
                 return result.dataframe
@@ -338,20 +363,11 @@ class DataProcessor:
 
     def _get_default_value_for_dtype(self, dtype_str):
         """Get appropriate default value for missing columns based on data type"""
-        if dtype_str == 'object':
-            return None
-        elif 'int' in dtype_str:
-            return None
-        elif 'float' in dtype_str:
-            return None
-        elif 'bool' in dtype_str:
+        if 'bool' in dtype_str:
             return False
-        elif 'datetime' in dtype_str:
-            return None
-        else:
-            return None
+        return None
 
-    def _normalize_filetype(self, filetype=None):
+    '''def _normalize_filetype(self, filetype=None):
         """Normalize and validate filetype filter input"""
         if filetype is None:
             filetype = ALLOWED_EXTENSIONS
@@ -365,7 +381,7 @@ class DataProcessor:
             unsupported_filters = set(filetype) - set(ALLOWED_EXTENSIONS)
             if unsupported_filters:
                 raise ValueError(f"Unsupported file types in filter: {unsupported_filters}. Supported: {ALLOWED_EXTENSIONS}")
-        return filetype
+        return filetype'''
     
     def _get_handler_for_extension(self, extension):
         """Get handler class for a given extension"""
@@ -401,17 +417,12 @@ class DataProcessor:
         handler = self._get_handler_for_extension(extension)
         
         # Merge constructor options with override options
-        final_read_options = {**self.read_options, **override_options}
+        final_read_options = {**self._read_options, **override_options}
         
         data = handler.read(file_path, **final_read_options)
         
         # Get relative path and remove first directory (input folder)
-        rel_path = os.path.relpath(abs_path)
-        path_parts = Path(rel_path).parts
-        if len(path_parts) > 1:
-            data.dataframe['source_file'] = str(Path(*path_parts[1:]))
-        else:
-            data.dataframe['source_file'] = path_parts[0]
+        data.dataframe['source_file'] = self._get_source_file_path(abs_path)
         
         return data
     
@@ -433,11 +444,11 @@ class DataProcessor:
         handler = self._get_handler_for_extension(extension)
         
         # Merge constructor options with override options
-        final_write_options = {**self.write_options, **override_options}
+        final_write_options = {**self._write_options, **override_options}
         
         # Write the file
         handler.write(dataframe, output_path, **final_write_options)
-        self.logger.info("Data saved to file", 
+        self._logger.info("Data saved to file", 
                         output_file=abs_path, 
                         rows=len(dataframe), 
                         columns=len(dataframe.columns))

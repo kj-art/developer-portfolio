@@ -6,6 +6,7 @@ from pathlib import Path
 from shared_utils.logger import set_up_logging, get_logger
 from data_pipeline.core.processor import DataProcessor
 from data_pipeline.core.processing_config import ProcessingConfig
+from ..core.dataframe_utils import ProcessingResult
 
 def cast_string_to_appropriate_type(value):
     """
@@ -297,6 +298,16 @@ def main():
     if schema_map:
         config = config.with_schema_map(schema_map)
     
+    summary:ProcessingResult = processor.run(config)
+
+    '''if summary:
+        logger.info("Processing complete", 
+                    files_processed=summary['files_processed'], 
+                    total_rows=summary['total_rows'])
+    else:
+        logger.error("Processing failed or no files processed")
+        sys.exit(1)
+    
     # Smart processing mode selection based on output format
     if args.output_file and args.output_file.lower().endswith('.csv'):
         # Automatically use streaming for CSV output (memory efficient)
@@ -332,7 +343,7 @@ def main():
                         rows=len(result),
                         columns=len(result.columns))
         else:
-            print(result)
+            print(result)'''
 
 if __name__ == '__main__':
     main()

@@ -1,8 +1,20 @@
 from collections import namedtuple
 import pandas as pd
+from dataclasses import dataclass
+from typing import Optional
 from .config import SCHEMA_MAP
 
 FileResult = namedtuple('FileResult', ['dataframe', 'normalized'])
+
+@dataclass
+class ProcessingResult:
+    files_processed: int
+    total_rows: int
+    total_columns: int
+    processing_time: float
+    data: Optional[pd.DataFrame] = None      # Only for InMemory
+    output_file: Optional[str] = None        # Only for Streaming  
+    schema: Optional[dict] = None            # Only for Streaming
 
 def merge_dataframes(sheets, schema_map=None, to_lower=True, spaces_to_underscores=True):
     """

@@ -1,8 +1,11 @@
-import json
+from .dataframe_utils import FileResult, merge_dataframes
+from .config import ALLOWED_EXTENSIONS
+from typing import Iterator
 from abc import ABC, abstractmethod
-from .utils import FileResult, merge_dataframes
 import pandas as pd
 import inspect
+import json
+import sys
 
 """
 File handlers for the data processing pipeline.
@@ -28,6 +31,39 @@ Adding New File Types:
     FileHandler abstract base class methods.
 """
 
+def get_handler_for_extension(extension: str):
+    """
+    Get file handler instance for the specified extension.
+    
+    Dynamically instantiates the appropriate handler class based on file
+    extension using naming convention (e.g., 'csv' -> CsvHandler).
+    
+    Args:
+        extension: File extension without dot (e.g., 'csv', 'xlsx', 'json')
+        
+    Returns:
+        FileHandler: Handler instance for the file type
+        
+    Raises:
+        ValueError: If extension is not supported or handler not found
+        
+    Examples:
+        >>> handler = get_handler_for_extension('csv')
+        >>> isinstance(handler, CsvHandler)
+        True
+        
+    Note:
+        Handler classes must follow naming convention: {Extension}Handler
+        where Extension is the capitalized file extension.
+    """
+    handler_class_name = f"{extension.capitalize()}Handler"
+    try:
+        handler_class = getattr(sys.modules[__name__], handler_class_name)
+    except AttributeError:
+        raise ValueError(f"Unsupported file format: .{extension}. Supported: {[f'.{ext}' for ext in ALLOWED_EXTENSIONS]}")
+    
+    return handler_class()
+
 class FileHandler(ABC):
     """Abstract base class for file handlers"""
 
@@ -44,7 +80,7 @@ class FileHandler(ABC):
     def get_read_function(self):
         return getattr(pd, f'read_{self.get_function_name()}')
     
-    def get_write_function(self, dataframe):
+    def get_write_function(self, dataframe:pd.DataFrame):
         return getattr(dataframe, f'to_{self.get_function_name()}')
     
     def get_read_kwargs(self) -> set:
@@ -80,11 +116,11 @@ class FileHandler(ABC):
         return {k: v for k, v in kwargs.items() if k in valid_kwargs}
 
     @abstractmethod
-    def read(self, file_path, **kwargs) -> FileResult:
+    def read(self, file_path: str, **kwargs) -> FileResult:
         """Read file and return FileResult"""
         pass
     
-    def write(self, dataframe, file_path, **kwargs) -> bool:
+    def write(self, dataframe: pd.DataFrame, file_path: str, **kwargs) -> bool:
         """Default write implementation - works for most formats"""
         filtered_kwargs = self.filter_kwargs(kwargs, mode='write')
         self.get_write_function(dataframe)(file_path, **filtered_kwargs)
@@ -92,11 +128,14 @@ class FileHandler(ABC):
 class CsvHandler(FileHandler):
     """Handler for CSV files"""
     
-    def read(self, file_path, **kwargs) -> FileResult:
+    def read(self, file_path: str, chunk_size: int = 1, **kwargs) -> Iterator[pd.DataFrame]:
         """Read CSV file and return FileResult"""
         filtered_kwargs = self.filter_kwargs(kwargs, mode='read')
-        df = pd.read_csv(file_path, **filtered_kwargs)
-        return FileResult(dataframe=df, normalized=False)
+        for chunk in pd.read_csv(file_path, chunksize=chunk_size, **kwargs):
+            yield chunk
+
+        #df = pd.read_csv(file_path, chunksize=chunk_size, **filtered_kwargs)
+        #return FileResult(dataframe=df, normalized=False)
 
 class XlsxHandler(FileHandler):
     """Handler for Excel files"""
@@ -104,7 +143,7 @@ class XlsxHandler(FileHandler):
     def get_function_name(self):
         return 'excel'  # Override for pd.read_excel
     
-    def read(self, file_path, **kwargs) -> FileResult:
+    def read(self, file_path: str, **kwargs) -> Iterator[pd.DataFrame]:
         """Read Excel file and return FileResult with sheet_name handling"""
         filtered_kwargs = self.filter_kwargs(kwargs, mode='read')
         sheet_name = filtered_kwargs.pop('sheet_name', 0)
@@ -117,27 +156,28 @@ class XlsxHandler(FileHandler):
         
         if sheet_name is None or isinstance(sheet_name, list):
             sheets_dict = pd.read_excel(file_path, sheet_name=sheet_name, **filtered_kwargs)
-            merged_df = merge_dataframes(sheets_dict)
-            return FileResult(dataframe=merged_df, normalized=True)
+            df = merge_dataframes(sheets_dict)
+            #merged_df = merge_dataframes(sheets_dict)
+            #return FileResult(dataframe=merged_df, normalized=True)
         elif isinstance(sheet_name, int):
             excel_file = pd.ExcelFile(file_path)
             actual_sheet_name = excel_file.sheet_names[sheet_name]
             df = pd.read_excel(excel_file, sheet_name=sheet_name, **filtered_kwargs)
             excel_file.close()
             df['sheet_name'] = actual_sheet_name
-            return FileResult(dataframe=df, normalized=False)
+            #return FileResult(dataframe=df, normalized=False)
         else:  # str
             df = pd.read_excel(file_path, sheet_name=sheet_name, **filtered_kwargs)
             df['sheet_name'] = sheet_name
-            return FileResult(dataframe=df, normalized=False)
-    
+            #return FileResult(dataframe=df, normalized=False)
+        yield df
 class JsonHandler(FileHandler):
     """Handler for JSON files"""
 
     def get_read_kwargs(self) -> set:
         return set(['encoding'])
     
-    def read(self, file_path, **kwargs) -> FileResult:
+    def read(self, file_path: str, **kwargs) -> Iterator[pd.DataFrame]:
         """Read JSON file and return FileResult, handling nested structures"""
         filtered_kwargs = self.filter_kwargs(kwargs, mode='read')
         
@@ -146,8 +186,9 @@ class JsonHandler(FileHandler):
         
         if isinstance(data, list):
             # Simple flat JSON array - direct pandas handling
-            df = pd.DataFrame(data)
-            return FileResult(dataframe=df, normalized=False)
+            yield pd.DataFrame(data) 
+            #df = pd.DataFrame(data)
+            #return FileResult(dataframe=df, normalized=False)
         elif isinstance(data, dict):
             # Nested JSON - treat keys as sheet names
             sheets_dict = {}
@@ -162,8 +203,9 @@ class JsonHandler(FileHandler):
                     sheets_dict[key] = pd.DataFrame(flattened_records)
             
             if sheets_dict:
-                merged_df = merge_dataframes(sheets_dict)
-                return FileResult(dataframe=merged_df, normalized=True)
+                yield merge_dataframes(sheets_dict)
+                #merged_df = merge_dataframes(sheets_dict)
+                #return FileResult(dataframe=merged_df, normalized=True)
             else:
                 raise ValueError(f"No array data found in nested JSON: {file_path}")
         else:
