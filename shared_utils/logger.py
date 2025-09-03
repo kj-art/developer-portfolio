@@ -113,6 +113,11 @@ class StringSmithLoggingFormatter(logging.Formatter):
     def __init__(self, template: str = None, enable_colors: bool = True):
         super().__init__()
         
+        # Set up fallback formatter FIRST
+        self.fallback_formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+
         # Default professional log template showcasing StringSmith features
         if template is None:
             template = (
@@ -193,6 +198,9 @@ class StringSmithLoggingFormatter(logging.Formatter):
                 return duration is not None and float(duration) > 5.0
             except (ValueError, TypeError):
                 return False
+            
+        def has_file_name(file_name):
+            return file_name is not None and str(file_name).strip() != ''
         
         # Create StringSmith formatter with logging functions
         functions = [
@@ -205,19 +213,15 @@ class StringSmithLoggingFormatter(logging.Formatter):
             has_file_count,
             has_error_count,
             has_memory_usage,
-            is_slow_operation
+            is_slow_operation,
+            has_file_name
         ]
         
         try:
             self.formatter = TemplateFormatter(template, functions=functions)
-            self.fallback_formatter = None
         except Exception as e:
-            # Fallback to basic formatting if StringSmith setup fails
             logging.getLogger(__name__).error(f"StringSmith formatter setup failed: {e}")
             self.formatter = None
-            self.fallback_formatter = logging.Formatter(
-                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-            )
     
     def format(self, record: logging.LogRecord) -> str:
         """Format log record using StringSmith conditional templating"""

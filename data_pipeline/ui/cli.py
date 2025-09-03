@@ -257,6 +257,7 @@ def main():
         enable_colors=True,
         console_template=(
             "{{#level_color;[;levelname;]}} {{message}}"
+            "{{?has_file_name; - ;file_name;}}"
             "{{?has_file_count; (;file_count; files)}}"
             "{{ in ;duration;{$format_duration}}}"
             "{{?has_error_count; - ;error_count; errors}}"
@@ -287,7 +288,7 @@ def main():
         except Exception as e:
             logger.error("Could not read schema file", schema_file=args.schema, error=str(e))
             sys.exit(1)
-    
+
     # Create processor with both read and write defaults
     processor = DataProcessor(read_kwargs=read_kwargs, write_kwargs=write_kwargs)
     

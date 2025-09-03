@@ -1,2 +1,0 @@
-class InMemoryWriter:
-  pass

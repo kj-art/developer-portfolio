@@ -1,2 +1,0 @@
-class StreamingWriter:
-  pass

@@ -30,7 +30,7 @@ class ProcessingConfig:
     
     # File selection
     recursive: bool = False
-    filetype: Optional[List[str]] = None
+    file_type_filter: Optional[List[str]] = None
     
     # Schema and normalization
     schema_map: Optional[Dict[str, List[str]]] = None
@@ -46,9 +46,9 @@ class ProcessingConfig:
         if not self.input_folder:
             raise ValueError("input_folder is required")
         
-        # Normalize filetype to list
-        if isinstance(self.filetype, str):
-            self.filetype = [self.filetype]
+        # Normalize file_type_filter to list
+        if isinstance(self.file_type_filter, str):
+            self.file_type_filter = [self.file_type_filter]
         
         # Ensure options are dicts
         if not isinstance(self.read_options, dict):
@@ -73,7 +73,7 @@ class ProcessingConfig:
             input_folder=args.input_folder,
             output_file=getattr(args, 'output_file', None),
             recursive=getattr(args, 'recursive', False),
-            filetype=getattr(args, 'filetype', None),
+            file_type_filter=getattr(args, 'filetype', None),
             schema_map=None,  # Will be loaded separately if args.schema exists
             to_lower=getattr(args, 'to_lower', True),
             spaces_to_underscores=getattr(args, 'spaces_to_underscores', True),
@@ -87,7 +87,7 @@ class ProcessingConfig:
             input_folder=self.input_folder,
             output_file=self.output_file,
             recursive=self.recursive,
-            filetype=self.filetype,
+            file_type_filter=self.file_type_filter,
             schema_map=schema_map,
             to_lower=self.to_lower,
             spaces_to_underscores=self.spaces_to_underscores,

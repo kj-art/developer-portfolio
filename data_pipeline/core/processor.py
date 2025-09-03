@@ -1,5 +1,6 @@
 import os
 import gc
+import time
 from pathlib import Path
 import pandas as pd
 from . import handlers
@@ -8,8 +9,8 @@ from .config import SCHEMA_MAP, ALLOWED_EXTENSIONS
 from .processing_config import ProcessingConfig
 from .file_utils import get_files_iterator, merge_kwargs
 from shared_utils.logger import get_logger, log_performance
-import processors.readers as readers
-import processors.writers as writers
+from .handlers import FileHandler, get_handler_for_extension
+from collections import defaultdict
 
 class DataProcessor:
     def __init__(self, read_kwargs: dict = None, write_kwargs: dict = None):
@@ -23,15 +24,153 @@ class DataProcessor:
         self._read_options = read_kwargs or {}
         self._write_options = write_kwargs or {}
         self._logger = get_logger('data_pipeline.processor')
+        self._handlers = defaultdict(lambda: None)
 
     def run(self, config: ProcessingConfig) -> ProcessingResult:
-        output_is_csv = config.output_file and config.output_file.lower().endswith('.csv')
-        writer_class = writers.StreamingWriter if output_is_csv else writers.InMemoryWriter 
-        read_options = merge_kwargs(self._read_options, config.read_options)
-        write_options = merge_kwargs(self._write_options, config.write_options)
+        """
+        Process files using appropriate reader/writer strategy based on configuration.
         
-        file_iterator = get_files_iterator(config.input_folder, config.recursive, config.filetype)
-        #return processor_class().run(config)
+        Args:
+            config: Processing configuration object
+            
+        Returns:
+            ProcessingResult: Standardized result with processing statistics and data/output info
+        """
+        with log_performance("data_processing", 
+                           input_folder=config.input_folder,
+                           output_file=config.output_file):
+            
+            start_time = time.time()
+            
+            # Process all files
+            files_processed = 0
+            total_rows = 0
+
+            def get_ext(file_path):
+                return Path(file_path).suffix.lstrip('.')
+            
+            def get_handler(file_path):
+                ext = get_ext(file_path)
+                self._handlers[ext] = self._handlers[ext] or get_handler_for_extension(ext)
+                return self._handlers[ext]
+            
+            for file_path in get_files_iterator(config.input_folder, config.recursive, config.file_type_filter):
+                self._logger.info("Processing file", file_name=file_path.name)
+            
+                read_options = merge_kwargs(self._read_options, config.read_options)
+                reader = get_handler(file_path)
+                
+                try:
+                    print(reader)
+                    reader.read(file_path, read_options)
+                except Exception as e:
+                    self._logger.error("Failed to process file", 
+                                     file_name=file_path.name, 
+                                     error=str(e))
+                    # Continue processing other files
+                    continue
+                
+            return    
+            write_options = merge_kwargs(self._write_options, config.write_options)
+            
+            if config.output_file:
+                writer = get_handler(config.output_file)
+            else:
+                # output to console only
+                pass
+
+
+
+
+            return
+            # Get writer based on output requirements
+            writer = self._get_writer(config)
+            
+            # Process all files
+            files_processed = 0
+            total_rows = 0
+            
+            for file_path in get_files_iterator(config.input_folder, config.recursive, config.filetype):
+                self._logger.info("Processing file", file_name=file_path.name)
+                
+                # Get appropriate reader for this file
+                reader = self._get_reader(file_path)
+                
+                # Merge config read options with processor defaults
+                merged_read_kwargs = merge_kwargs(self._read_options, config.read_options)
+                
+                try:
+                    # Process file in chunks (even if it's one big chunk)
+                    for chunk in reader.read(file_path, **merged_read_kwargs):
+                        # Add source file tracking
+                        chunk['source_file'] = get_source_file_path(file_path)
+                        
+                        # Normalize columns if needed
+                        if hasattr(reader, 'needs_normalization') and reader.needs_normalization():
+                            chunk = self._normalize_chunk(chunk, config)
+                        
+                        # Send chunk to writer
+                        writer.write_chunk(chunk)
+                        total_rows += len(chunk)
+                        
+                    files_processed += 1
+                    
+                except Exception as e:
+                    self._logger.error("Failed to process file", 
+                                     file_name=file_path.name, 
+                                     error=str(e))
+                    # Continue processing other files
+                    continue
+            
+            # Finalize and get results
+            processing_time = time.time() - start_time
+            
+            self._logger.info("Processing complete", 
+                            files_processed=files_processed,
+                            total_rows=total_rows,
+                            duration=processing_time)
+            
+            return writer.finalize(
+                files_processed=files_processed,
+                total_rows=total_rows, 
+                processing_time=processing_time
+            )
+
+    def _write_output(self, data: pd.DataFrame, config: ProcessingConfig):
+        """Write merged data to output file using appropriate handler."""
+        output_path = Path(config.output_file)
+        extension = output_path.suffix.lower()[1:]
+        
+        # Get handler for output format
+        output_handler = self._get_handler_by_extension(extension)
+        
+        # Merge config write options with processor defaults  
+        merged_write_kwargs = merge_kwargs(self._write_options, config.write_options)
+        
+        # Write the data
+        output_handler.write(data, config.output_file, **merged_write_kwargs)
+        
+        self._logger.info("Output written", 
+                        output_file=config.output_file,
+                        rows=len(data),
+                        columns=len(data.columns))
+
+    def _get_handler_by_extension(self, extension: str):
+        """Get handler by extension string."""
+        from .handlers import get_handler_for_extension
+        return get_handler_for_extension(extension)
+    
+    def _normalize_chunk(self, chunk: pd.DataFrame, config: ProcessingConfig) -> pd.DataFrame:
+        """Apply column normalization to a chunk."""
+        from .dataframe_utils import normalize_columns
+        
+        schema_map = config.schema_map or {}  # Use config schema or empty dict
+        return normalize_columns(
+            chunk, 
+            schema_map, 
+            config.to_lower, 
+            config.spaces_to_underscores
+        )
 
     def process_folder(self, config):
         """
