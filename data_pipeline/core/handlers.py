@@ -121,7 +121,7 @@ class CsvHandler(FileHandler):
     """Handler for CSV files"""
     _SCHEMA_SAMPLE_ROWS:int = 2
     
-    def read(self, file_path: str, chunk_size: int = 2, **kwargs) -> Iterator[pd.DataFrame]:
+    def read(self, file_path: str, chunk_size: int = 10000, **kwargs) -> Iterator[pd.DataFrame]:
         """Read CSV file and return FileResult"""
         filtered_kwargs = self.filter_kwargs(kwargs, mode='read')
         for chunk in pd.read_csv(file_path, chunksize=chunk_size, **filtered_kwargs):

@@ -147,3 +147,45 @@ def normalize_chunk(chunk: pd.DataFrame, config: ProcessingConfig) -> pd.DataFra
         config.to_lower, 
         config.spaces_to_underscores
         )
+
+def merge_dtypes(existing_dtype: Optional[str], new_dtype: str) -> str:
+    """
+    Merge two pandas dtypes, choosing the most permissive one.
+    
+    Combines data types from multiple files to create a unified column naming,
+    selecting the most permissive type that can handle all data variations.
+    Uses hierarchy: object > float64 > int64 > bool > datetime64[ns]
+    
+    Args:
+        existing_dtype: Current dtype for the column (None if first occurrence)
+        new_dtype: New dtype encountered for the same column
+        
+    Returns:
+        str: Most permissive dtype that can handle both input types
+        
+    Examples:
+        >>> merge_dtypes('int64', 'float64')
+        'float64'  # float is more permissive than int
+        
+        >>> merge_dtypes('int64', 'object')
+        'object'   # object is most permissive
+        
+        >>> merge_dtypes(None, 'int64')
+        'int64'    # first occurrence
+    """
+    if existing_dtype is None:
+        return new_dtype
+    
+    dtype_hierarchy = ['object', 'float64', 'int64', 'bool', 'datetime64[ns]']
+    
+    try:
+        existing_pos = dtype_hierarchy.index(existing_dtype)
+    except ValueError:
+        existing_pos = 0
+        
+    try:
+        new_pos = dtype_hierarchy.index(new_dtype)
+    except ValueError:
+        new_pos = 0
+    
+    return dtype_hierarchy[min(existing_pos, new_pos)]
