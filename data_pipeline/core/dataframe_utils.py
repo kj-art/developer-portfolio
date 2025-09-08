@@ -2,7 +2,7 @@ from collections import namedtuple
 import pandas as pd
 from dataclasses import dataclass
 from typing import Optional
-from .config import SCHEMA_MAP
+from .processing_config import ProcessingConfig
 
 FileResult = namedtuple('FileResult', ['dataframe', 'normalized'])
 
@@ -12,9 +12,9 @@ class ProcessingResult:
     total_rows: int
     total_columns: int
     processing_time: float
+    output_file: Optional[str] = None 
+    schema: Optional[dict] = None
     data: Optional[pd.DataFrame] = None      # Only for InMemory
-    output_file: Optional[str] = None        # Only for Streaming  
-    schema: Optional[dict] = None            # Only for Streaming
 
 def merge_dataframes(sheets, schema_map=None, to_lower=True, spaces_to_underscores=True):
     """
@@ -137,3 +137,13 @@ def normalize_columns(dataframe, schema_map=None, to_lower=True, spaces_to_under
         df_n = df_n.drop([name_col], axis=1)
     
     return df_n
+
+def normalize_chunk(chunk: pd.DataFrame, config: ProcessingConfig) -> pd.DataFrame:
+    """Apply column normalization to a chunk."""
+    schema_map = config.schema_map or {}  # Use config schema or empty dict
+    return normalize_columns(
+        chunk, 
+        schema_map, 
+        config.to_lower, 
+        config.spaces_to_underscores
+        )

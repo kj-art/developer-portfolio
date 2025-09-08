@@ -3,11 +3,9 @@ import gc
 import time
 from pathlib import Path
 import pandas as pd
-from . import handlers
-from .dataframe_utils import merge_dataframes, normalize_columns, ProcessingResult
-from .config import SCHEMA_MAP, ALLOWED_EXTENSIONS
-from .processing_config import ProcessingConfig
-from .file_utils import get_files_iterator, merge_kwargs
+from .dataframe_utils import merge_dataframes, normalize_columns, normalize_chunk, ProcessingResult
+from .processing_config import ProcessingConfig, IndexMode
+from .file_utils import *
 from shared_utils.logger import get_logger, log_performance
 from .handlers import FileHandler, get_handler_for_extension
 from collections import defaultdict
@@ -25,6 +23,10 @@ class DataProcessor:
         self._write_options = write_kwargs or {}
         self._logger = get_logger('data_pipeline.processor')
         self._handlers = defaultdict(lambda: None)
+    
+    def _get_handler_for_extension(self, extension: str) -> FileHandler:
+        self._handlers[extension] = self._handlers[extension] or get_handler_for_extension(extension)
+        return self._handlers[extension]
 
     def run(self, config: ProcessingConfig) -> ProcessingResult:
         """
@@ -41,87 +43,29 @@ class DataProcessor:
                            output_file=config.output_file):
             
             start_time = time.time()
-            
-            # Process all files
-            files_processed = 0
-            total_rows = 0
 
-            def get_ext(file_path):
-                return Path(file_path).suffix.lstrip('.')
-            
-            def get_handler(file_path):
-                ext = get_ext(file_path)
-                self._handlers[ext] = self._handlers[ext] or get_handler_for_extension(ext)
-                return self._handlers[ext]
-            
-            for file_path in get_files_iterator(config.input_folder, config.recursive, config.file_type_filter):
-                self._logger.info("Processing file", file_name=file_path.name)
-            
-                read_options = merge_kwargs(self._read_options, config.read_options)
-                reader = get_handler(file_path)
-                
-                try:
-                    print(reader)
-                    reader.read(file_path, read_options)
-                except Exception as e:
-                    self._logger.error("Failed to process file", 
-                                     file_name=file_path.name, 
-                                     error=str(e))
-                    # Continue processing other files
-                    continue
-                
-            return    
+            read_options = merge_kwargs(self._read_options, config.read_options)
             write_options = merge_kwargs(self._write_options, config.write_options)
-            
+            write_options['mode'] = 'w'
+            write_options['header'] = True
+
             if config.output_file:
-                writer = get_handler(config.output_file)
+                output_ext = get_extension(config.output_file)
+                writer = self._get_handler_for_extension(output_ext)
+                can_stream_output = is_streamable_extension(output_ext)
             else:
                 # output to console only
-                pass
-
-
-
-
-            return
-            # Get writer based on output requirements
-            writer = self._get_writer(config)
+                writer = None
+                can_stream_output = True
             
-            # Process all files
-            files_processed = 0
-            total_rows = 0
-            
-            for file_path in get_files_iterator(config.input_folder, config.recursive, config.filetype):
-                self._logger.info("Processing file", file_name=file_path.name)
-                
-                # Get appropriate reader for this file
-                reader = self._get_reader(file_path)
-                
-                # Merge config read options with processor defaults
-                merged_read_kwargs = merge_kwargs(self._read_options, config.read_options)
-                
-                try:
-                    # Process file in chunks (even if it's one big chunk)
-                    for chunk in reader.read(file_path, **merged_read_kwargs):
-                        # Add source file tracking
-                        chunk['source_file'] = get_source_file_path(file_path)
-                        
-                        # Normalize columns if needed
-                        if hasattr(reader, 'needs_normalization') and reader.needs_normalization():
-                            chunk = self._normalize_chunk(chunk, config)
-                        
-                        # Send chunk to writer
-                        writer.write_chunk(chunk)
-                        total_rows += len(chunk)
-                        
-                    files_processed += 1
-                    
-                except Exception as e:
-                    self._logger.error("Failed to process file", 
-                                     file_name=file_path.name, 
-                                     error=str(e))
-                    # Continue processing other files
-                    continue
-            
+            use_streaming = can_stream_output and not config.force_in_memory
+
+            files_processed, total_rows, total_columns, data = (
+                self._run_streaming(config, writer, read_options, write_options)
+                if use_streaming
+                else self._run_in_memory(config)
+            )
+
             # Finalize and get results
             processing_time = time.time() - start_time
             
@@ -130,206 +74,198 @@ class DataProcessor:
                             total_rows=total_rows,
                             duration=processing_time)
             
-            return writer.finalize(
-                files_processed=files_processed,
-                total_rows=total_rows, 
-                processing_time=processing_time
-            )
+            return ProcessingResult(files_processed,
+                                    total_rows,
+                                    total_columns,
+                                    processing_time,
+                                    config.output_file,
+                                    config.schema_map,
+                                    data)
 
-    def _write_output(self, data: pd.DataFrame, config: ProcessingConfig):
-        """Write merged data to output file using appropriate handler."""
-        output_path = Path(config.output_file)
-        extension = output_path.suffix.lower()[1:]
+    def _run_in_memory(self,
+                       config: ProcessingConfig,
+                       writer: FileHandler = None,
+                       read_options: dict = None,
+                       write_options: dict = None) -> tuple[int, int, int, pd.DataFrame]:
+        files_processed = 0
+        total_rows = 0
         
-        # Get handler for output format
-        output_handler = self._get_handler_by_extension(extension)
-        
-        # Merge config write options with processor defaults  
-        merged_write_kwargs = merge_kwargs(self._write_options, config.write_options)
-        
-        # Write the data
-        output_handler.write(data, config.output_file, **merged_write_kwargs)
-        
-        self._logger.info("Output written", 
-                        output_file=config.output_file,
-                        rows=len(data),
-                        columns=len(data.columns))
+        read_options = read_options or {}
+        write_options = write_options or {}
 
-    def _get_handler_by_extension(self, extension: str):
-        """Get handler by extension string."""
-        from .handlers import get_handler_for_extension
-        return get_handler_for_extension(extension)
-    
-    def _normalize_chunk(self, chunk: pd.DataFrame, config: ProcessingConfig) -> pd.DataFrame:
-        """Apply column normalization to a chunk."""
-        from .dataframe_utils import normalize_columns
+        write_options['index'] = False
         
-        schema_map = config.schema_map or {}  # Use config schema or empty dict
-        return normalize_columns(
-            chunk, 
-            schema_map, 
-            config.to_lower, 
-            config.spaces_to_underscores
-        )
+        all_chunks = []
+        current_global_index = config.index_start
 
-    def process_folder(self, config):
-        """
-        Process all files in a folder and return merged DataFrame (in-memory processing)
+        # if config.columns is provided, limit (and expand) columns to those columns only.
+        # otherwise, add columns as you find them 
         
-        Args:
-            config (ProcessingConfig): Processing configuration object
-            
-        Returns:
-            pandas.DataFrame: Merged DataFrame from all processed files
-        """
-        with log_performance("in_memory_processing", 
-                           input_folder=config.input_folder, 
-                           recursive=config.recursive):
-            
-            self._logger.info("Starting in-memory processing", 
-                           input_folder=config.input_folder,
-                           recursive=config.recursive,
-                           file_types=config.filetype)
-            
-            schema_map = config.schema_map or SCHEMA_MAP
-            dataframes = []
-            path = Path(config.input_folder)
-            
-            files = path.rglob('*') if config.recursive else path.iterdir()
-            files_processed = 0
-            
-            # Merge constructor options with config options
-            merged_read_kwargs = {**self._read_options, **config.read_options}
-            
-            for file_path in files:
-                if file_path.is_file():
-                    data = self.read_file(str(file_path), config.filetype, **merged_read_kwargs)
-                    if not data:
-                        continue
-                    df = data.dataframe
-                    if not data.normalized:
-                        df = normalize_columns(df, schema_map, config.to_lower, config.spaces_to_underscores)
-                    dataframes.append(df)
-                    files_processed += 1
-
-            result = merge_dataframes(dataframes, schema_map, config.to_lower, config.spaces_to_underscores)
-            self._logger.info("In-memory processing complete", 
-                           files_processed=files_processed, 
-                           total_rows=len(result), 
-                           columns=len(result.columns))
-            return result
-
-    def process_folder_streaming(self, config):
-        """
-        Stream processing implementation for large datasets
-        
-        This method processes files one at a time and writes output incrementally,
-        maintaining constant memory usage regardless of dataset size.
-        
-        Args:
-            config (ProcessingConfig): Processing configuration object
-            
-        Returns:
-            dict: Processing summary with files_processed, total_rows, output_file
-        """
-        with log_performance("streaming_processing", 
-                           input_folder=config.input_folder,
-                           output_file=config.output_file,
-                           file_types=config.filetype):
-            
-            self._logger.info("Starting streaming processing", 
-                           input_folder=config.input_folder,
-                           output_file=config.output_file)
-            
-            # Merge constructor defaults with config options
-            merged_read_kwargs = {**self._read_options, **config.read_options}
-            merged_write_kwargs = {**self._write_options, **config.write_options}
-            
-            # Get CSV handler to filter both read and write kwargs
-            csv_handler = self._get_handler_for_extension('csv')
-            filtered_read_kwargs = csv_handler.filter_kwargs(merged_read_kwargs, mode='read')
-            filtered_write_kwargs = csv_handler.filter_kwargs(merged_write_kwargs, mode='write')
-            
-            # Step 1: Detect unified schema across all files
-            schema_info = self._determine_schema(
-                config.input_folder, config.recursive, config.filetype, config.schema_map, 
-                config.to_lower, config.spaces_to_underscores, **filtered_read_kwargs
-            )
-            
-            self._logger.info("Schema detection complete", 
-                           columns=len(schema_info['dtypes']),
-                           files_sampled=schema_info['files_processed'])
-            
-            # Step 2: Get file iterator (memory efficient)
-            file_iterator = self._get_files_iterator(config.input_folder, config.recursive, config.filetype)
+        for file_path in get_files_iterator(config.input_folder, config.recursive, config.file_type_filter):
+            self._logger.info("Processing file", file_name=file_path.name)
+            reader = self._get_handler_for_extension(get_extension(file_path))
             
             try:
-                # Step 3: Handle first file (with headers)
-                first_file_path = next(file_iterator)
-                self._logger.info("Processing first file", file_name=first_file_path.name)
-                
-                first_df = self._process_single_file(
-                    first_file_path, schema_info, config.schema_map, 
-                    config.to_lower, config.spaces_to_underscores, **filtered_read_kwargs
-                )
-                
-                if first_df is not None:
-                    first_df.to_csv(config.output_file, index=False, mode='w', **filtered_write_kwargs)
-                    total_rows = len(first_df)
-                    self._logger.info("First file written", rows=total_rows)
-                    del first_df
-                else:
-                    self._logger.error("Failed to process first file", file_name=first_file_path.name)
-                    return None
-                    
-                # Step 4: Stream remaining files
-                files_processed = 1
-                
-                for file_path in file_iterator:
-                    self._logger.info("Processing file", 
-                                   file_name=file_path.name, 
-                                   file_number=files_processed + 1)
-                    
-                    df = self._process_single_file(
-                        file_path, schema_info, config.schema_map,
-                        config.to_lower, config.spaces_to_underscores, **filtered_read_kwargs
-                    )
-                    
-                    if df is not None:
-                        df.to_csv(config.output_file, index=False, mode='a', header=False, **filtered_write_kwargs)
-                        total_rows += len(df)
-                        del df
-                        
-                    files_processed += 1
-                
-                self._logger.info("Streaming processing complete", 
-                               files_processed=files_processed,
-                               total_rows=total_rows,
-                               output_file=config.output_file)
-                
-                return {
-                    'files_processed': files_processed,
-                    'total_rows': total_rows,
-                    'output_file': config.output_file,
-                    'schema': schema_info
-                }
-                
-            except StopIteration:
-                self._logger.warning("No files found to process", input_folder=config.input_folder)
-                return None
+                for chunk in reader.read(file_path, **read_options):
+                    chunk['source_file'] = get_source_file_path(file_path)
+                    chunk = normalize_chunk(chunk, config)
 
-    def _get_source_file_path(self, file_path):
-        """Extract source file path relative to input folder"""
-        rel_path = os.path.relpath(str(file_path))
-        path_parts = Path(rel_path).parts
-        if len(path_parts) > 1:
-            return str(Path(*path_parts[1:]))
+                    # If config.columns is provided, filter columns. Otherwise, add all columns found.
+                    if config.columns:
+                        chunk = chunk.reindex(columns=config.columns, fill_value=None)
+                    
+                    # Add manual index column based on mode
+                    if config.index_mode == IndexMode.LOCAL:
+                        # Each file starts from index_start
+                        chunk['__index__'] = range(config.index_start, 
+                                                config.index_start + len(chunk))
+                    elif config.index_mode == IndexMode.SEQUENTIAL:
+                        # Continuous across all files
+                        chunk['__index__'] = range(current_global_index, 
+                                                current_global_index + len(chunk))
+                        current_global_index += len(chunk)
+                    
+                    all_chunks.append(chunk)
+                    total_rows += len(chunk)
+                files_processed += 1
+            except Exception as e:
+                self._logger.error("Failed to process file", 
+                                    file_name=file_path.name, 
+                                    error=str(e),
+                                    exception=e)
+                
+        # Merge and finalize
+        merged_data = pd.concat(all_chunks, ignore_index=True)
+        
+        # Move manual index to actual index if needed
+        if config.index_mode in [IndexMode.LOCAL, IndexMode.SEQUENTIAL]:
+            merged_data = merged_data.set_index('__index__')
+            merged_data.index.name = None  # Remove the index name
+            write_options['index'] = True
+
+        # Output the result
+        if writer:
+            writer.write(merged_data, config.output_file, **write_options)
+            self._logger.info("Data saved to file", 
+                            output_file=config.output_file,
+                            rows=len(merged_data),
+                            columns=len(merged_data.columns))
         else:
-            return path_parts[0]
+            print(merged_data.to_string(index=write_options['index']))
 
-    def _determine_schema(self, input_folder, recursive=False, filetype=None, 
-                         schema_map=None, to_lower=True, spaces_to_underscores=True, 
-                         sample_rows=100, **kwargs):
+        return files_processed, total_rows, len(merged_data.columns), merged_data
+
+    def _run_streaming(self,
+                       config: ProcessingConfig,
+                       writer: FileHandler = None,
+                       read_options: dict = None,
+                       write_options: dict = None) -> tuple[int, int, int, pd.DataFrame]:
+        files_processed = 0
+        total_rows = 0
+        
+        read_options = read_options or {}
+        write_options = write_options or {}
+
+        needs_reindex = False
+        match config.index_mode:
+            case IndexMode.NONE:
+                write_options['index'] = False
+            case IndexMode.LOCAL:
+                write_options['index'] = True
+                if config.index_start != 0:
+                    needs_reindex = True
+            case IndexMode.SEQUENTIAL:
+                write_options['index'] = True
+                needs_reindex = True
+
+        has_unmapped = False
+            
+        if config.columns:
+            column_dtypes = {}
+            for col in config.columns:
+                mapped_value = (config.schema_map or {}).get(col, None)
+                column_dtypes[col] = mapped_value
+                if mapped_value is None:
+                    has_unmapped = True
+        else:
+            # if streaming, determine columns now
+            column_dtypes, _ = self._determine_columns(config.input_folder,
+                                                       config.recursive,
+                                                       config.file_type_filter,
+                                                       config.schema_map,
+                                                       config.to_lower,
+                                                       config.spaces_to_underscores,
+                                                       **read_options)
+            
+            column_dtypes['source_file'] = 'object'
+
+        for file_path in get_files_iterator(config.input_folder, config.recursive, config.file_type_filter):
+            self._logger.info("Processing file", file_name=file_path.name)
+            reader = self._get_handler_for_extension(get_extension(file_path))
+            
+            try:
+                for chunk in reader.read(file_path, **read_options):
+                    '''if hasattr(column_dtypes, 'source_file'):
+                        column_dtypes['source_file'] = get_source_file_path(file_path)'''
+                    if has_unmapped:                        
+                        file_columns = self._get_dtypes_from_sample(chunk, config.schema_map, config.to_lower,
+                                                                    config.spaces_to_underscores, column_dtypes)
+                        if not file_columns:
+                            continue
+                        has_unmapped = False
+                    
+                    chunk['source_file'] = get_source_file_path(file_path)
+                    
+                    chunk:pd.DataFrame = normalize_chunk(chunk, config)
+                    chunk = chunk.reindex(columns=column_dtypes.keys(), fill_value=None)
+
+                    if needs_reindex:
+                        chunk.reset_index(drop=True, inplace=True)
+                        offset = total_rows if config.index_mode == IndexMode.SEQUENTIAL else 0
+                        chunk.index = range(offset + config.index_start,
+                                            offset + config.index_start + len(chunk))
+                    
+                    # Send chunk to writer
+                    if writer:
+                        writer.write(chunk, config.output_file, **write_options)
+                        write_options['mode'] = 'a'
+                        write_options['header'] = False
+                    else:
+                        print(chunk.to_string(index=write_options['index']))
+                    total_rows += len(chunk)
+                    
+                files_processed += 1
+
+            except Exception as e:
+                self._logger.error("Failed to process file", 
+                                    file_name=file_path.name, 
+                                    error=str(e),
+                                    exception=e)
+
+        return files_processed, total_rows, len(column_dtypes.keys()), None
+
+    def _get_dtypes_from_sample(self, sample_df: pd.DataFrame, schema_map:dict,
+                                to_lower:bool, spaces_to_underscores:bool, column_dtypes:dict):        
+        normalized_df = normalize_columns(sample_df,
+                                          schema_map,
+                                          to_lower,
+                                          spaces_to_underscores)
+        
+        file_columns = set(normalized_df.columns)
+        
+        for col in normalized_df.columns:
+            current_dtype = str(normalized_df[col].dtype)
+            existing_dtype = column_dtypes.get(col)
+            unified_dtype = merge_dtypes(existing_dtype, current_dtype)
+            column_dtypes[col] = unified_dtype
+        
+        del sample_df, normalized_df
+
+        return file_columns
+
+    def _determine_columns(self, input_folder, recursive=False, filetype=None,
+                           schema_map:dict=None, to_lower=True, spaces_to_underscores=True,
+                           sample_rows=100, **kwargs) -> tuple[dict, int]:
         """
         Determine unified schema across all files by sampling headers and data types
         """
@@ -337,37 +273,23 @@ class DataProcessor:
                         input_folder=input_folder, 
                         sample_rows=sample_rows)
         
-        schema_map = schema_map or SCHEMA_MAP
         all_columns = set()
         column_dtypes = {}
         files_processed = 0
         
-        file_iterator = self._get_files_iterator(input_folder, recursive, filetype)
+        file_iterator = get_files_iterator(input_folder, recursive, filetype)
         
         for file_path in file_iterator:
             try:
                 sample_df = self._read_file_sample(file_path, sample_rows, **kwargs)
-
-                # Add source_file column during schema detection
-                sample_df['source_file'] = self._get_source_file_path(file_path)
-
+                
                 if sample_df is None or sample_df.empty:
-                    continue
+                    return None
                 
-                normalized_df = normalize_columns(sample_df, schema_map, to_lower, spaces_to_underscores)
-                
-                file_columns = set(normalized_df.columns)
-                all_columns.update(file_columns)
-                
-                for col in normalized_df.columns:
-                    current_dtype = str(normalized_df[col].dtype)
-                    existing_dtype = column_dtypes.get(col)
-                    unified_dtype = self._merge_dtypes(existing_dtype, current_dtype)
-                    column_dtypes[col] = unified_dtype
-                
-                files_processed += 1
-                del sample_df, normalized_df
-                
+                file_columns = self._get_dtypes_from_sample(sample_df, schema_map, to_lower,
+                                                            spaces_to_underscores, column_dtypes)
+                if file_columns:
+                    files_processed += 1
             except Exception as e:
                 self._logger.warning("Could not sample file", 
                                   file_name=file_path.name, 
@@ -376,218 +298,21 @@ class DataProcessor:
         
         gc.collect()
         
-        schema_info = {
-            'dtypes': column_dtypes,
-            'files_processed': files_processed
-        }
-        
-        return schema_info
+        return column_dtypes, files_processed
 
-    '''def _get_files_iterator(self, input_folder, recursive=False, filetype=None):
-        """Memory-efficient file iterator that yields valid files one at a time"""
-        path = Path(input_folder)
-        files = path.rglob('*') if recursive else path.iterdir()
-        valid_extensions = self._normalize_filetype(filetype)
-        
-        for file_path in files:
-            if file_path.is_file():
-                extension = file_path.suffix.lower()[1:]
-                if extension in valid_extensions:
-                    yield file_path'''
-
-    def _process_single_file(self, file_path, schema_info, schema_map=None, 
-                           to_lower=True, spaces_to_underscores=True, **kwargs):
-        """Process a single file using the unified schema"""
-        try:
-            data = self.read_file(str(file_path), **kwargs)
-            if data is None:
-                return None
-                
-            normalized_df = self._normalize_to_schema(
-                data.dataframe, 
-                schema_info,
-                schema_map,
-                to_lower,
-                spaces_to_underscores
-            )
-            
-            return normalized_df
-            
-        except Exception as e:
-            self._logger.error("Error processing file", 
-                            file_name=file_path.name, 
-                            error=str(e))
-            return None
-
-    def _normalize_to_schema(self, dataframe, schema_info, schema_map=None, 
-                           to_lower=True, spaces_to_underscores=True):
-        """Normalize a dataframe to match the unified schema"""
-        normalized_df = normalize_columns(dataframe, schema_map, to_lower, spaces_to_underscores)
-        
-        target_dtypes = schema_info['dtypes']
-        target_columns = list(target_dtypes.keys())
-        
-        # Add missing columns
-        current_columns = set(normalized_df.columns)
-        missing_columns = set(target_columns) - current_columns
-        
-        for col in missing_columns:
-            default_value = self._get_default_value_for_dtype(target_dtypes[col])
-            normalized_df[col] = default_value
-        
-        # Remove extra columns
-        extra_columns = current_columns - set(target_columns)
-        if extra_columns:
-            normalized_df = normalized_df.drop(columns=list(extra_columns))
-        
-        # Reorder columns to match schema order
-        normalized_df = normalized_df.reindex(columns=target_columns)
-        
-        # Cast data types to match schema
-        try:
-            for col in target_columns:
-                if col in normalized_df.columns:
-                    current_dtype = str(normalized_df[col].dtype)
-                    target_dtype = target_dtypes[col]
-                    
-                    if current_dtype != target_dtype:
-                        normalized_df[col] = normalized_df[col].astype(target_dtype, errors='ignore')
-                        
-        except Exception as e:
-            self._logger.warning("Type casting failed for some columns", error=str(e))
-        
-        return normalized_df
-
-    def _read_file_sample(self, file_path, sample_rows, **kwargs):
+    def _read_file_sample(self, file_path: str, default_sample_rows:int = 100, **kwargs):
         """Read a small sample of a file for schema detection"""
-        extension = file_path.suffix.lower()[1:]
-        handler = self._get_handler_for_extension(extension)
+        extension = get_extension(file_path)
+        handler = get_handler_for_extension(extension)
+        handler_sample_rows = handler.schema_sample_rows
+        sample_rows = handler_sample_rows if handler_sample_rows is not None else default_sample_rows
         
         try:
-            sample_kwargs = {**self._read_options, **kwargs}
-            if extension in ['csv', 'xlsx']:
-                sample_kwargs['nrows'] = sample_rows
-            
-            result = handler.read(str(file_path), **sample_kwargs)
-            return result.dataframe
-            
+            if handler_sample_rows is not None:  # Handler supports sampling
+                kwargs['nrows'] = sample_rows
+            return next(handler.read(str(file_path), **kwargs))
         except Exception:
-            # Fallback: try reading without nrows
-            try:
-                result = handler.read(str(file_path), **self._read_options)
-                if len(result.dataframe) > sample_rows:
-                    return result.dataframe.head(sample_rows)
-                return result.dataframe
-            except Exception:
-                return None
-
-    def _merge_dtypes(self, existing_dtype, new_dtype):
-        """Merge two pandas dtypes, choosing the most permissive one"""
-        if existing_dtype is None:
-            return new_dtype
-        
-        dtype_hierarchy = ['object', 'float64', 'int64', 'bool', 'datetime64[ns]']
-        
-        try:
-            existing_pos = dtype_hierarchy.index(existing_dtype)
-        except ValueError:
-            existing_pos = 0
-            
-        try:
-            new_pos = dtype_hierarchy.index(new_dtype)
-        except ValueError:
-            new_pos = 0
-        
-        return dtype_hierarchy[min(existing_pos, new_pos)]
-
-    def _get_default_value_for_dtype(self, dtype_str):
-        """Get appropriate default value for missing columns based on data type"""
-        if 'bool' in dtype_str:
-            return False
-        return None
-
-    '''def _normalize_filetype(self, filetype=None):
-        """Normalize and validate filetype filter input"""
-        if filetype is None:
-            filetype = ALLOWED_EXTENSIONS
-        else:
-            if isinstance(filetype, list):
-                filetype = [ext.lstrip('.').lower() for ext in filetype]
-            elif isinstance(filetype, str):
-                filetype = [filetype.lstrip('.').lower()]
-            else:
-                raise TypeError(f"filetype must be str, list, or None. Got {type(filetype).__name__}: {filetype}")
-            unsupported_filters = set(filetype) - set(ALLOWED_EXTENSIONS)
-            if unsupported_filters:
-                raise ValueError(f"Unsupported file types in filter: {unsupported_filters}. Supported: {ALLOWED_EXTENSIONS}")
-        return filetype'''
-    
-    def _get_handler_for_extension(self, extension):
-        """Get handler class for a given extension"""
-        handler_class_name = f"{extension.capitalize()}Handler"
-        try:
-            handler_class = getattr(handlers, handler_class_name)
-        except AttributeError:
-            raise ValueError(f"Unsupported file format: .{extension}. Supported: {[f'.{ext}' for ext in ALLOWED_EXTENSIONS]}")
-        
-        return handler_class()
-
-    def read_file(self, file_path, filetype=None, **override_options):
-        """
-        Read a single file if it matches the filetype filter
-        
-        Args:
-            file_path (str): Path to file to read
-            filetype (str|list, optional): File extensions to allow
-            **override_options: Options passed to file handlers
-        
-        Returns:
-            FileResult|None: FileResult if file matches filter, None if filtered out
-        """
-        abs_path = os.path.abspath(file_path)
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"The file '{abs_path}' does not exist.")
-
-        extension = Path(file_path).suffix.lower()[1:]
-
-        if extension not in self._normalize_filetype(filetype):
-            return None
-        
-        handler = self._get_handler_for_extension(extension)
-        
-        # Merge constructor options with override options
-        final_read_options = {**self._read_options, **override_options}
-        
-        data = handler.read(file_path, **final_read_options)
-        
-        # Get relative path and remove first directory (input folder)
-        data.dataframe['source_file'] = self._get_source_file_path(abs_path)
-        
-        return data
-    
-    def write_file(self, dataframe, output_path, **override_options):
-        """
-        Save DataFrame to file, determining format from file extension
-        
-        Args:
-            dataframe (pandas.DataFrame): DataFrame to save
-            output_path (str): Path to output file
-            **override_options: Options passed to file handlers
-        """
-        abs_path = os.path.abspath(output_path)
-        extension = Path(output_path).suffix.lower()[1:]
-        
-        if not extension:
-            raise ValueError(f"Output file must have an extension to determine format: {output_path}")
-        
-        handler = self._get_handler_for_extension(extension)
-        
-        # Merge constructor options with override options
-        final_write_options = {**self._write_options, **override_options}
-        
-        # Write the file
-        handler.write(dataframe, output_path, **final_write_options)
-        self._logger.info("Data saved to file", 
-                        output_file=abs_path, 
-                        rows=len(dataframe), 
-                        columns=len(dataframe.columns))
+            # Fallback logic can safely reference actual_sample_rows (never None)
+            if sample_rows and 'nrows' in kwargs:
+                del kwargs['nrows']  # Remove nrows and try again
+                return next(handler.read(str(file_path), **kwargs))

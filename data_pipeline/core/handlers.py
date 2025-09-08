@@ -1,5 +1,5 @@
 from .dataframe_utils import FileResult, merge_dataframes
-from .config import ALLOWED_EXTENSIONS
+from .config import ALLOWED_EXTENSIONS, STREAMABLE_EXTENSIONS
 from typing import Iterator
 from abc import ABC, abstractmethod
 import pandas as pd
@@ -31,46 +31,38 @@ Adding New File Types:
     FileHandler abstract base class methods.
 """
 
-def get_handler_for_extension(extension: str):
-    """
-    Get file handler instance for the specified extension.
-    
-    Dynamically instantiates the appropriate handler class based on file
-    extension using naming convention (e.g., 'csv' -> CsvHandler).
-    
-    Args:
-        extension: File extension without dot (e.g., 'csv', 'xlsx', 'json')
-        
-    Returns:
-        FileHandler: Handler instance for the file type
-        
-    Raises:
-        ValueError: If extension is not supported or handler not found
-        
-    Examples:
-        >>> handler = get_handler_for_extension('csv')
-        >>> isinstance(handler, CsvHandler)
-        True
-        
-    Note:
-        Handler classes must follow naming convention: {Extension}Handler
-        where Extension is the capitalized file extension.
-    """
-    handler_class_name = f"{extension.capitalize()}Handler"
-    try:
-        handler_class = getattr(sys.modules[__name__], handler_class_name)
-    except AttributeError:
-        raise ValueError(f"Unsupported file format: .{extension}. Supported: {[f'.{ext}' for ext in ALLOWED_EXTENSIONS]}")
-    
-    return handler_class()
-
 class FileHandler(ABC):
     """Abstract base class for file handlers"""
+    _SCHEMA_SAMPLE_ROWS:int = None
+
+    @classmethod
+    def get_schema_sample_rows(cls) -> int:
+        return cls._SCHEMA_SAMPLE_ROWS
+    
+    @classmethod
+    def get_extension(cls) -> str:
+        return cls.__name__[:-len("Handler")].lower()
+
+    @classmethod
+    def is_streamable(cls) -> bool:
+        return cls.get_extension() in STREAMABLE_EXTENSIONS
 
     def __init__(self):
         self._READ_KWARGS = self.get_read_kwargs()
         self._WRITE_KWARGS = self.get_write_kwargs()
-    
+
+    @property
+    def schema_sample_rows(self) -> int:
+        return type(self).get_schema_sample_rows()
+
+    @property
+    def extension(self) -> str:
+        return type(self).get_extension()
+
+    @property
+    def streamable(self) -> bool:
+        return type(self).is_streamable()
+
     def get_function_name(self):
         """Override this if pandas function name differs from class name"""
         # Default: CsvHandler → read_csv, JsonHandler → read_json
@@ -127,11 +119,12 @@ class FileHandler(ABC):
     
 class CsvHandler(FileHandler):
     """Handler for CSV files"""
+    _SCHEMA_SAMPLE_ROWS:int = 2
     
-    def read(self, file_path: str, chunk_size: int = 1, **kwargs) -> Iterator[pd.DataFrame]:
+    def read(self, file_path: str, chunk_size: int = 2, **kwargs) -> Iterator[pd.DataFrame]:
         """Read CSV file and return FileResult"""
         filtered_kwargs = self.filter_kwargs(kwargs, mode='read')
-        for chunk in pd.read_csv(file_path, chunksize=chunk_size, **kwargs):
+        for chunk in pd.read_csv(file_path, chunksize=chunk_size, **filtered_kwargs):
             yield chunk
 
         #df = pd.read_csv(file_path, chunksize=chunk_size, **filtered_kwargs)
@@ -139,6 +132,7 @@ class CsvHandler(FileHandler):
 
 class XlsxHandler(FileHandler):
     """Handler for Excel files"""
+    _SCHEMA_SAMPLE_ROWS:int = 5
 
     def get_function_name(self):
         return 'excel'  # Override for pd.read_excel
@@ -221,3 +215,36 @@ class JsonHandler(FileHandler):
             else:
                 flattened[key] = value
         return flattened
+    
+def get_handler_for_extension(extension: str) -> FileHandler:
+    """
+    Get file handler instance for the specified extension.
+    
+    Dynamically instantiates the appropriate handler class based on file
+    extension using naming convention (e.g., 'csv' -> CsvHandler).
+    
+    Args:
+        extension: File extension without dot (e.g., 'csv', 'xlsx', 'json')
+        
+    Returns:
+        FileHandler: Handler instance for the file type
+        
+    Raises:
+        ValueError: If extension is not supported or handler not found
+        
+    Examples:
+        >>> handler = get_handler_for_extension('csv')
+        >>> isinstance(handler, CsvHandler)
+        True
+        
+    Note:
+        Handler classes must follow naming convention: {Extension}Handler
+        where Extension is the capitalized file extension.
+    """
+    handler_class_name = f"{extension.capitalize()}Handler"
+    try:
+        handler_class = getattr(sys.modules[__name__], handler_class_name)
+    except AttributeError:
+        raise ValueError(f"Unsupported file format: .{extension}. Supported: {[f'.{ext}' for ext in ALLOWED_EXTENSIONS]}")
+    
+    return handler_class()

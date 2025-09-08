@@ -1,6 +1,18 @@
 {
     "employees": [
-        {"name": "Jason", "details": {"age": 25, "city": "New York"}},
-        {"name": "Jane", "details": {"age": 30, "city": "Chicago"}}
+        {
+            "name": "George",
+            "details": {
+                "age": 25,
+                "city": "New York"
+            }
+        },
+        {
+            "name": "Jerry",
+            "details": {
+                "age": 30,
+                "city": "Chicago"
+            }
+        }
     ]
 }

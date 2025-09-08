@@ -1,11 +1,11 @@
-# ui/cli.py - Updated with BooleanOptionalAction
+# ui/cli.py - Updated with custom argument parser
 
 import argparse
 import sys
 from pathlib import Path
 from shared_utils.logger import set_up_logging, get_logger
 from data_pipeline.core.processor import DataProcessor
-from data_pipeline.core.processing_config import ProcessingConfig
+from data_pipeline.core.processing_config import ProcessingConfig, IndexMode
 from ..core.dataframe_utils import ProcessingResult
 
 def cast_string_to_appropriate_type(value):
@@ -40,6 +40,11 @@ def cast_string_to_appropriate_type(value):
     # Handle empty strings
     if value == "":
         return value
+    
+    if value.lower() in ('true'):
+        return True
+    elif value.lower() in ('false'):
+        return False
     
     # Check for type prefixes
     if ':' in value:
@@ -77,37 +82,55 @@ def cast_string_to_appropriate_type(value):
     # Keep as string if not numeric
     return value
 
-def parse_unknown_args(unknown_args):
+def get_known_args_from_parser(parser):
+    """Extract all defined argument names from the parser"""
+    known_args = set()
+    for action in parser._actions:
+        if action.option_strings:  # Skip positional arguments
+            known_args.update(action.option_strings)
+    return known_args
+
+def split_arguments(argv, parser):
+    """Split command line into defined args and pandas args"""
+    known_args = get_known_args_from_parser(parser)
+    defined_args = []
+    pandas_args = []
+
+    current_list = None
+
+    for item in argv[1:]:
+        if item.startswith("--"):
+            current_list = defined_args if item in known_args else pandas_args
+            current_list.append(item)
+        else:
+            if current_list is None:
+                raise ValueError(f"Value '{item}' found before any key")
+            current_list.append(item)
+
+    return defined_args, pandas_args
+
+def parse_pandas_args(pandas_args):
     """
-    Parse unknown arguments from argparse into kwargs dict
-    
-    Handles the read/write split logic:
-    - 0 values: use defaults
-    - 1 value: same for read and write  
-    - 2 values: first=read, second=write
-    - 3+ values: error
-    
-    String values are automatically cast to appropriate types (int, float, or string).
+    Parse pandas arguments into read/write kwargs
     
     Args:
-        unknown_args: List from parse_known_args() like ['--encoding', 'utf-8', '--sep', ';', ';']
+        pandas_args: List like ['--index', 'False', 'false', '--sep', ';']
         
     Returns:
         tuple: (read_kwargs, write_kwargs)
     """
-    # Parse flat list into key-value pairs
     kwargs = {}
     i = 0
-    while i < len(unknown_args):
-        if unknown_args[i].startswith('--'):
-            key = unknown_args[i][2:].replace('-', '_')  # --sheet-name -> sheet_name
+    while i < len(pandas_args):
+        if pandas_args[i].startswith('--'):
+            key = pandas_args[i][2:].replace('-', '_')  # --sheet-name -> sheet_name
             values = []
             
             # Collect all values for this key (until next -- or end)
             i += 1
-            while i < len(unknown_args) and not unknown_args[i].startswith('--'):
-                # Cast string numbers to actual numbers
-                cast_value = cast_string_to_appropriate_type(unknown_args[i])
+            while i < len(pandas_args) and not pandas_args[i].startswith('--'):
+                # Cast string values to appropriate types
+                cast_value = cast_string_to_appropriate_type(pandas_args[i])
                 values.append(cast_value)
                 i += 1
             
@@ -240,12 +263,40 @@ def main():
         help='Convert spaces to underscores in column names. Use --no-spaces-to-underscores to disable. Default: enabled'
     )
     
-    # Parse known args, let everything else go to unknown
-    args, unknown_args = parser.parse_known_args()
+    parser.add_argument(
+        '--columns',
+        help='Comma-separated list of column names to expect in output (enables streaming for mixed file types by skipping schema detection). Example: --columns first_name,last_name,age,city'
+    )
 
-    # Parse unknown arguments into read/write kwargs
+    parser.add_argument(
+        '--force-in-memory',
+        action='store_true',
+        help='Force in-memory processing even for large datasets or CSV output. Overrides streaming optimizations. Use when you need the full dataset in memory for complex operations.'
+    )
+
+    parser.add_argument(
+        '--index-mode',
+        choices=['none', 'local', 'sequential'],
+        type=str.lower,
+        help='Index handling mode: none=no index column, local=per-file indices (0,1,2 then 0,1,2), sequential=continuous across files (0,1,2,3,4...). Overrides --index parameter if specified.'
+    )
+
+    parser.add_argument(
+        '--index-start',
+        type=int,
+        default=0,
+        help='Starting number for index values. Examples: 0 (0,1,2...), 1 (1,2,3...), 100 (100,101,102...). Only applies when index-mode shows indices. Default: 0'
+    )
+    
+    # Custom argument parsing to handle pandas arguments reliably
+    defined_args, pandas_args = split_arguments(sys.argv, parser)
+    
+    # Parse defined arguments
+    args = parser.parse_args(defined_args)  # Skip script name
+    
+    # Parse pandas arguments
     try:
-        read_kwargs, write_kwargs = parse_unknown_args(unknown_args)
+        read_kwargs, write_kwargs = parse_pandas_args(pandas_args)
     except ValueError as e:
         print(f"Error: {e}")
         sys.exit(1)
@@ -261,6 +312,7 @@ def main():
             "{{?has_file_count; (;file_count; files)}}"
             "{{ in ;duration;{$format_duration}}}"
             "{{?has_error_count; - ;error_count; errors}}"
+            "{{?has_error; - ;error;}}"
         )
     )
     logger = get_logger('data_pipeline.cli')
@@ -271,7 +323,7 @@ def main():
     if not Path(args.input_folder).exists():
         logger.error("Input folder does not exist", folder=args.input_folder)
         sys.exit(1)
-    
+
     # Load custom schema if provided
     schema_map = None
     if args.schema:
@@ -299,54 +351,7 @@ def main():
     if schema_map:
         config = config.with_schema_map(schema_map)
     
-    summary:ProcessingResult = processor.run(config)
-
-    '''if summary:
-        logger.info("Processing complete", 
-                    files_processed=summary['files_processed'], 
-                    total_rows=summary['total_rows'])
-    else:
-        logger.error("Processing failed or no files processed")
-        sys.exit(1)
-    
-    # Smart processing mode selection based on output format
-    if args.output_file and args.output_file.lower().endswith('.csv'):
-        # Automatically use streaming for CSV output (memory efficient)
-        logger.info("Using streaming mode for CSV output", output_file=args.output_file)
-        
-        summary = processor.process_folder_streaming(config)
-        
-        if summary:
-            logger.info("Streaming processing complete", 
-                       files_processed=summary['files_processed'], 
-                       total_rows=summary['total_rows'])
-        else:
-            logger.error("Processing failed or no files processed")
-            sys.exit(1)
-            
-    else:
-        # Use normal in-memory processing for other formats or console output
-        if args.output_file:
-            logger.info("Using in-memory processing for file output", 
-                        output_format=Path(args.output_file).suffix.upper(),
-                        output_file=args.output_file)
-        else:
-            logger.info("Using in-memory processing for console output")
-            
-        # Use the config object for in-memory processing too
-        result = processor.process_folder(config)
-
-        # Output results
-        if args.output_file:
-            processor.write_file(result, args.output_file)
-            logger.info("Data saved to file", 
-                        output_file=args.output_file,
-                        rows=len(result),
-                        columns=len(result.columns))
-        else:
-            print(result)'''
+    summary = processor.run(config)
 
 if __name__ == '__main__':
     main()
-
-#python -m data_pipeline.ui.cli --input-folder data_pipeline/test_data --output-file c:/users/krjar/downloads/merged.csv --recursive --to-lower --spaces-to-underscores

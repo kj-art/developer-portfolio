@@ -10,10 +10,17 @@ from pathlib import Path
 from typing import Iterator, Optional, Union, List
 import pandas as pd
 from shared_utils.logger import EnterpriseLogger
+from .processing_config import ProcessingConfig
+from .dataframe_utils import normalize_columns
 
 from . import handlers
-from .config import ALLOWED_EXTENSIONS
+from .config import ALLOWED_EXTENSIONS, STREAMABLE_EXTENSIONS
 
+def get_extension(file_path: str) -> str:
+        return Path(file_path).suffix.lstrip('.')
+
+def is_streamable_extension(extension: str) -> bool:
+    return extension.lower() in STREAMABLE_EXTENSIONS
 
 def get_files_iterator(
     input_folder: Union[str, Path], 
@@ -207,7 +214,7 @@ def get_default_value_for_dtype(dtype_str: str):
     Get appropriate default value for missing columns based on pandas data type.
     
     Returns sensible default values for different pandas data types when
-    adding missing columns during schema normalization.
+    adding missing columns during column name normalization.
     
     Args:
         dtype_str: String representation of pandas dtype (e.g., 'int64', 'object')
@@ -232,7 +239,7 @@ def merge_dtypes(existing_dtype: Optional[str], new_dtype: str) -> str:
     """
     Merge two pandas dtypes, choosing the most permissive one.
     
-    Combines data types from multiple files to create a unified schema,
+    Combines data types from multiple files to create a unified column naming,
     selecting the most permissive type that can handle all data variations.
     Uses hierarchy: object > float64 > int64 > bool > datetime64[ns]
     
@@ -253,4 +260,19 @@ def merge_dtypes(existing_dtype: Optional[str], new_dtype: str) -> str:
         >>> merge_dtypes(None, 'int64')
         'int64'    # first occurrence
     """
-    pass
+    if existing_dtype is None:
+        return new_dtype
+    
+    dtype_hierarchy = ['object', 'float64', 'int64', 'bool', 'datetime64[ns]']
+    
+    try:
+        existing_pos = dtype_hierarchy.index(existing_dtype)
+    except ValueError:
+        existing_pos = 0
+        
+    try:
+        new_pos = dtype_hierarchy.index(new_dtype)
+    except ValueError:
+        new_pos = 0
+    
+    return dtype_hierarchy[min(existing_pos, new_pos)]

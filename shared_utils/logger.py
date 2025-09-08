@@ -136,7 +136,7 @@ class StringSmithLoggingFormatter(logging.Formatter):
         def level_color(level):
             """Map log levels to colors"""
             colors = {
-                'DEBUG': 'dim',
+                'DEBUG': 'FFA500',
                 'INFO': 'blue', 
                 'WARNING': 'yellow',
                 'ERROR': 'red',
@@ -202,6 +202,9 @@ class StringSmithLoggingFormatter(logging.Formatter):
         def has_file_name(file_name):
             return file_name is not None and str(file_name).strip() != ''
         
+        def has_error(error):
+            return error is not None and str(error).strip() != ''
+        
         # Create StringSmith formatter with logging functions
         functions = [
             level_color,
@@ -214,7 +217,8 @@ class StringSmithLoggingFormatter(logging.Formatter):
             has_error_count,
             has_memory_usage,
             is_slow_operation,
-            has_file_name
+            has_file_name,
+            has_error
         ]
         
         try:
@@ -311,18 +315,26 @@ class EnterpriseLogger:
         
     def _log(self, level: int, message: str, **kwargs):
         """Internal logging with StringSmith extra data support"""
+        # Handle exception parameter specially
+        exc_info = kwargs.get('exc_info')
+        if 'exception' in kwargs and exc_info is None:
+            # Convert exception object to exc_info tuple
+            exception = kwargs.pop('exception')
+            exc_info = (type(exception), exception, exception.__traceback__)
+        
+        # Filter out logging-specific parameters from extra data
         extra_data = {k: v for k, v in kwargs.items() 
-                     if k not in ['exc_info', 'stack_info', 'stacklevel']}
+                     if k not in ['exc_info', 'stack_info', 'stacklevel', 'exception']}
         
         if extra_data:
-            # Create LogRecord with StringSmith-compatible extra data
+            # Create LogRecord with StringSmith-compatible extra data and exception info
             record = self.logger.makeRecord(
                 self.logger.name, level, '', 0, message, (), 
-                kwargs.get('exc_info'), extra={'extra_data': extra_data}
+                exc_info, extra={'extra_data': extra_data}
             )
             self.logger.handle(record)
         else:
-            self.logger.log(level, message, **kwargs)
+            self.logger.log(level, message, exc_info=exc_info, **kwargs)
 
 
 def set_up_logging(

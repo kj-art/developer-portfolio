@@ -148,7 +148,7 @@ def demo_professional_logging():
     
     # Professional log formatter functions
     def level_color(level):
-        colors = {'ERROR': 'red', 'WARNING': 'yellow', 'INFO': 'blue', 'DEBUG': 'dim'}
+        colors = {'ERROR': 'red', 'WARNING': 'yellow', 'INFO': 'blue', 'DEBUG': 'orange'}
         return colors.get(level.upper(), 'white')
 
     def has_user(user_id):
