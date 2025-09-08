@@ -3,8 +3,9 @@ import gc
 import time
 from pathlib import Path
 import pandas as pd
-from .dataframe_utils import merge_dataframes, normalize_columns, normalize_chunk, ProcessingResult
+from .dataframe_utils import normalize_columns, normalize_chunk, ProcessingResult
 from .processing_config import ProcessingConfig, IndexMode
+from .indexing import IndexManager
 from .file_utils import *
 from shared_utils.logger import get_logger, log_performance
 from .handlers import FileHandler, get_handler_for_extension
@@ -83,103 +84,109 @@ class DataProcessor:
                                     data)
 
     def _run_in_memory(self,
-                       config: ProcessingConfig,
-                       writer: FileHandler = None,
-                       read_options: dict = None,
-                       write_options: dict = None) -> tuple[int, int, int, pd.DataFrame]:
+                    config: ProcessingConfig,
+                    writer: FileHandler = None,
+                    read_options: dict = None,
+                    write_options: dict = None) -> tuple[int, int, int, pd.DataFrame]:
+        """
+        Process all files in memory with unified index management.
+        
+        Loads all data into memory, applies transformations, then outputs the complete dataset.
+        Suitable for smaller datasets or when you need the full dataset for complex operations.
+        """
         files_processed = 0
         total_rows = 0
         
         read_options = read_options or {}
         write_options = write_options or {}
-
-        write_options['index'] = False
+        
+        # Initialize index management
+        index_manager = IndexManager(config.index_mode, config.index_start)
+        write_options = index_manager.apply_write_options(write_options)
         
         all_chunks = []
-        current_global_index = config.index_start
-
-        # if config.columns is provided, limit (and expand) columns to those columns only.
-        # otherwise, add columns as you find them 
         
         for file_path in get_files_iterator(config.input_folder, config.recursive, config.file_type_filter):
             self._logger.info("Processing file", file_name=file_path.name)
             reader = self._get_handler_for_extension(get_extension(file_path))
+            is_first_chunk_of_file = True
             
             try:
                 for chunk in reader.read(file_path, **read_options):
+                    # Add source file tracking
                     chunk['source_file'] = get_source_file_path(file_path)
+                    
+                    # Apply column normalization
                     chunk = normalize_chunk(chunk, config)
 
-                    # If config.columns is provided, filter columns. Otherwise, add all columns found.
+                    # Filter/reorder columns if specified
                     if config.columns:
                         chunk = chunk.reindex(columns=config.columns, fill_value=None)
                     
-                    # Add manual index column based on mode
-                    if config.index_mode == IndexMode.LOCAL:
-                        # Each file starts from index_start
-                        chunk['__index__'] = range(config.index_start, 
-                                                config.index_start + len(chunk))
-                    elif config.index_mode == IndexMode.SEQUENTIAL:
-                        # Continuous across all files
-                        chunk['__index__'] = range(current_global_index, 
-                                                current_global_index + len(chunk))
-                        current_global_index += len(chunk)
+                    # Apply index management
+                    chunk = index_manager.process_chunk(chunk, is_new_file=is_first_chunk_of_file)
+                    is_first_chunk_of_file = False
                     
                     all_chunks.append(chunk)
                     total_rows += len(chunk)
+                    
                 files_processed += 1
+                
             except Exception as e:
                 self._logger.error("Failed to process file", 
-                                    file_name=file_path.name, 
-                                    error=str(e),
-                                    exception=e)
+                                file_name=file_path.name, 
+                                error=str(e),
+                                exception=e)
                 
-        # Merge and finalize
-        merged_data = pd.concat(all_chunks, ignore_index=True)
-        
-        # Move manual index to actual index if needed
-        if config.index_mode in [IndexMode.LOCAL, IndexMode.SEQUENTIAL]:
-            merged_data = merged_data.set_index('__index__')
-            merged_data.index.name = None  # Remove the index name
-            write_options['index'] = True
+        # Merge all chunks and finalize indexing
+        if not all_chunks:
+            merged_data = pd.DataFrame()
+        else:
+            merged_data = pd.concat(all_chunks, ignore_index=True)
+            merged_data = index_manager.finalize_in_memory_index(merged_data)
 
         # Output the result
-        if writer:
+        if writer and config.output_file:
             writer.write(merged_data, config.output_file, **write_options)
             self._logger.info("Data saved to file", 
                             output_file=config.output_file,
                             rows=len(merged_data),
                             columns=len(merged_data.columns))
         else:
-            print(merged_data.to_string(index=write_options['index']))
+            # Console output
+            print(merged_data.to_string(index=write_options.get('index', False)))
 
-        return files_processed, total_rows, len(merged_data.columns), merged_data
+        return files_processed, total_rows, len(merged_data.columns) if not merged_data.empty else 0, merged_data
+
 
     def _run_streaming(self,
-                       config: ProcessingConfig,
-                       writer: FileHandler = None,
-                       read_options: dict = None,
-                       write_options: dict = None) -> tuple[int, int, int, pd.DataFrame]:
+                    config: ProcessingConfig,
+                    writer: FileHandler = None,
+                    read_options: dict = None,
+                    write_options: dict = None) -> tuple[int, int, int, pd.DataFrame]:
+        """
+        Process files using streaming with unified index management.
+        
+        Processes files chunk by chunk, writing output immediately. Memory-efficient
+        for large datasets but provides limited access to the complete dataset.
+        """
         files_processed = 0
         total_rows = 0
         
         read_options = read_options or {}
         write_options = write_options or {}
-
-        needs_reindex = False
-        match config.index_mode:
-            case IndexMode.NONE:
-                write_options['index'] = False
-            case IndexMode.LOCAL:
-                write_options['index'] = True
-                if config.index_start != 0:
-                    needs_reindex = True
-            case IndexMode.SEQUENTIAL:
-                write_options['index'] = True
-                needs_reindex = True
+        
+        # Initialize index management
+        index_manager = IndexManager(config.index_mode, config.index_start)
+        write_options = index_manager.apply_write_options(write_options)
+        
+        # Set up write mode for streaming
+        write_options['mode'] = 'w'
+        write_options['header'] = True
 
         has_unmapped = False
-            
+                
+        # Determine schema for streaming consistency
         if config.columns:
             column_dtypes = {}
             for col in config.columns:
@@ -188,25 +195,25 @@ class DataProcessor:
                 if mapped_value is None:
                     has_unmapped = True
         else:
-            # if streaming, determine columns now
+            # Schema detection for streaming
             column_dtypes, _ = self._determine_columns(config.input_folder,
-                                                       config.recursive,
-                                                       config.file_type_filter,
-                                                       config.schema_map,
-                                                       config.to_lower,
-                                                       config.spaces_to_underscores,
-                                                       **read_options)
+                                                    config.recursive,
+                                                    config.file_type_filter,
+                                                    config.schema_map,
+                                                    config.to_lower,
+                                                    config.spaces_to_underscores,
+                                                    **read_options)
             
             column_dtypes['source_file'] = 'object'
 
         for file_path in get_files_iterator(config.input_folder, config.recursive, config.file_type_filter):
             self._logger.info("Processing file", file_name=file_path.name)
             reader = self._get_handler_for_extension(get_extension(file_path))
+            is_first_chunk_of_file = True
             
             try:
                 for chunk in reader.read(file_path, **read_options):
-                    '''if hasattr(column_dtypes, 'source_file'):
-                        column_dtypes['source_file'] = get_source_file_path(file_path)'''
+                    # Handle dynamic schema detection if needed
                     if has_unmapped:                        
                         file_columns = self._get_dtypes_from_sample(chunk, config.schema_map, config.to_lower,
                                                                     config.spaces_to_underscores, column_dtypes)
@@ -214,33 +221,39 @@ class DataProcessor:
                             continue
                         has_unmapped = False
                     
+                    # Add source file tracking
                     chunk['source_file'] = get_source_file_path(file_path)
                     
-                    chunk:pd.DataFrame = normalize_chunk(chunk, config)
+                    # Apply column normalization
+                    chunk = normalize_chunk(chunk, config)
+                    
+                    # Ensure consistent column structure
                     chunk = chunk.reindex(columns=column_dtypes.keys(), fill_value=None)
 
-                    if needs_reindex:
-                        chunk.reset_index(drop=True, inplace=True)
-                        offset = total_rows if config.index_mode == IndexMode.SEQUENTIAL else 0
-                        chunk.index = range(offset + config.index_start,
-                                            offset + config.index_start + len(chunk))
+                    # Apply index management
+                    chunk = index_manager.process_chunk(chunk, is_new_file=is_first_chunk_of_file)
+                    chunk = index_manager.finalize_streaming_chunk(chunk)
+                    is_first_chunk_of_file = False
                     
-                    # Send chunk to writer
-                    if writer:
+                    # Write chunk immediately
+                    if writer and config.output_file:
                         writer.write(chunk, config.output_file, **write_options)
+                        # Switch to append mode after first write
                         write_options['mode'] = 'a'
                         write_options['header'] = False
                     else:
-                        print(chunk.to_string(index=write_options['index']))
+                        # Console output
+                        print(chunk.to_string(index=write_options.get('index', False)))
+                        
                     total_rows += len(chunk)
                     
                 files_processed += 1
 
             except Exception as e:
                 self._logger.error("Failed to process file", 
-                                    file_name=file_path.name, 
-                                    error=str(e),
-                                    exception=e)
+                                file_name=file_path.name, 
+                                error=str(e),
+                                exception=e)
 
         return files_processed, total_rows, len(column_dtypes.keys()), None
 
