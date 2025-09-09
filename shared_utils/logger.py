@@ -121,7 +121,7 @@ class StringSmithLoggingFormatter(logging.Formatter):
         # Default professional log template showcasing StringSmith features
         if template is None:
             template = (
-                "{{#level_color;[;levelname;]}} {{asctime}} {{name}} "
+                "{{#level_color;[;levelname;]}} {{@italic#111111;asctime}} {{name}} "
                 "{{?has_user_context;(User: ;user_id;) }}"
                 "{{?has_request_id;[Req: ;request_id;] }}"
                 "{{message}}"
