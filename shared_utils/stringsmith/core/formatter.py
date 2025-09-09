@@ -188,7 +188,7 @@ class TemplateFormatter:
             
             # Process inline formatting within each template part
             for p, part in section.parts.iter_fields():
-                if not part and not p is 'field':
+                if not part and p != 'field':
                     continue
 
                 # Apply formatting from each token handler pass
@@ -339,8 +339,13 @@ class TemplateFormatter:
             
             # Assemble section with proper ANSI reset codes
             result_parts.append(self._assemble_section_with_resets(new_section))
+            
         return ''.join(result_parts)
     
+    def _raw_ansi(self, s):
+        return s.encode('unicode_escape').decode('ascii')
+
+
     def _set_up_variable_accessor(self, args, kwargs):
         """
         Create variable accessor function based on argument type.
