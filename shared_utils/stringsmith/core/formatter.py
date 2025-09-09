@@ -188,6 +188,9 @@ class TemplateFormatter:
             
             # Process inline formatting within each template part
             for p, part in section.parts.iter_fields():
+                if not part and not p is 'field':
+                    continue
+
                 # Apply formatting from each token handler pass
                 for regex, handlers_dict in self.token_handlers.items():
                     split_part = self.parser.split_tokens(section.parts[p], regex)
