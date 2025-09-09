@@ -125,10 +125,10 @@ class StringSmithLoggingFormatter(logging.Formatter):
                 "{{?has_user_context;(User: ;user_id;) }}"
                 "{{?has_request_id;[Req: ;request_id;] }}"
                 "{{message}}"
-                "{{?has_duration; in ;duration;$format_duration}}"
+                "{{?has_duration; in ;{$format_duration}duration}}"
                 "{{?has_file_count; (;file_count; files)}}"
-                "{{?has_error_count; - ;error_count;$format_errors}}"
-                "{{?has_memory_usage; [;memory_usage_mb;MB]}}"
+                "{{?has_error_count; - ;{$format_errors}error_count}}"
+                "{{?has_memory_usage;;memory_usage_mb;MB]}}"
                 "{{?is_slow_operation; ⚠️ SLOW ;duration;}}"
             )
         
@@ -386,7 +386,7 @@ def set_up_logging(
             file_template = (
                 "{{asctime}} - {{name}} - {{levelname}} - {{funcName}}:{{lineno}} - {{message}}"
                 "{{ (;file_count; files)}}"
-                "{{ - duration: ;duration;$format_duration}}"  
+                "{{ - duration: ;{$format_duration}duration}}"  
                 "{{ - size: ;file_size_mb;MB}}"
                 "{{ - error: ;error_code;}}"
                 "{{ - memory: ;memory_delta_mb;MB}}"

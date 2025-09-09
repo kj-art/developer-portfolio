@@ -352,6 +352,7 @@ def main():
         config = config.with_schema_map(schema_map)
     
     summary = processor.run(config)
+    print(summary)
 
 if __name__ == '__main__':
     main()
