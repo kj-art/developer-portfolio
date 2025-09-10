@@ -17,7 +17,8 @@ from . import handlers
 from .config import ALLOWED_EXTENSIONS, STREAMABLE_EXTENSIONS
 
 def get_extension(file_path: str) -> str:
-        return Path(file_path).suffix.lstrip('.')
+    print(f'file path|{file_path}|')
+    return Path(file_path).suffix.lstrip('.')
 
 def is_streamable_extension(extension: str) -> bool:
     return extension.lower() in STREAMABLE_EXTENSIONS

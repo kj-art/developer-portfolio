@@ -15,8 +15,9 @@ from data_pipeline.core.processing_config import ProcessingConfig, IndexMode
 from shared_utils.logger import set_up_logging, get_logger
 
 try:
-    import psutil
     from shared_utils.memory_sparkline_widget import MemorySparklineWidget
+    from shared_utils.memory_monitor import MemoryMonitor
+    from shared_utils.background_task_manager import BackgroundTaskManager
     MEMORY_MONITORING_AVAILABLE = True
 except ImportError:
     MEMORY_MONITORING_AVAILABLE = False
@@ -40,14 +41,17 @@ class DataPipelineGUI:
         set_up_logging(level='INFO', enable_colors=False)
         self.logger = get_logger('data_pipeline.gui')
         
-        # Processing state
-        self.processor = None
-        self.processing_thread = None
-        self.is_processing = False
-        self.progress_queue = queue.Queue()
+        # Initialize task manager
+        self.task_manager = BackgroundTaskManager(
+            status_callback=self._update_status,
+            progress_callback=self._update_progress,
+            completion_callback=self._handle_completion,
+            error_callback=self._handle_error,
+            scheduler_callback=self.root.after
+        )
         
-        # Memory monitoring state
-        self.memory_monitoring_active = False
+        # Memory monitoring
+        self.memory_monitor = None
         
         # Create GUI variables for form binding
         self._create_variables()
@@ -59,9 +63,6 @@ class DataPipelineGUI:
         # Setup memory monitoring if available
         if MEMORY_MONITORING_AVAILABLE:
             self._setup_memory_monitoring()
-        
-        # Start progress monitoring
-        self._check_progress_queue()
     
     def _create_variables(self):
         """Create tkinter variables for two-way data binding with ProcessingConfig"""
@@ -241,7 +242,7 @@ class DataPipelineGUI:
         self.progress_bar.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
         
         # Results text area
-        self.results_text = scrolledtext.ScrolledText(results_frame, height=12, wrap=tk.WORD)
+        self.results_text = scrolledtext.ScrolledText(results_frame, height=8, wrap=tk.WORD)
         self.results_text.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         current_row += 1
@@ -252,82 +253,20 @@ class DataPipelineGUI:
         status_bar.grid(row=current_row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(10, 0))
     
     def _setup_memory_monitoring(self):
-        """Set up memory monitoring"""
-        try:
-            self.process = psutil.Process()
-            self._start_memory_monitoring()
-        except Exception as e:
-            self.memory_status_var.set(f"⚠️ Memory monitoring error: {str(e)}")
-    
-    def _start_memory_monitoring(self):
-        """Start the memory monitoring loop"""
-        if not hasattr(self, 'process'):
-            return
+        """Set up memory monitoring with integrated callbacks"""
+        # Create memory monitor with GUI integration
+        self.memory_monitor = MemoryMonitor(
+            update_interval_ms=1000,
+            status_callback=self.memory_status_var.set,
+            scheduler_callback=self.root.after
+        )
         
-        self.memory_monitoring_active = True
-        self._memory_monitoring_loop()
-    
-    def _memory_monitoring_loop(self):
-        """Memory monitoring loop - runs on main thread with after()"""
-        if not self.memory_monitoring_active:
-            return
+        # Connect to sparkline widget
+        if hasattr(self, 'memory_sparkline'):
+            self.memory_monitor.set_sparkline_widget(self.memory_sparkline)
         
-        try:
-            # Get current memory usage
-            memory_mb = self.process.memory_info().rss / 1024 / 1024
-            
-            # Update sparkline
-            self.memory_sparkline.add_data_point(memory_mb)
-            
-            # Build status text
-            status_text = self._build_memory_status_text(memory_mb)
-            self.memory_status_var.set(status_text)
-            
-        except Exception as e:
-            self.memory_status_var.set(f"Memory monitoring error: {str(e)}")
-        
-        # Schedule next update
-        self.root.after(1000, self._memory_monitoring_loop)  # Update every second
-    
-    def _build_memory_status_text(self, memory_mb):
-        """Build memory status text without StringSmith"""
-        # Get status icon
-        if hasattr(self.memory_sparkline, 'red_threshold') and memory_mb > self.memory_sparkline.red_threshold:
-            icon = '🚨'
-        elif hasattr(self.memory_sparkline, 'yellow_threshold') and memory_mb > self.memory_sparkline.yellow_threshold:
-            icon = '⚠️'
-        else:
-            icon = '📊'
-        
-        # Get trend indicator
-        if len(self.memory_sparkline.data) < 6:
-            trend = '→'
-        else:
-            recent = list(self.memory_sparkline.data)[-3:]
-            older = list(self.memory_sparkline.data)[-6:-3]
-            
-            recent_avg = sum(recent) / len(recent)
-            older_avg = sum(older) / len(older)
-            
-            if recent_avg > older_avg * 1.1:
-                trend = '↗'
-            elif recent_avg < older_avg * 0.9:
-                trend = '↘'
-            else:
-                trend = '→'
-        
-        # Build status text
-        status_text = f"{icon} {memory_mb:.1f}MB {trend}"
-        
-        # Add baseline if available
-        if self.memory_sparkline.yellow_threshold > 0:
-            status_text += f" (Baseline: {self.memory_sparkline.baseline:.0f}MB)"
-        
-        return status_text
-    
-    def _stop_memory_monitoring(self):
-        """Stop memory monitoring"""
-        self.memory_monitoring_active = False
+        # Start monitoring
+        self.memory_monitor.start_monitoring()
     
     def _setup_bindings(self):
         """Set up event bindings and keyboard shortcuts"""
@@ -351,8 +290,27 @@ class DataPipelineGUI:
             ("JSON files", "*.json"),
             ("All files", "*.*")
         ]
-        filename = filedialog.asksaveasfilename(title="Select Output File", filetypes=filetypes)
+        
+        # Create a variable to track selected file type
+        file_type_var = tk.StringVar()
+        
+        filename = filedialog.asksaveasfilename(
+            title="Select Output File", 
+            filetypes=filetypes,
+            typevariable=file_type_var
+        )
+        
         if filename:
+            # Check if extension is missing and add based on selected type
+            if not Path(filename).suffix:
+                selected_type = file_type_var.get()
+                if "CSV" in selected_type:
+                    filename += ".csv"
+                elif "Excel" in selected_type:
+                    filename += ".xlsx"
+                elif "JSON" in selected_type:
+                    filename += ".json"
+            
             self.output_file.set(filename)
     
     def _browse_schema_file(self):
@@ -455,8 +413,8 @@ class DataPipelineGUI:
         return config
     
     def _run_processing(self):
-        """Start the data processing operation in a separate thread"""
-        if self.is_processing:
+        """Start the data processing operation using task manager"""
+        if self.task_manager.is_running():
             return
         
         # Validate form
@@ -472,115 +430,87 @@ class DataPipelineGUI:
             return
         
         # Update UI state
-        self.is_processing = True
         self.run_button.config(state="disabled")
         self.cancel_button.config(state="normal")
         self.progress_bar.start()
-        self.status_var.set("Processing...")
         
         # Clear results area
         self.results_text.delete(1.0, tk.END)
         
-        # Start processing in separate thread
-        self.processor = DataProcessor()
-        self.processing_thread = threading.Thread(
-            target=self._process_data_thread,
-            args=(config,),
-            daemon=True
-        )
-        self.processing_thread.start()
+        # Start processing using task manager
+        success = self.task_manager.run_task(self._process_data_task, config)
+        if not success:
+            messagebox.showerror("Task Error", "Could not start processing task")
+            self._reset_ui_state()
     
-    def _process_data_thread(self, config):
-        """Run data processing in separate thread to avoid blocking GUI"""
-        try:
-            start_time = time.time()
-            
-            # Send initial progress update
-            self.progress_queue.put(("status", "Starting data processing..."))
-            
-            # Run the actual processing
-            result = self.processor.run(config)
-            
-            processing_time = time.time() - start_time
-            
-            # Send completion message
-            success_msg = (
-                f"Processing completed successfully!\n\n"
-                f"Files processed: {result.files_processed}\n"
-                f"Total rows: {result.total_rows}\n"
-                f"Total columns: {result.total_columns}\n"
-                f"Processing time: {processing_time:.2f} seconds\n"
-            )
-            
-            if result.output_file:
-                success_msg += f"Output written to: {result.output_file}\n"
-            else:
-                success_msg += "Results written to console\n"
-            
-            self.progress_queue.put(("complete", success_msg))
-            
-        except Exception as e:
-            error_msg = f"Processing failed: {str(e)}"
-            self.progress_queue.put(("error", error_msg))
+    def _process_data_task(self, config, progress_reporter=None):
+        """Data processing task function for BackgroundTaskManager"""
+        processor = DataProcessor()
+        result = processor.run(config)
+        
+        # Build completion message
+        completion_msg = (
+            f"Processing completed successfully!\n\n"
+            f"Files processed: {result.files_processed}\n"
+            f"Total rows: {result.total_rows}\n"
+            f"Total columns: {result.total_columns}\n"
+            f"Processing time: {result.processing_time:.2f} seconds\n"
+        )
+        
+        if result.output_file:
+            completion_msg += f"Output written to: {result.output_file}\n"
+        else:
+            completion_msg += "Results written to console\n"
+        
+        return completion_msg
     
     def _cancel_processing(self):
         """Cancel the current processing operation"""
-        if not self.is_processing:
+        if not self.task_manager.is_running():
             return
         
-        self.status_var.set("Cancelling...")
-        self._processing_finished()
+        self.task_manager.cancel_task()
+        self._reset_ui_state()
     
-    def _processing_finished(self):
-        """Clean up after processing is complete"""
-        self.is_processing = False
+    def _reset_ui_state(self):
+        """Reset UI to ready state"""
         self.run_button.config(state="normal")
         self.cancel_button.config(state="disabled")
         self.progress_bar.stop()
-        self.processor = None
-        self.processing_thread = None
-        import gc
-        gc.collect()
+        self.status_var.set("Ready")
     
-    def _check_progress_queue(self):
-        """Check for progress updates from processing thread"""
-        try:
-            while True:
-                message_type, message = self.progress_queue.get_nowait()
-                
-                if message_type == "status":
-                    self.status_var.set(message)
-                    self.results_text.insert(tk.END, f"{message}\n")
-                    self.results_text.see(tk.END)
-                    
-                elif message_type == "complete":
-                    self.status_var.set("Processing completed successfully")
-                    self.results_text.insert(tk.END, f"\n{message}")
-                    self.results_text.see(tk.END)
-                    self._processing_finished()
-                    messagebox.showinfo("Success", "Processing completed successfully!")
-                    
-                elif message_type == "error":
-                    self.status_var.set("Processing failed")
-                    self.results_text.insert(tk.END, f"\nERROR: {message}")
-                    self.results_text.see(tk.END)
-                    self._processing_finished()
-                    messagebox.showerror("Error", message)
-                    
-        except queue.Empty:
-            pass
-        
-        # Schedule next check
-        self.root.after(100, self._check_progress_queue)
+    def _update_status(self, status_text):
+        """Callback for task manager status updates"""
+        self.status_var.set(status_text)
+    
+    def _update_progress(self, progress_text):
+        """Callback for task manager progress updates"""
+        self.results_text.insert(tk.END, f"{progress_text}\n")
+        self.results_text.see(tk.END)
+    
+    def _handle_completion(self, completion_text):
+        """Callback for task completion"""
+        self.results_text.insert(tk.END, f"\n{completion_text}")
+        self.results_text.see(tk.END)
+        self._reset_ui_state()
+        messagebox.showinfo("Success", "Processing completed successfully!")
+    
+    def _handle_error(self, error_text):
+        """Callback for task errors"""
+        self.results_text.insert(tk.END, f"\nERROR: {error_text}")
+        self.results_text.see(tk.END)
+        self._reset_ui_state()
+        messagebox.showerror("Error", error_text)
     
     def _on_closing(self):
         """Handle window close event"""
         # Stop memory monitoring if active
-        if MEMORY_MONITORING_AVAILABLE and hasattr(self, '_stop_memory_monitoring'):
-            self._stop_memory_monitoring()
+        if self.memory_monitor:
+            self.memory_monitor.stop_monitoring()
         
-        if self.is_processing:
+        if self.task_manager.is_running():
             if messagebox.askokcancel("Quit", "Processing is still running. Do you want to quit anyway?"):
+                self.task_manager.cancel_task()
                 self.root.destroy()
         else:
             self.root.destroy()
@@ -601,3 +531,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+#   python -m data_pipeline.ui.gui

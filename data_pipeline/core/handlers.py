@@ -245,6 +245,7 @@ def get_handler_for_extension(extension: str) -> FileHandler:
     try:
         handler_class = getattr(sys.modules[__name__], handler_class_name)
     except AttributeError:
+        print(f"Unsupported file format: .{extension}. Supported: {[f'.{ext}' for ext in ALLOWED_EXTENSIONS]}")
         raise ValueError(f"Unsupported file format: .{extension}. Supported: {[f'.{ext}' for ext in ALLOWED_EXTENSIONS]}")
     
     return handler_class()
