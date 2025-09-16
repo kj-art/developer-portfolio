@@ -1,298 +1,310 @@
-# ui/cli.py - Updated with custom argument parser
+# data_pipeline/ui/cli.py
+"""
+Command-line interface for the Data Processing Pipeline
+
+Provides a comprehensive CLI for data processing operations with progress tracking,
+professional logging, and flexible configuration options.
+
+Features:
+- Auto-detection of file formats
+- Schema normalization and column mapping
+- Streaming and in-memory processing modes
+- Progress tracking with tqdm
+- Rich logging with StringSmith formatting
+- Pandas parameter pass-through
+- Configuration validation
+
+Usage:
+    python -m data_pipeline.ui.cli --input-folder ./data --output-file merged.csv
+    python -m data_pipeline.ui.cli --input-folder ./data --recursive --progress
+    python -m data_pipeline.ui.cli --help
+"""
 
 import argparse
 import sys
+import json
 from pathlib import Path
-from shared_utils.logger import set_up_logging, get_logger
+from typing import Dict, List, Tuple, Any
+
 from data_pipeline.core.processor import DataProcessor
 from data_pipeline.core.processing_config import ProcessingConfig, IndexMode
-from ..core.dataframe_utils import ProcessingResult
+from shared_utils.logger import set_up_logging, get_logger
+from shared_utils.progress import create_progress_reporter
 
-def cast_string_to_appropriate_type(value):
+
+def split_arguments(argv: List[str], parser: argparse.ArgumentParser) -> Tuple[List[str], List[str]]:
     """
-    Cast string values to appropriate Python types (int, float, or keep as string)
+    Split command line arguments into defined args and pandas args
     
-    Supports optional type prefixes to force specific types:
-    - "str:5" -> "5" (force string)
-    - "int:3.14" -> 3 (force int, truncates float)
-    - "float:42" -> 42.0 (force float)
-    - "5" -> 5 (auto-detect as int)
-    
-    Args:
-        value (str): String value to cast, optionally with type prefix
-        
-    Returns:
-        int|float|str: Appropriately cast value
-        
-    Examples:
-        "42" -> 42
-        "3.14" -> 3.14
-        "1e-5" -> 1e-05
-        "utf-8" -> "utf-8"
-        "str:5" -> "5"
-        "int:3.14" -> 3
-        "float:42" -> 42.0
-        "" -> ""
+    This function separates arguments that are explicitly defined in our parser
+    from those that should be passed through to pandas functions.
     """
-    if not isinstance(value, str):
-        return value
-    
-    # Handle empty strings
-    if value == "":
-        return value
-    
-    if value.lower() in ('true'):
-        return True
-    elif value.lower() in ('false'):
-        return False
-    
-    # Check for type prefixes
-    if ':' in value:
-        prefix, actual_value = value.split(':', 1)
-        
-        if prefix == 'str':
-            return actual_value
-        elif prefix == 'int':
-            try:
-                return int(float(actual_value))  # Handle "int:3.14" -> 3
-            except ValueError:
-                raise ValueError(f"Cannot convert '{actual_value}' to int with int: prefix")
-        elif prefix == 'float':
-            try:
-                return float(actual_value)
-            except ValueError:
-                raise ValueError(f"Cannot convert '{actual_value}' to float with float: prefix")
-        # If prefix is not recognized, fall through to auto-detection
-    
-    # Auto-detection for values without prefixes
-    # Try integer first
-    try:
-        # Check if it looks like an integer (no decimal point, no scientific notation)
-        if '.' not in value and 'e' not in value.lower():
-            return int(value)
-    except ValueError:
-        pass
-    
-    # Try float (handles scientific notation too)
-    try:
-        return float(value)
-    except ValueError:
-        pass
-    
-    # Keep as string if not numeric
-    return value
-
-def get_known_args_from_parser(parser):
-    """Extract all defined argument names from the parser"""
-    known_args = set()
-    for action in parser._actions:
-        if action.option_strings:  # Skip positional arguments
-            known_args.update(action.option_strings)
-    return known_args
-
-def split_arguments(argv, parser):
-    """Split command line into defined args and pandas args"""
-    known_args = get_known_args_from_parser(parser)
     defined_args = []
     pandas_args = []
-
-    current_list = None
-
-    for item in argv[1:]:
-        if item.startswith("--"):
-            current_list = defined_args if item in known_args else pandas_args
-            current_list.append(item)
+    
+    # Get all defined argument names from parser
+    defined_names = set()
+    for action in parser._actions:
+        for option_string in action.option_strings:
+            defined_names.add(option_string)
+    
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        
+        if arg.startswith('--'):
+            # Check if this is a defined argument
+            arg_name = arg.split('=')[0]  # Handle --arg=value format
+            
+            if arg_name in defined_names:
+                defined_args.append(arg)
+                # Check if we need to add the next argument as a value
+                if '=' not in arg and i + 1 < len(argv) and not argv[i + 1].startswith('-'):
+                    i += 1
+                    if i < len(argv):
+                        defined_args.append(argv[i])
+            else:
+                # This is a pandas argument
+                pandas_args.append(arg)
+                # Add value if present
+                if '=' not in arg and i + 1 < len(argv) and not argv[i + 1].startswith('-'):
+                    i += 1
+                    if i < len(argv):
+                        pandas_args.append(argv[i])
+        elif arg.startswith('-'):
+            # Short arguments - assume they're defined
+            defined_args.append(arg)
+            if i + 1 < len(argv) and not argv[i + 1].startswith('-'):
+                i += 1
+                if i < len(argv):
+                    defined_args.append(argv[i])
         else:
-            if current_list is None:
-                raise ValueError(f"Value '{item}' found before any key")
-            current_list.append(item)
-
+            # Positional arguments go to defined
+            defined_args.append(arg)
+        
+        i += 1
+    
     return defined_args, pandas_args
 
-def parse_pandas_args(pandas_args):
+
+def parse_pandas_args(pandas_args: List[str]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """
-    Parse pandas arguments into read/write kwargs
+    Parse pandas arguments with type casting and read/write separation
     
-    Args:
-        pandas_args: List like ['--index', 'False', 'false', '--sep', ';']
-        
-    Returns:
-        tuple: (read_kwargs, write_kwargs)
+    Supports automatic type casting and manual type override with prefixes:
+    - --sep "," → {'sep': ','}
+    - --int:chunksize 1000 → {'chunksize': 1000}
+    - --encoding "utf-8" "latin-1" → read={'encoding': 'utf-8'}, write={'encoding': 'latin-1'}
     """
-    kwargs = {}
-    i = 0
-    while i < len(pandas_args):
-        if pandas_args[i].startswith('--'):
-            key = pandas_args[i][2:].replace('-', '_')  # --sheet-name -> sheet_name
-            values = []
-            
-            # Collect all values for this key (until next -- or end)
-            i += 1
-            while i < len(pandas_args) and not pandas_args[i].startswith('--'):
-                # Cast string values to appropriate types
-                cast_value = cast_string_to_appropriate_type(pandas_args[i])
-                values.append(cast_value)
-                i += 1
-            
-            kwargs[key] = values
-        else:
-            i += 1
-    
-    # Apply read/write split logic
     read_kwargs = {}
     write_kwargs = {}
     
-    for key, values in kwargs.items():
-        if len(values) == 0:
-            # No values - use defaults
-            pass
-        elif len(values) == 1:
-            # One value - same for both
-            read_kwargs[key] = values[0]
-            write_kwargs[key] = values[0]
-        elif len(values) == 2:
-            # Two values - read, write
-            read_kwargs[key] = values[0]
-            write_kwargs[key] = values[1]
+    i = 0
+    while i < len(pandas_args):
+        if not pandas_args[i].startswith('--'):
+            i += 1
+            continue
+        
+        # Extract argument name and type prefix
+        arg_name = pandas_args[i][2:]  # Remove --
+        type_prefix = None
+        
+        if ':' in arg_name:
+            type_prefix, arg_name = arg_name.split(':', 1)
+        
+        # Get values
+        values = []
+        i += 1
+        while i < len(pandas_args) and not pandas_args[i].startswith('-'):
+            values.append(pandas_args[i])
+            i += 1
+        
+        if not values:
+            continue
+        
+        # Apply type casting
+        casted_values = []
+        for value in values:
+            if type_prefix == 'str':
+                casted_values.append(str(value))
+            elif type_prefix == 'int':
+                try:
+                    casted_values.append(int(value))
+                except ValueError:
+                    raise ValueError(f"Cannot convert '{value}' to integer for argument --{arg_name}")
+            elif type_prefix == 'float':
+                try:
+                    casted_values.append(float(value))
+                except ValueError:
+                    raise ValueError(f"Cannot convert '{value}' to float for argument --{arg_name}")
+            else:
+                # Auto-detect type
+                try:
+                    if '.' in value or 'e' in value.lower():
+                        casted_values.append(float(value))
+                    else:
+                        casted_values.append(int(value))
+                except ValueError:
+                    casted_values.append(value)
+        
+        # Distribute to read/write kwargs
+        if len(casted_values) == 1:
+            # Single value - applies to both read and write
+            read_kwargs[arg_name] = casted_values[0]
+            write_kwargs[arg_name] = casted_values[0]
+        elif len(casted_values) == 2:
+            # Two values - first for read, second for write
+            read_kwargs[arg_name] = casted_values[0]
+            write_kwargs[arg_name] = casted_values[1]
         else:
-            raise ValueError(f"--{key.replace('_', '-')} accepts 0, 1, or 2 values. Got {len(values)}: {values}")
+            # Multiple values - treat as list for both
+            read_kwargs[arg_name] = casted_values
+            write_kwargs[arg_name] = casted_values
     
     return read_kwargs, write_kwargs
 
-def print_pandas_help():
-    """Print help for pandas options"""
-    print("""
-Pandas options:
-  Any pandas read/write parameter can be used with the pattern:
-  --parameter-name VALUE [VALUE]
-  
-  Pattern rules:
-    0 values: use pandas defaults for both read and write
-    1 value: same value for both read and write  
-    2 values: first value for read, second value for write
-  
-  Type casting:
-    Values are automatically converted to int/float when possible.
-    To force a specific type, use prefixes:
-      str:VALUE    Force string type (e.g., str:5 -> "5")
-      int:VALUE    Force integer type (e.g., int:3.14 -> 3)
-      float:VALUE  Force float type (e.g., float:42 -> 42.0)
-  
-  For available parameters, see pandas documentation:
-    Read functions: https://pandas.pydata.org/docs/reference/io.html
-    Write functions: DataFrame.to_csv(), .to_excel(), .to_json() methods
-  
-  Common examples:
-    --encoding utf-8                    # Same encoding for read and write
-    --encoding latin-1 utf-8           # Read latin-1, write utf-8
-    --sep ";"                          # Use semicolon separator for CSV
-    --sheet-name str:5                 # Access sheet named "5" (not 6th sheet)
-    --sheet-name 0 Summary             # Read sheet 0, write to sheet "Summary"
-    --na-values "NULL" "N/A"           # Treat NULL as NaN when reading, N/A when writing
-    --schema custom_mappings.json      # Use custom column name mappings
+
+def add_progress_arguments(parser: argparse.ArgumentParser):
+    """Add progress-related CLI arguments"""
+    progress_group = parser.add_argument_group('progress options')
     
-  Parameter names:
-    Use dashes in CLI (--sheet-name) which become underscores in pandas (sheet_name)
-""")
+    progress_group.add_argument(
+        '--progress',
+        action='store_true',
+        help='Show progress bars during processing'
+    )
+    
+    progress_group.add_argument(
+        '--no-progress',
+        action='store_true',
+        help='Disable progress reporting (overrides --progress)'
+    )
+    
+    progress_group.add_argument(
+        '--quiet',
+        action='store_true',
+        help='Minimal output - no progress bars or detailed logging'
+    )
 
-class CustomHelpAction(argparse.Action):
-    """Custom help action that shows both argparse help and pandas help"""
-    def __init__(self, option_strings, dest=argparse.SUPPRESS, default=argparse.SUPPRESS, help=None):
-        super().__init__(option_strings, dest, nargs=0, default=default, help=help)
 
-    def __call__(self, parser, namespace, values, option_string=None):
-        parser.print_help()
-        print_pandas_help()
-        parser.exit()
+def determine_progress_mode(args) -> str:
+    """Determine the appropriate progress mode from CLI arguments"""
+    if args.quiet:
+        return 'null'
+    elif args.no_progress:
+        return 'null'
+    elif args.progress:
+        return 'cli'
+    else:
+        # Auto-detect based on terminal
+        return 'auto'
+
 
 def main():
-    # Create argument parser - only define the core CLI arguments
+    """Main CLI entry point with enhanced progress tracking"""
     parser = argparse.ArgumentParser(
-        description='Process and merge data files from multiple formats. CSV outputs automatically use memory-efficient streaming for large datasets.',
-        prog='data-pipeline',
-        add_help=False  # We'll add custom help
-    )
+        description='Multi-File Data Processing Pipeline - Merge and normalize data from multiple file formats',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  Basic usage:
+    %(prog)s --input-folder ./data --output-file merged.csv
     
-    # Add custom help action
-    parser.add_argument(
-        '-h', '--help',
-        action=CustomHelpAction,
-        help='Show this help message and exit'
-    )
+  Advanced processing:
+    %(prog)s --input-folder ./customer_data --recursive --progress \\
+             --filetype csv xlsx --index-mode sequential \\
+             --columns first_name,last_name,email
     
-    # Only define our custom CLI arguments
+  With pandas options:
+    %(prog)s --input-folder ./data --sep ";" --encoding utf-8 latin-1
+    
+  Schema mapping:
+    %(prog)s --input-folder ./data --schema ./schema.json
+        """
+    )
+
+    # Core arguments
     parser.add_argument(
         '--input-folder',
         required=True,
-        help='Folder containing files to process'
+        help='Path to folder containing input files'
     )
-    
+
     parser.add_argument(
         '--output-file',
-        help='Path to output file. CSV files automatically use memory-efficient streaming processing for large datasets. Other formats use in-memory processing with full feature support.'
+        help='Output file path. If not specified, results are printed to console'
     )
-    
+
     parser.add_argument(
         '--recursive',
         action='store_true',
-        help='Search subdirectories recursively for files'
-    )
-    
-    parser.add_argument(
-        '--filetype',
-        nargs='*',
-        help='File types to process (csv, xlsx, json). Default: all supported types'
-    )
-    
-    parser.add_argument(
-        '--schema',
-        help='JSON file with custom column name mappings (overrides default schema)'
+        help='Process files in subdirectories recursively'
     )
 
+    parser.add_argument(
+        '--filetype',
+        nargs='+',
+        choices=['csv', 'xlsx', 'json'],
+        default=['csv', 'xlsx', 'json'],
+        help='File types to process (default: csv xlsx json)'
+    )
+
+    # Schema and column options
+    parser.add_argument(
+        '--schema',
+        help='JSON file containing column mapping schema'
+    )
+
+    parser.add_argument(
+        '--columns',
+        help='Comma-separated list of expected column names'
+    )
+
+    # Column normalization options
     parser.add_argument(
         '--to-lower',
         action=argparse.BooleanOptionalAction,
         default=True,
-        help='Convert column names to lowercase. Use --no-to-lower to disable. Default: enabled'
+        help='Convert column names to lowercase (default: true)'
     )
 
     parser.add_argument(
         '--spaces-to-underscores',
         action=argparse.BooleanOptionalAction,
         default=True,
-        help='Convert spaces to underscores in column names. Use --no-spaces-to-underscores to disable. Default: enabled'
-    )
-    
-    parser.add_argument(
-        '--columns',
-        help='Comma-separated list of column names to expect in output (enables streaming for mixed file types by skipping schema detection). Example: --columns first_name,last_name,age,city'
+        help='Convert spaces to underscores in column names (default: true)'
     )
 
+    # Processing options
     parser.add_argument(
         '--force-in-memory',
         action='store_true',
-        help='Force in-memory processing even for large datasets or CSV output. Overrides streaming optimizations. Use when you need the full dataset in memory for complex operations.'
+        help='Force in-memory processing instead of streaming (for small datasets)'
     )
 
+    # Index management
     parser.add_argument(
         '--index-mode',
         choices=['none', 'local', 'sequential'],
         type=str.lower,
-        help='Index handling mode: none=no index column, local=per-file indices (0,1,2 then 0,1,2), sequential=continuous across files (0,1,2,3,4...). Overrides --index parameter if specified.'
+        help='Index handling mode: none=no index column, local=per-file indices (0,1,2 then 0,1,2), sequential=continuous across files (0,1,2,3,4...)'
     )
 
     parser.add_argument(
         '--index-start',
         type=int,
         default=0,
-        help='Starting number for index values. Examples: 0 (0,1,2...), 1 (1,2,3...), 100 (100,101,102...). Only applies when index-mode shows indices. Default: 0'
+        help='Starting number for index values (default: 0)'
     )
+
+    # Add progress arguments
+    add_progress_arguments(parser)
     
     # Custom argument parsing to handle pandas arguments reliably
     defined_args, pandas_args = split_arguments(sys.argv, parser)
     
     # Parse defined arguments
-    args = parser.parse_args(defined_args)  # Skip script name
+    args = parser.parse_args(defined_args[1:])  # Skip script name
     
     # Parse pandas arguments
     try:
@@ -301,21 +313,18 @@ def main():
         print(f"Error: {e}")
         sys.exit(1)
 
-    # Set up logging after argument parsing is complete with StringSmith templates
+    # Set up logging after argument parsing is complete
+    log_level = 'WARNING' if args.quiet else 'INFO'
     set_up_logging(
-        level='INFO', 
+        level=log_level,
         log_file='data_pipeline.log',
-        enable_colors=True,
-        console_template=(
-            "{{#level_color;[;levelname;]}} {{message}}"
-            "{{?has_file_name; - ;file_name;}}"
-            "{{?has_file_count; (;file_count; files)}}"
-            "{{ in ;duration;{$format_duration}}}"
-            "{{?has_error_count; - ;error_count; errors}}"
-            "{{?has_error; - ;error;}}"
-        )
+        enable_colors=True
     )
     logger = get_logger('data_pipeline.cli')
+    
+    # Create progress reporter
+    progress_mode = determine_progress_mode(args)
+    progress_reporter = create_progress_reporter(mode=progress_mode)
     
     logger.info("Data pipeline started", input_folder=args.input_folder)
     
@@ -331,7 +340,6 @@ def main():
             logger.error("Schema file does not exist", schema_file=args.schema)
             sys.exit(1)
         try:
-            import json
             with open(args.schema, 'r') as f:
                 schema_map = json.load(f)
         except json.JSONDecodeError as e:
@@ -344,6 +352,10 @@ def main():
     # Create processor with both read and write defaults
     processor = DataProcessor(read_kwargs=read_kwargs, write_kwargs=write_kwargs)
     
+    # Set progress reporter on processor if it supports it
+    if hasattr(processor, 'set_progress_reporter'):
+        processor.set_progress_reporter(progress_reporter)
+    
     # Create processing configuration from CLI arguments
     config = ProcessingConfig.from_cli_args(args, read_kwargs, write_kwargs)
     
@@ -351,8 +363,41 @@ def main():
     if schema_map:
         config = config.with_schema_map(schema_map)
     
-    summary = processor.run(config)
-    print(summary)
+    try:
+        # Run processing with progress tracking
+        result = processor.run(config)
+        
+        # Display results
+        if not args.quiet:
+            print(f"\n✅ Processing Complete!")
+            print(f"Files processed: {result.files_processed}")
+            print(f"Total rows: {result.total_rows:,}")
+            print(f"Total columns: {result.total_columns}")
+            print(f"Processing time: {result.processing_time:.2f}s")
+            
+            if result.processing_time > 0:
+                rate = result.total_rows / result.processing_time
+                print(f"Processing rate: {rate:.0f} rows/sec")
+            
+            if result.output_file:
+                print(f"Output written to: {result.output_file}")
+            else:
+                print("Results displayed above")
+        
+        logger.info("Processing completed successfully",
+                   files_processed=result.files_processed,
+                   total_rows=result.total_rows,
+                   processing_time=result.processing_time)
+        
+    except KeyboardInterrupt:
+        logger.info("Processing cancelled by user")
+        print("\n⚠️ Processing cancelled by user")
+        sys.exit(1)
+    except Exception as e:
+        logger.exception("Processing failed")
+        print(f"\n❌ Error: {e}")
+        sys.exit(1)
+
 
 if __name__ == '__main__':
     main()
