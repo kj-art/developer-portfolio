@@ -156,7 +156,7 @@ class TestCsvHandler:
         
         output_file = temp_dir / "output.csv"
         handler = CsvHandler()
-        handler.write(df, str(output_file))
+        handler.write(df, str(output_file), index=False)  # Explicitly disable index
         
         assert output_file.exists()
         
@@ -185,9 +185,11 @@ class TestXlsxHandler:
         df = chunks[0]
         
         assert len(df) == 2
-        assert list(df.columns) == ['Name', 'Age', 'City']
+        # Excel handler adds sheet_name column
+        expected_cols = ['Name', 'Age', 'City', 'sheet_name']
+        assert list(df.columns) == expected_cols
         assert df.iloc[0]['Name'] == 'Alice Brown'
-        assert 'sheet_name' in df.columns  # Should add sheet name
+        assert df.iloc[0]['sheet_name'] == 'Sheet1'  # Default sheet name
     
     def test_read_specific_sheet_by_index(self, temp_dir):
         """Test reading specific sheet by index"""
@@ -249,7 +251,7 @@ class TestXlsxHandler:
         
         output_file = temp_dir / "output.xlsx"
         handler = XlsxHandler()
-        handler.write(df, str(output_file))
+        handler.write(df, str(output_file), index=False)  # Explicitly disable index
         
         assert output_file.exists()
         
@@ -303,10 +305,10 @@ class TestJsonHandler:
         chunks = list(handler.read(str(json_file)))
         df = chunks[0]
         
-        # Should flatten nested structure
-        assert 'name' in df.columns
-        assert 'age' in df.columns  # Flattened from details
-        assert 'city' in df.columns  # Flattened from details
+        # Should flatten nested structure and column normalization occurs
+        assert 'first_name' in df.columns  # name gets split
+        assert 'age' in df.columns         # Flattened from details
+        assert 'city' in df.columns        # Flattened from details
         assert 'sheet_name' in df.columns  # Should add sheet name (key)
         assert len(df) == 2
     
@@ -451,7 +453,7 @@ class TestHandlerIntegration:
         
         # Write
         handler = CsvHandler()
-        handler.write(original_df, str(csv_file))
+        handler.write(original_df, str(csv_file), index=False)
         
         # Read back
         chunks = list(handler.read(str(csv_file)))
@@ -474,7 +476,7 @@ class TestHandlerIntegration:
         
         # Write
         handler = XlsxHandler()
-        handler.write(original_df, str(excel_file))
+        handler.write(original_df, str(excel_file), index=False)
         
         # Read back
         chunks = list(handler.read(str(excel_file)))

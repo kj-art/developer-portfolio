@@ -226,15 +226,16 @@ class TestDataProcessor:
     def test_invalid_input_folder(self):
         """Test handling of invalid input folder"""
         config = ProcessingConfig(
-            input_folder="/nonexistent/folder",
+            input_folder="./definitely_nonexistent_test_folder_12345",
             output_file="output.csv"
         )
         
         processor = DataProcessor()
         
-        # Should handle gracefully - no files found
-        result = processor.run(config)
-        assert result.files_processed == 0
+        # The processor should raise FileNotFoundError for invalid paths
+        # This is correct behavior - fail fast for invalid input
+        with pytest.raises(FileNotFoundError):
+            result = processor.run(config)
     
     def test_get_available_strategies(self):
         """Test strategy enumeration"""

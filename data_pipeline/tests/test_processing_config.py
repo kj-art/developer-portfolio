@@ -147,13 +147,15 @@ class TestProcessingConfigCLIIntegration:
         """Test CLI args conversion with minimal arguments"""
         mock_args = Mock()
         mock_args.input_folder = "/test/folder"
-        
-        # Set default values for optional attributes
-        for attr in ['output_file', 'recursive', 'filetype', 'to_lower', 
-                     'spaces_to_underscores', 'index_mode', 'index_start', 
-                     'columns', 'force_in_memory']:
-            if not hasattr(mock_args, attr):
-                setattr(mock_args, attr, None)
+        mock_args.output_file = None
+        mock_args.recursive = False
+        mock_args.filetype = None
+        mock_args.to_lower = True
+        mock_args.spaces_to_underscores = True
+        mock_args.index_mode = None  # Set to None instead of letting it be a Mock
+        mock_args.index_start = 0
+        mock_args.columns = None
+        mock_args.force_in_memory = False
         
         config = ProcessingConfig.from_cli_args(mock_args)
         

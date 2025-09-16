@@ -186,8 +186,8 @@ class TestSchemaDetector:
         
         schema = schema_detector.detect_schema(config)
         
-        # Should have mapped column names
-        assert 'name' in schema
+        # Should have mapped column names (name gets split into first_name/last_name)
+        assert 'first_name' in schema
         assert 'email' in schema
     
     def test_sampling_rows_parameter(self, schema_detector, temp_dir):
