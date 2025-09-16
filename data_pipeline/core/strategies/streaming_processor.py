@@ -1,54 +1,55 @@
-# data_pipeline/core/strategies/streaming_processor.py
 """
-Streaming data processing strategy with progress reporting.
+Streaming processing strategy for data pipeline operations.
 
-Processes files one chunk at a time to maintain constant memory usage,
-ideal for large datasets. Enhanced with detailed progress tracking
-for CLI and GUI integration.
+Implements memory-efficient streaming processing by detecting schema upfront,
+then processing and writing files chunk-by-chunk without loading entire dataset.
 """
 
-import time
 from typing import Optional
+import time
 
 from shared_utils.logger import get_logger
-from shared_utils.progress import BaseProgressReporter, NullProgressReporter
-from ..handlers import FileHandler
-from ..processing_config import ProcessingConfig
+from shared_utils.progress import NullProgressReporter
+from ..services.schema_detector import SchemaDetector
+from ..services.file_processor import FileProcessor
+from ..services.output_writer import OutputWriter
 from ..dataframe_utils import ProcessingResult
+from ..processing_config import ProcessingConfig
 from ..indexing import IndexManager
-from ..file_utils import get_files_iterator
+from ..handlers import FileHandler
 
 
 class StreamingProcessor:
     """
-    Strategy for processing files in streaming mode with progress tracking.
+    Strategy for memory-efficient streaming data processing.
     
-    Maintains constant memory usage by processing files in chunks and writing
-    output incrementally. Provides detailed progress reporting for user feedback.
+    Optimized for large datasets and CSV output. Detects schema upfront for consistency,
+    then processes files chunk-by-chunk, writing output immediately to minimize memory usage.
     """
     
-    def __init__(self, schema_detector, file_processor, output_writer):
+    def __init__(self, schema_detector: SchemaDetector, file_processor: FileProcessor, 
+                 output_writer: OutputWriter):
         """
-        Initialize streaming processor with injected services.
+        Initialize streaming processor with required services.
         
         Args:
-            schema_detector: Service for detecting and normalizing schemas
-            file_processor: Service for reading and processing individual files
-            output_writer: Service for writing processed data
+            schema_detector: Service for detecting unified schema across files
+            file_processor: Service for processing file chunks
+            output_writer: Service for writing output data
         """
         self.schema_detector = schema_detector
         self.file_processor = file_processor
         self.output_writer = output_writer
-        self._logger = get_logger('data_pipeline.streaming')
+        self._logger = get_logger('data_pipeline.streaming_processor')
         self._progress_reporter = NullProgressReporter()
     
-    def set_progress_reporter(self, progress_reporter: BaseProgressReporter):
+    def set_progress_reporter(self, progress_reporter):
         """Set progress reporter for tracking processing status"""
         self._progress_reporter = progress_reporter
     
-    def process(self, config: ProcessingConfig, writer: Optional[FileHandler] = None) -> ProcessingResult:
+    def process(self, config: ProcessingConfig, writer: Optional[FileHandler]) -> ProcessingResult:
         """
-        Process files using streaming strategy with detailed progress reporting.
+        Execute streaming processing strategy with progress tracking.
         
         Args:
             config: Processing configuration
@@ -70,26 +71,35 @@ class StreamingProcessor:
         self._logger.info("Starting streaming processing", 
                          schema_columns=len(schema))
         
-        # Get files iterator for progress tracking
-        files = list(get_files_iterator(
-            config.input_folder, 
-            config.recursive, 
-            config.file_type_filter
-        ))
+        # Get file list for progress tracking
+        from ..file_utils import get_files_iterator
+        files_for_progress = list(get_files_iterator(config.input_folder, config.recursive, config.file_type_filter))
+        self._progress_reporter.start_processing(len(files_for_progress))
         
-        # Process files with enhanced progress tracking
-        chunk_iterator = self._process_files_with_progress(
-            files, config, schema, index_manager
+        # Get original chunk iterator
+        chunk_iterator = self.file_processor.process_files_streaming(
+            config, schema, index_manager
         )
+        
+        # Wrap with progress tracking
+        def progress_wrapped_chunks():
+            file_index = 0
+            for chunk in chunk_iterator:
+                if file_index < len(files_for_progress):
+                    self._progress_reporter.start_file(files_for_progress[file_index].name)
+                    file_index += 1
+                if hasattr(chunk, '__len__'):
+                    self._progress_reporter.update_rows(len(chunk))
+                yield chunk
         
         # Write chunks as they're produced
         total_rows = self.output_writer.write_streaming(
-            chunk_iterator, config.output_file, writer, write_options, index_manager
+            progress_wrapped_chunks(), config.output_file, writer, write_options, index_manager
         )
         
         # Calculate final statistics
         processing_time = time.time() - start_time
-        files_processed = len(files)
+        files_processed = self._estimate_files_processed(config)
         
         self._logger.info("Streaming processing complete",
                          files_processed=files_processed,
@@ -106,56 +116,22 @@ class StreamingProcessor:
             data=None  # No data retained in streaming mode
         )
     
-    def _process_files_with_progress(self, files, config, schema, index_manager):
+    def _estimate_files_processed(self, config: ProcessingConfig) -> int:
         """
-        Process files with detailed progress reporting.
+        Estimate number of files processed (since streaming doesn't track this directly).
         
-        Yields processed chunks while reporting progress for each file
-        and row processing within files.
+        This is a limitation of streaming mode - we don't know exactly how many
+        files were successfully processed without additional tracking.
         """
-        for file_path in files:
-            # Report file start
-            file_name = file_path.name
-            self._progress_reporter.start_file(file_name)
-            
-            try:
-                # Process file in chunks
-                file_chunks = self.file_processor.process_file_streaming(
-                    file_path, config, schema, index_manager
-                )
-                
-                file_row_count = 0
-                chunk_count = 0
-                
-                for chunk in file_chunks:
-                    chunk_size = len(chunk)
-                    file_row_count += chunk_size
-                    chunk_count += 1
-                    
-                    # Report progress within file
-                    if chunk_count % 10 == 0:  # Report every 10 chunks to avoid spam
-                        self._progress_reporter.update_rows(chunk_size * 10)
-                    
-                    yield chunk
-                
-                # Report any remaining rows
-                if chunk_count % 10 != 0:
-                    remaining_chunks = chunk_count % 10
-                    self._progress_reporter.update_rows(
-                        file_row_count - ((chunk_count // 10) * 10 * len(chunk))
-                    )
-                
-                # Report file completion
-                self._progress_reporter.complete_file(file_row_count)
-                
-                self._logger.debug("File processed successfully",
-                                 file=file_name,
-                                 rows=file_row_count,
-                                 chunks=chunk_count)
-                
-            except Exception as e:
-                self._logger.error("Failed to process file",
-                                 file=file_name,
-                                 error=str(e))
-                # Continue with other files instead of failing completely
-                continue
+        # For now, return a simple count of valid files found
+        # In production, you might want to add more sophisticated tracking
+        from ..file_utils import get_files_iterator
+        
+        try:
+            return len(list(get_files_iterator(
+                config.input_folder, 
+                config.recursive, 
+                config.file_type_filter
+            )))
+        except Exception:
+            return 0  # Fallback if file counting fails

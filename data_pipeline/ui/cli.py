@@ -394,7 +394,7 @@ Examples:
         print("\n⚠️ Processing cancelled by user")
         sys.exit(1)
     except Exception as e:
-        logger.exception("Processing failed")
+        logger.error("Processing failed", error=str(e))
         print(f"\n❌ Error: {e}")
         sys.exit(1)
 
