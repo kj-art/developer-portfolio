@@ -1,8 +1,5 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
-import threading
-import queue
-import time
 from pathlib import Path
 import sys
 import os
@@ -58,11 +55,11 @@ class DataPipelineGUI:
         
         # Build the interface
         self._create_widgets()
-        self._setup_bindings()
+        self._set_up_bindings()
         
         # Setup memory monitoring if available
         if MEMORY_MONITORING_AVAILABLE:
-            self._setup_memory_monitoring()
+            self._set_up_memory_monitoring()
     
     def _create_variables(self):
         """Create tkinter variables for two-way data binding with ProcessingConfig"""
@@ -252,7 +249,7 @@ class DataPipelineGUI:
         status_bar = ttk.Label(main_frame, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W)
         status_bar.grid(row=current_row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(10, 0))
     
-    def _setup_memory_monitoring(self):
+    def _set_up_memory_monitoring(self):
         """Set up memory monitoring with integrated callbacks"""
         # Create memory monitor with GUI integration
         self.memory_monitor = MemoryMonitor(
@@ -268,7 +265,7 @@ class DataPipelineGUI:
         # Start monitoring
         self.memory_monitor.start_monitoring()
     
-    def _setup_bindings(self):
+    def _set_up_bindings(self):
         """Set up event bindings and keyboard shortcuts"""
         self.root.bind('<Control-Return>', lambda e: self._run_processing())
         self.root.bind('<Escape>', lambda e: self._cancel_processing())

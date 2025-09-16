@@ -1,0 +1,32 @@
+# data_pipeline/requirements-dev.txt
+
+# Testing framework
+pytest>=7.0.0
+pytest-cov>=4.0.0
+pytest-xdist>=3.0.0  # For parallel test execution
+pytest-mock>=3.10.0   # For enhanced mocking capabilities
+
+# Code quality
+black>=23.0.0         # Code formatting
+isort>=5.12.0         # Import sorting
+flake8>=6.0.0         # Linting
+mypy>=1.0.0           # Type checking
+
+# Performance and memory monitoring (optional)
+psutil>=5.9.0         # For memory monitoring features
+memory-profiler>=0.60.0  # For memory profiling in tests
+
+# Development utilities
+ipython>=8.0.0        # Better REPL for debugging
+ipdb>=0.13.0          # Debugger
+pre-commit>=3.0.0     # Git hooks for code quality
+
+# Documentation (if needed)
+sphinx>=5.0.0         # Documentation generation
+sphinx-rtd-theme>=1.2.0  # Read the Docs theme
+
+# Jupyter notebooks (for data exploration)
+jupyter>=1.0.0
+pandas>=1.5.0         # Already in main requirements but ensuring latest
+matplotlib>=3.6.0     # For data visualization in notebooks
+seaborn>=0.12.0       # Statistical data visualization

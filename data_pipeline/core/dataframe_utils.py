@@ -110,8 +110,9 @@ def normalize_columns(dataframe, schema_map=None, to_lower=True, spaces_to_under
                 rename_map[normalize(alt_name)] = standard_name
         
         df_n = df_n.rename(columns=rename_map)
-
+    
     # Smart name handling with "fill in the gaps" logic
+    normalized_cols = list(df_n.columns)
     name_index = normalized_cols.index('name') if 'name' in normalized_cols else -1
     first_index = normalized_cols.index('first_name') if 'first_name' in normalized_cols else -1
     last_index = normalized_cols.index('last_name') if 'last_name' in normalized_cols else -1

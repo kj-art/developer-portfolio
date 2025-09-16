@@ -1,25 +1,37 @@
 # StringSmith: Professional Template Formatting
 
-Advanced Python library for conditional template formatting with rich styling and dynamic content control. Templates automatically adapt based on available data, eliminating manual null checks and conditional logic.
+**Production-ready Python library for conditional template formatting with rich styling and dynamic content control.**
+
+StringSmith eliminates manual null checking and conditional string building by automatically adapting templates based on available data. Template sections disappear when their variables are missing, while rich formatting options provide professional-grade output for logging systems, CLI applications, and business reporting.
 
 ## Quick Start
 
 ```python
 from stringsmith import TemplateFormatter
 
-# Basic conditional formatting
+# Basic conditional sections - sections disappear when data is missing
 formatter = TemplateFormatter("{{Hello ;name;}}")
 print(formatter.format(name="World"))  # "Hello World"
-print(formatter.format())               # "" (section disappears when data missing)
+print(formatter.format())               # "" (section disappears)
 
 # Rich formatting with colors and emphasis
-formatter = TemplateFormatter("{{#red@bold;Error: ;message;}}")
-print(formatter.format(message="Failed"))  # Bold red "Error: Failed"
+formatter = TemplateFormatter("{{#red@bold;ERROR: ;message;}}")
+print(formatter.format(message="Failed"))  # Red bold "ERROR: Failed"
+
+# Custom functions for dynamic behavior
+def priority_color(level):
+    return 'red' if int(level) > 5 else 'yellow'
+
+formatter = TemplateFormatter(
+    "{{#priority_color;Level ;priority;: ;message;}}", 
+    functions=[priority_color]
+)
+print(formatter.format(priority=8, message="Critical"))  # Red "Level 8: Critical"
 ```
 
 ## Key Features
 
-### Conditional Sections
+### Conditional Sections with Graceful Degradation
 Template sections automatically disappear when their data is missing, enabling clean output without manual checks.
 
 ```python
@@ -29,8 +41,8 @@ formatter.format(name="admin")           # "User: admin " (level section gone)
 formatter.format()                       # "" (both sections gone)
 ```
 
-### Rich Formatting
-Full support for ANSI colors, text emphasis, and hex color codes.
+### Rich ANSI Formatting
+Full support for colors, text emphasis, and hex color codes with automatic reset handling.
 
 ```python
 # Named colors and emphasis
@@ -43,27 +55,8 @@ formatter = TemplateFormatter("{{#FF5733@italic;Status: ;status;}}")
 formatter = TemplateFormatter("{{#blue@underline;Info: ;details;}}")
 ```
 
-### Custom Functions
-Dynamic formatting and conditional logic through user-defined functions.
-
-```python
-def priority_color(level):
-    return 'red' if int(level) > 5 else 'yellow' if int(level) > 2 else 'green'
-
-def is_urgent(priority):
-    return int(priority) > 7
-
-formatter = TemplateFormatter(
-    "{{#priority_color;[;priority;]}} {{?is_urgent;🚨 URGENT 🚨 ;}} {{message}}",
-    functions={'priority_color': priority_color, 'is_urgent': is_urgent}
-)
-
-print(formatter.format(priority="9", message="Server down"))
-# Red "[9] 🚨 URGENT 🚨 Server down"
-```
-
-### Multi-Parameter Functions
-Functions can access multiple template fields through parameter name matching.
+### Multi-Parameter Custom Functions
+Dynamic formatting and conditional logic through user-defined functions with intelligent parameter matching.
 
 ```python
 def is_profitable(revenue, costs):
@@ -78,8 +71,8 @@ formatter.format(company="TechCorp", revenue="150", costs="100")
 # "TechCorp ✓ Profitable"
 ```
 
-### Mandatory Fields
-Enforce required data with the `!` prefix.
+### Mandatory Field Validation
+Enforce required data with the `!` prefix for critical template sections.
 
 ```python
 formatter = TemplateFormatter("{{!username}} logged in {{at ;timestamp;}}")
@@ -88,19 +81,25 @@ formatter.format(username="admin")                     # "admin logged in "
 # formatter.format() raises MissingMandatoryFieldError
 ```
 
-## Token Types
+## Comprehensive Feature Demonstration
 
-| Token | Purpose | Examples |
-|-------|---------|----------|
-| `#` | Colors | `#red`, `#FF0000`, custom color functions |
-| `@` | Text emphasis | `@bold`, `@italic`, `@underline` |
-| `?` | Conditionals | Show section only if function returns True |
-| `$` | Literal transforms | Replace content with function result |
+Run the full feature demonstration to see StringSmith's capabilities in action:
+
+```bash
+python -m shared_utils.stringsmith.demo
+```
+
+The demo showcases:
+- **Professional logging systems** with conditional context
+- **Business reporting** with dynamic formatting
+- **Creative applications** like sparkline charts and progress indicators
+- **Real-time status displays** for GUI applications
+- **Performance monitoring** with memory usage visualization
+- **Advanced formatting patterns** for enterprise use cases
 
 ## Professional Use Cases
 
-### Application Logging
-
+### Application Logging with Contextual Information
 ```python
 def level_color(level):
     return {'ERROR': 'red', 'WARNING': 'yellow', 'INFO': 'blue'}.get(level.upper(), 'white')
@@ -110,7 +109,7 @@ def has_user(user_id):
 
 log_formatter = TemplateFormatter(
     "{{#level_color;[;level;]}} {{timestamp}} {{module}} {{?has_user;(User: ;user_id;) }}{{message}}",
-    functions={'level_color': level_color, 'has_user': has_user}
+    functions=[level_color, has_user]
 )
 
 # Produces contextual log entries:
@@ -118,8 +117,7 @@ log_formatter = TemplateFormatter(
 # [INFO] 10:31 system Backup completed
 ```
 
-### Business Reporting
-
+### Business Intelligence Reporting
 ```python
 def performance_color(revenue):
     rev = float(revenue) if revenue else 0
@@ -130,12 +128,11 @@ def has_notes(notes):
 
 report_formatter = TemplateFormatter(
     "{{Company: ;company;}} {{#performance_color;(Revenue: $;revenue;M)}} {{?has_notes;[Notes: ;notes;]}}",
-    functions={'performance_color': performance_color, 'has_notes': has_notes}
+    functions=[performance_color, has_notes]
 )
 ```
 
-### CLI Status Messages
-
+### CLI Status Messages with Dynamic Indicators
 ```python
 def status_icon(status):
     return {'running': '⏳', 'complete': '✅', 'failed': '❌'}.get(status, '❓')
@@ -145,22 +142,57 @@ def progress_color(percent):
 
 status_formatter = TemplateFormatter(
     "{{$status_icon;status}} {{task}} {{#progress_color;[;progress;%]}} {{?has_eta;ETA: ;eta;}}",
-    functions={'status_icon': status_icon, 'progress_color': progress_color, 'has_eta': lambda eta: eta}
+    functions=[status_icon, progress_color, lambda eta: eta]
 )
+```
+
+## Template Syntax Reference
+
+### Section Structure
+```
+{{[!][formatting;]prefix;field_name;suffix}}
+```
+
+- `!` - Mandatory field (throws error if missing)
+- `formatting` - Optional color/emphasis tokens
+- `prefix` - Text before field value
+- `field_name` - Variable name (empty for positional args)
+- `suffix` - Text after field value
+
+### Formatting Tokens
+| Token | Purpose | Examples |
+|-------|---------|----------|
+| `#` | Colors | `#red`, `#FF0000`, custom color functions |
+| `@` | Text emphasis | `@bold`, `@italic`, `@underline` |
+| `?` | Conditionals | Show section only if function returns True |
+| `$` | Literal transforms | Replace content with function result |
+
+### Custom Functions
+Functions can access multiple template fields through parameter name matching:
+
+```python
+# Multi-parameter function receives matched values
+def is_profitable(revenue, costs): 
+    return float(revenue) > float(costs)
+
+# Single-parameter function receives field value
+def priority_color(level): 
+    return 'red' if int(level) > 5 else 'green'
+
+# No-parameter function receives nothing
+def random_color():
+    return choice(['red', 'blue', 'green'])
 ```
 
 ## Advanced Features
 
 ### Positional Arguments
-Use empty field names for ordered data input.
-
 ```python
 formatter = TemplateFormatter("{{}} + {{}} = {{}}")
 formatter.format("15", "27", "42")  # "15 + 27 = 42"
 ```
 
 ### Custom Delimiters and Escaping
-
 ```python
 # Custom delimiter
 formatter = TemplateFormatter("{{prefix|field|suffix}}", delimiter="|")
@@ -174,25 +206,25 @@ formatter = TemplateFormatter("Use ~{name~} for {{name}}", escape_char="~")
 ```
 
 ### Inline Formatting
-Apply formatting to specific text spans within template parts.
+Apply formatting to specific text spans within template parts:
 
 ```python
 formatter = TemplateFormatter("{{Status: {#green}OK{#normal} ;message;}}")
 formatter.format(message="All systems operational")
 ```
 
-## Performance
+## Performance & Architecture
 
 - **Template Parsing**: Done once during initialization for fast formatting
 - **Runtime Complexity**: O(n) where n is the number of template sections
 - **Thread Safety**: Immutable after creation, safe for concurrent use
 - **Memory Efficient**: Minimal overhead, suitable for high-frequency formatting
+- **Production Ready**: Comprehensive error handling and graceful degradation
 
 ## Installation
 
 ```bash
-pip install stringsmith
-pip install "stringsmith[colors]"  # Extended color support via Rich
+pip install -r requirements.txt
 ```
 
 **Requirements**: Python 3.7+
@@ -247,4 +279,4 @@ class CurrencyTokenHandler(BaseTokenHandler):
 
 ---
 
-**StringSmith** eliminates the complexity of conditional string formatting while providing professional-grade styling capabilities. Perfect for logging systems, CLI applications, business reporting, and any scenario where clean, adaptive text output is essential.
+**StringSmith** demonstrates professional API design with enterprise-grade conditional formatting capabilities. Perfect for logging systems, CLI applications, business reporting, and any scenario requiring adaptive, formatted text output with zero manual null checking.
