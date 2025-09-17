@@ -86,14 +86,12 @@ def create_test_files():
     print("EXAMPLE COMMANDS TO TRY:")
     print("="*60)
     
-    print("\n1. Basic split extraction with uppercase conversion:")
+    print("\n1. Basic split extraction with number padding:")
     print("python main.py \\")
     print("  --input-folder ./test_files \\")
-    print("  --extractor split \\")
-    print("  --extractor-args \"split_on=_,fields=dept,type,date\" \\")
-    print("  --converter uppercase \\")
-    print("  --converter-args \"fields=dept\" \\")
-    print("  --template \"{dept}_{type}_{date}\" \\")
+    print("  --extractor split,_,dept,type,date \\")
+    print("  --converter pad_numbers,date,4 \\")
+    print("  --converter template,\"{dept}_{type}_{date}\" \\")
     print("  --preview")
     
     print("\n2. Filter for PDFs only, pad numbers:")
