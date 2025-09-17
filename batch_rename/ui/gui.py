@@ -16,7 +16,8 @@ from PyQt6.QtWidgets import (
     QWidget, QLabel, QLineEdit, QPushButton, QFileDialog, QTableWidget,
     QTableWidgetItem, QTabWidget, QComboBox, QCheckBox, QTextEdit,
     QMessageBox, QProgressBar, QStatusBar, QGroupBox, QSpinBox,
-    QSplitter, QHeaderView, QScrollArea, QFrame
+    QSplitter, QHeaderView, QScrollArea, QFrame, QRadioButton,
+    QButtonGroup, QFormLayout
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont, QIcon
@@ -64,7 +65,7 @@ class ExtractorPanel(QWidget):
         type_layout = QHBoxLayout()
         type_layout.addWidget(QLabel("Extractor Type:"))
         self.extractor_combo = QComboBox()
-        self.extractor_combo.addItems(['split', 'regex', 'position', 'metadata'])
+        self.extractor_combo.addItems(['split', 'regex', 'position', 'metadata', 'custom'])
         self.extractor_combo.currentTextChanged.connect(self.on_extractor_changed)
         type_layout.addWidget(self.extractor_combo)
         type_layout.addStretch()
@@ -115,6 +116,33 @@ class ExtractorPanel(QWidget):
             self.config_layout.addWidget(self.created_date)
             self.config_layout.addWidget(self.modified_date)
             self.config_layout.addWidget(self.file_size)
+            
+        elif extractor_type == 'custom':
+            # File path selection
+            file_layout = QHBoxLayout()
+            self.custom_file_path = QLineEdit()
+            self.custom_file_path.setPlaceholderText("Select a .py file containing extract_data function")
+            file_layout.addWidget(self.custom_file_path)
+            
+            browse_btn = QPushButton("Browse...")
+            browse_btn.clicked.connect(self.browse_custom_extractor)
+            file_layout.addWidget(browse_btn)
+            
+            self.config_layout.addLayout(file_layout)
+            
+            # Function arguments (optional)
+            self.config_layout.addWidget(QLabel("Custom Arguments (optional):"))
+            self.custom_args = QLineEdit()
+            self.custom_args.setPlaceholderText("e.g., arg1,arg2,key=value")
+            self.config_layout.addWidget(self.custom_args)
+    
+    def browse_custom_extractor(self):
+        """Open file dialog to select custom extractor .py file."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select Custom Extractor", str(Path.home()), "Python Files (*.py)"
+        )
+        if file_path:
+            self.custom_file_path.setText(file_path)
     
     def get_extractor_config(self) -> tuple:
         """Return (extractor_name, positional_args, keyword_args)."""
@@ -140,6 +168,25 @@ class ExtractorPanel(QWidget):
             if self.file_size.isChecked():
                 fields.append("size")
             return extractor_type, fields, {}
+            
+        elif extractor_type == 'custom':
+            if not self.custom_file_path.text().strip():
+                raise ValueError("Custom extractor requires a .py file")
+            
+            # Parse custom arguments if provided
+            pos_args = []
+            kwargs = {}
+            if self.custom_args.text().strip():
+                # Simple parsing - this could be enhanced
+                args_text = self.custom_args.text().strip()
+                for arg in args_text.split(','):
+                    if '=' in arg:
+                        key, value = arg.split('=', 1)
+                        kwargs[key.strip()] = value.strip()
+                    else:
+                        pos_args.append(arg.strip())
+            
+            return self.custom_file_path.text().strip(), pos_args, kwargs
 
 
 class ConverterPanel(QWidget):
@@ -166,75 +213,292 @@ class ConverterPanel(QWidget):
         self.scroll_area.setWidgetResizable(True)
         layout.addWidget(self.scroll_area)
         
-        # Add initial template converter
-        self.add_converter()
-        
         self.setLayout(layout)
     
     def add_converter(self):
         """Add a new converter configuration widget."""
         converter_widget = QGroupBox(f"Converter {len(self.converters) + 1}")
-        layout = QHBoxLayout(converter_widget)
+        main_layout = QVBoxLayout(converter_widget)
         
-        # Converter type
+        # Header with type selection and remove button
+        header_layout = QHBoxLayout()
+        
+        # Converter type (removed template and stringsmith)
         type_combo = QComboBox()
-        type_combo.addItems(['template', 'pad_numbers', 'date_format', 'stringsmith'])
-        layout.addWidget(type_combo)
+        type_combo.addItems(['pad_numbers', 'date_format', 'custom'])
+        header_layout.addWidget(QLabel("Type:"))
+        header_layout.addWidget(type_combo)
         
-        # Configuration input
-        config_input = QLineEdit()
-        type_combo.currentTextChanged.connect(
-            lambda text: self.update_converter_placeholder(config_input, text)
-        )
-        layout.addWidget(config_input)
+        header_layout.addStretch()
         
         # Remove button
         remove_btn = QPushButton("Remove")
         remove_btn.clicked.connect(lambda: self.remove_converter(converter_widget))
-        layout.addWidget(remove_btn)
+        header_layout.addWidget(remove_btn)
         
-        # Set initial placeholder
-        self.update_converter_placeholder(config_input, type_combo.currentText())
+        main_layout.addLayout(header_layout)
+        
+        # Configuration area that changes based on converter type
+        config_area = QWidget()
+        config_layout = QFormLayout(config_area)
+        main_layout.addWidget(config_area)
+        
+        # Connect type change to update config area
+        type_combo.currentTextChanged.connect(
+            lambda converter_type: self.update_converter_config(config_area, config_layout, converter_type)
+        )
+        
+        # Initialize with first converter type
+        self.update_converter_config(config_area, config_layout, type_combo.currentText())
         
         self.scroll_layout.addWidget(converter_widget)
-        self.converters.append((type_combo, config_input))
+        self.converters.append((type_combo, config_area))
     
-    def update_converter_placeholder(self, input_widget, converter_type):
-        """Update placeholder text based on converter type."""
-        placeholders = {
-            'template': '"{dept}_{type}_{date}"',
-            'pad_numbers': 'field,width (e.g., date,4)',
-            'date_format': 'field,input_format,output_format',
-            'stringsmith': '"{{;dept;}}{{_;type;}}{{_;date;}}"'
-        }
-        input_widget.setPlaceholderText(placeholders.get(converter_type, ''))
+    def update_converter_config(self, config_area, config_layout, converter_type):
+        """Update configuration UI based on selected converter type."""
+        # Clear existing config widgets
+        for i in reversed(range(config_layout.count())):
+            item = config_layout.itemAt(i)
+            if item.widget():
+                item.widget().setParent(None)
+            elif item.layout():
+                # Handle nested layouts
+                nested_layout = item.layout()
+                for j in reversed(range(nested_layout.count())):
+                    nested_item = nested_layout.itemAt(j)
+                    if nested_item.widget():
+                        nested_item.widget().setParent(None)
+        
+        if converter_type == 'pad_numbers':
+            # Field name input
+            field_input = QLineEdit()
+            field_input.setPlaceholderText("e.g., sequence, date, number")
+            field_input.setObjectName("field")
+            config_layout.addRow("Field:", field_input)
+            
+            # Width input with spinner
+            width_input = QSpinBox()
+            width_input.setRange(1, 10)
+            width_input.setValue(3)
+            width_input.setObjectName("width")
+            config_layout.addRow("Width:", width_input)
+            
+        elif converter_type == 'date_format':
+            # Field name input
+            field_input = QLineEdit()
+            field_input.setPlaceholderText("e.g., date, created_date")
+            field_input.setObjectName("field")
+            config_layout.addRow("Field:", field_input)
+            
+            # Input format
+            input_format = QLineEdit("%Y%m%d")
+            input_format.setObjectName("input_format")
+            config_layout.addRow("Input Format:", input_format)
+            
+            # Output format
+            output_format = QLineEdit("%Y-%m-%d")
+            output_format.setObjectName("output_format")
+            config_layout.addRow("Output Format:", output_format)
+            
+        elif converter_type == 'custom':
+            # File path selection
+            file_layout = QHBoxLayout()
+            file_input = QLineEdit()
+            file_input.setPlaceholderText("Select a .py file containing convert_data function")
+            file_input.setObjectName("custom_file")
+            file_layout.addWidget(file_input)
+            
+            browse_btn = QPushButton("Browse...")
+            browse_btn.clicked.connect(lambda: self.browse_custom_converter(file_input))
+            file_layout.addWidget(browse_btn)
+            
+            config_layout.addRow("Python File:", file_layout)
+            
+            # Function arguments (optional)
+            args_input = QLineEdit()
+            args_input.setPlaceholderText("e.g., arg1,arg2,key=value")
+            args_input.setObjectName("custom_args")
+            config_layout.addRow("Arguments:", args_input)
+    
+    def browse_custom_converter(self, file_input):
+        """Open file dialog to select custom converter .py file."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select Custom Converter", str(Path.home()), "Python Files (*.py)"
+        )
+        if file_path:
+            file_input.setText(file_path)
     
     def remove_converter(self, widget):
         """Remove a converter widget."""
         widget.setParent(None)
-        self.converters = [(combo, input) for combo, input in self.converters 
+        self.converters = [(combo, config_area) for combo, config_area in self.converters 
                           if combo.parent() != widget]
     
     def get_converter_configs(self) -> List[Dict]:
         """Return list of converter configurations."""
         configs = []
-        for type_combo, config_input in self.converters:
-            if config_input.text().strip():
-                converter_type = type_combo.currentText()
-                args_text = config_input.text().strip()
+        for type_combo, config_area in self.converters:
+            converter_type = type_combo.currentText()
+            
+            # Extract values from input widgets in config area
+            pos_args = []
+            kwargs = {}
+            
+            if converter_type == 'pad_numbers':
+                field_widget = config_area.findChild(QLineEdit, "field")
+                width_widget = config_area.findChild(QSpinBox, "width")
                 
-                # Parse arguments (simple comma split for now)
-                if args_text:
-                    pos_args = [arg.strip().strip('"') for arg in args_text.split(',')]
-                else:
-                    pos_args = []
+                if field_widget and field_widget.text().strip():
+                    pos_args = [field_widget.text().strip(), str(width_widget.value())]
+                    
+            elif converter_type == 'date_format':
+                field_widget = config_area.findChild(QLineEdit, "field")
+                input_format_widget = config_area.findChild(QLineEdit, "input_format")
+                output_format_widget = config_area.findChild(QLineEdit, "output_format")
                 
+                if field_widget and field_widget.text().strip():
+                    pos_args = [
+                        field_widget.text().strip(),
+                        input_format_widget.text().strip() or "%Y%m%d",
+                        output_format_widget.text().strip() or "%Y-%m-%d"
+                    ]
+                    
+            elif converter_type == 'custom':
+                file_widget = config_area.findChild(QLineEdit, "custom_file")
+                args_widget = config_area.findChild(QLineEdit, "custom_args")
+                
+                if file_widget and file_widget.text().strip():
+                    converter_name = file_widget.text().strip()
+                    
+                    # Parse custom arguments if provided
+                    if args_widget and args_widget.text().strip():
+                        args_text = args_widget.text().strip()
+                        for arg in args_text.split(','):
+                            if '=' in arg:
+                                key, value = arg.split('=', 1)
+                                kwargs[key.strip()] = value.strip()
+                            else:
+                                pos_args.append(arg.strip())
+                    
+                    configs.append({
+                        'name': converter_name,  # Use file path as name for custom
+                        'positional': pos_args,
+                        'keyword': kwargs
+                    })
+                    continue  # Skip the standard config addition below
+            
+            # Only add converter if we have valid configuration
+            if pos_args:
                 configs.append({
                     'name': converter_type,
                     'positional': pos_args,
-                    'keyword': {}
+                    'keyword': kwargs
                 })
+        
         return configs
+
+
+class TemplatePanel(QWidget):
+    """Panel for configuring output template (optional, mutually exclusive options)."""
+    
+    def __init__(self):
+        super().__init__()
+        self.init_ui()
+    
+    def init_ui(self):
+        layout = QVBoxLayout()
+        
+        # Enable template checkbox
+        self.enable_template = QCheckBox("Enable Template")
+        self.enable_template.stateChanged.connect(self.on_template_enabled)
+        layout.addWidget(self.enable_template)
+        
+        # Template configuration area
+        self.config_area = QWidget()
+        self.config_layout = QVBoxLayout(self.config_area)
+        
+        # Template type selection (radio buttons for mutual exclusion)
+        type_group = QGroupBox("Template Type")
+        type_layout = QVBoxLayout(type_group)
+        
+        self.template_group = QButtonGroup()
+        self.template_radio = QRadioButton("Standard Template")
+        self.stringsmith_radio = QRadioButton("StringSmith Template")
+        self.template_radio.setChecked(True)  # Default to standard template
+        
+        self.template_group.addButton(self.template_radio)
+        self.template_group.addButton(self.stringsmith_radio)
+        
+        type_layout.addWidget(self.template_radio)
+        type_layout.addWidget(self.stringsmith_radio)
+        
+        self.config_layout.addWidget(type_group)
+        
+        # Template input area
+        input_group = QGroupBox("Template Configuration")
+        input_layout = QVBoxLayout(input_group)
+        
+        self.template_input = QLineEdit()
+        self.template_input.setPlaceholderText('"{dept}_{type}_{date}"')
+        input_layout.addWidget(QLabel("Template Pattern:"))
+        input_layout.addWidget(self.template_input)
+        
+        # Help text that changes based on selected type
+        self.help_label = QLabel()
+        self.help_label.setWordWrap(True)
+        self.help_label.setStyleSheet("QLabel { color: #666; font-size: 11px; }")
+        input_layout.addWidget(self.help_label)
+        
+        self.config_layout.addWidget(input_group)
+        
+        # Connect radio button changes to update help text
+        self.template_radio.toggled.connect(self.update_help_text)
+        self.stringsmith_radio.toggled.connect(self.update_help_text)
+        
+        # Set initial help text
+        self.update_help_text()
+        
+        layout.addWidget(self.config_area)
+        layout.addStretch()
+        
+        # Initially disable the config area
+        self.config_area.setEnabled(False)
+        
+        self.setLayout(layout)
+    
+    def on_template_enabled(self, state):
+        """Enable/disable template configuration based on checkbox."""
+        self.config_area.setEnabled(state == Qt.CheckState.Checked.value)
+    
+    def update_help_text(self):
+        """Update help text based on selected template type."""
+        if self.template_radio.isChecked():
+            self.help_label.setText(
+                "Standard Template: Use {field_name} syntax. "
+                "Example: \"{dept}_{type}_{date}\" → \"sales_report_20240315\""
+            )
+            self.template_input.setPlaceholderText('"{dept}_{type}_{date}"')
+        else:
+            self.help_label.setText(
+                "StringSmith Template: Use {{;field;}} syntax with graceful missing field handling. "
+                "Example: \"{{;dept;}}{{_;type;}}{{_;date;}}\" → \"sales_report_20240315\" "
+                "(automatically handles missing fields)"
+            )
+            self.template_input.setPlaceholderText('"{{;dept;}}{{_;type;}}{{_;date;}}"')
+    
+    def get_template_config(self) -> Optional[Dict]:
+        """Return template configuration or None if disabled."""
+        if not self.enable_template.isChecked() or not self.template_input.text().strip():
+            return None
+        
+        template_type = "template" if self.template_radio.isChecked() else "stringsmith"
+        template_pattern = self.template_input.text().strip().strip('"')
+        
+        return {
+            'name': template_type,
+            'positional': [template_pattern],
+            'keyword': {}
+        }
 
 
 class FilterPanel(QWidget):
@@ -266,69 +530,234 @@ class FilterPanel(QWidget):
     def add_filter(self):
         """Add a new filter configuration widget."""
         filter_widget = QGroupBox(f"Filter {len(self.filters) + 1}")
-        layout = QHBoxLayout(filter_widget)
+        main_layout = QVBoxLayout(filter_widget)
+        
+        # Header with invert checkbox, type selection, and remove button
+        header_layout = QHBoxLayout()
         
         # Invert checkbox
         invert_check = QCheckBox("Exclude")
-        layout.addWidget(invert_check)
+        header_layout.addWidget(invert_check)
         
         # Filter type
         type_combo = QComboBox()
-        type_combo.addItems(['pattern', 'file-type', 'file-size', 'name-length', 'date-modified'])
-        layout.addWidget(type_combo)
+        type_combo.addItems(['pattern', 'file-type', 'file-size', 'name-length', 'date-modified', 'custom'])
+        header_layout.addWidget(QLabel("Type:"))
+        header_layout.addWidget(type_combo)
         
-        # Configuration input
-        config_input = QLineEdit()
-        type_combo.currentTextChanged.connect(
-            lambda text: self.update_filter_placeholder(config_input, text)
-        )
-        layout.addWidget(config_input)
+        header_layout.addStretch()
         
         # Remove button
         remove_btn = QPushButton("Remove")
         remove_btn.clicked.connect(lambda: self.remove_filter(filter_widget))
-        layout.addWidget(remove_btn)
+        header_layout.addWidget(remove_btn)
         
-        # Set initial placeholder
-        self.update_filter_placeholder(config_input, type_combo.currentText())
+        main_layout.addLayout(header_layout)
+        
+        # Configuration area that changes based on filter type
+        config_area = QWidget()
+        config_layout = QFormLayout(config_area)
+        main_layout.addWidget(config_area)
+        
+        # Connect type change to update config area
+        type_combo.currentTextChanged.connect(
+            lambda filter_type: self.update_filter_config(config_area, config_layout, filter_type)
+        )
+        
+        # Initialize with first filter type
+        self.update_filter_config(config_area, config_layout, type_combo.currentText())
         
         self.scroll_layout.addWidget(filter_widget)
-        self.filters.append((invert_check, type_combo, config_input))
+        self.filters.append((invert_check, type_combo, config_area))
     
-    def update_filter_placeholder(self, input_widget, filter_type):
-        """Update placeholder text based on filter type."""
-        placeholders = {
-            'pattern': '*.pdf (or *.pdf,*_backup_*)',
-            'file-type': 'pdf,docx,xlsx',
-            'file-size': '1MB,100MB (min,max)',
-            'name-length': '5,50 (min,max)',
-            'date-modified': '2024-01-01 (or "1 week ago")'
-        }
-        input_widget.setPlaceholderText(placeholders.get(filter_type, ''))
+    def update_filter_config(self, config_area, config_layout, filter_type):
+        """Update configuration UI based on selected filter type."""
+        # Clear existing config widgets
+        for i in reversed(range(config_layout.count())):
+            item = config_layout.itemAt(i)
+            if item.widget():
+                item.widget().setParent(None)
+            elif item.layout():
+                # Handle nested layouts
+                nested_layout = item.layout()
+                for j in reversed(range(nested_layout.count())):
+                    nested_item = nested_layout.itemAt(j)
+                    if nested_item.widget():
+                        nested_item.widget().setParent(None)
+        
+        if filter_type == 'pattern':
+            # Include pattern
+            include_input = QLineEdit()
+            include_input.setPlaceholderText("e.g., *.pdf, *_report_*")
+            include_input.setObjectName("include")
+            config_layout.addRow("Include Pattern:", include_input)
+            
+            # Exclude pattern (optional)
+            exclude_input = QLineEdit()
+            exclude_input.setPlaceholderText("e.g., *_backup_*, *_temp_*")
+            exclude_input.setObjectName("exclude")
+            config_layout.addRow("Exclude Pattern:", exclude_input)
+            
+        elif filter_type == 'file-type':
+            # File types
+            types_input = QLineEdit()
+            types_input.setPlaceholderText("e.g., pdf,docx,xlsx")
+            types_input.setObjectName("types")
+            config_layout.addRow("File Types:", types_input)
+            
+        elif filter_type == 'file-size':
+            # Min and max size
+            min_size_input = QLineEdit()
+            min_size_input.setPlaceholderText("e.g., 1MB, 500KB")
+            min_size_input.setObjectName("min_size")
+            config_layout.addRow("Min Size:", min_size_input)
+            
+            max_size_input = QLineEdit()
+            max_size_input.setPlaceholderText("e.g., 100MB, 1GB")
+            max_size_input.setObjectName("max_size")
+            config_layout.addRow("Max Size:", max_size_input)
+            
+        elif filter_type == 'name-length':
+            # Min and max length
+            min_length_input = QSpinBox()
+            min_length_input.setRange(0, 1000)
+            min_length_input.setValue(0)
+            min_length_input.setObjectName("min_length")
+            config_layout.addRow("Min Length:", min_length_input)
+            
+            max_length_input = QSpinBox()
+            max_length_input.setRange(0, 1000)
+            max_length_input.setValue(255)
+            max_length_input.setObjectName("max_length")
+            config_layout.addRow("Max Length:", max_length_input)
+            
+        elif filter_type == 'date-modified':
+            # Date threshold
+            date_input = QLineEdit()
+            date_input.setPlaceholderText("e.g., 2024-01-01, '1 week ago'")
+            date_input.setObjectName("date_threshold")
+            config_layout.addRow("Date Threshold:", date_input)
+            
+        elif filter_type == 'custom':
+            # File path selection
+            file_layout = QHBoxLayout()
+            file_input = QLineEdit()
+            file_input.setPlaceholderText("Select a .py file containing filter_files function")
+            file_input.setObjectName("custom_file")
+            file_layout.addWidget(file_input)
+            
+            browse_btn = QPushButton("Browse...")
+            browse_btn.clicked.connect(lambda: self.browse_custom_filter(file_input))
+            file_layout.addWidget(browse_btn)
+            
+            config_layout.addRow("Python File:", file_layout)
+            
+            # Function arguments (optional)
+            args_input = QLineEdit()
+            args_input.setPlaceholderText("e.g., arg1,arg2,key=value")
+            args_input.setObjectName("custom_args")
+            config_layout.addRow("Arguments:", args_input)
+    
+    def browse_custom_filter(self, file_input):
+        """Open file dialog to select custom filter .py file."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select Custom Filter", str(Path.home()), "Python Files (*.py)"
+        )
+        if file_path:
+            file_input.setText(file_path)
     
     def remove_filter(self, widget):
         """Remove a filter widget."""
         widget.setParent(None)
-        self.filters = [(invert, combo, input) for invert, combo, input in self.filters 
+        self.filters = [(invert, combo, config_area) for invert, combo, config_area in self.filters 
                        if combo.parent() != widget]
     
     def get_filter_configs(self) -> List[Dict]:
         """Return list of filter configurations."""
         configs = []
-        for invert_check, type_combo, config_input in self.filters:
-            if config_input.text().strip():
-                filter_type = type_combo.currentText()
-                args_text = config_input.text().strip()
+        for invert_check, type_combo, config_area in self.filters:
+            filter_type = type_combo.currentText()
+            pos_args = []
+            
+            if filter_type == 'pattern':
+                include_widget = config_area.findChild(QLineEdit, "include")
+                exclude_widget = config_area.findChild(QLineEdit, "exclude")
                 
-                # Parse arguments
-                pos_args = [arg.strip() for arg in args_text.split(',') if arg.strip()]
+                if include_widget and include_widget.text().strip():
+                    pos_args.append(include_widget.text().strip())
+                    
+                if exclude_widget and exclude_widget.text().strip():
+                    pos_args.append(exclude_widget.text().strip())
+                    
+            elif filter_type == 'file-type':
+                types_widget = config_area.findChild(QLineEdit, "types")
                 
+                if types_widget and types_widget.text().strip():
+                    # Split comma-separated types into individual args
+                    types = [t.strip() for t in types_widget.text().split(',') if t.strip()]
+                    pos_args.extend(types)
+                    
+            elif filter_type == 'file-size':
+                min_size_widget = config_area.findChild(QLineEdit, "min_size")
+                max_size_widget = config_area.findChild(QLineEdit, "max_size")
+                
+                size_args = []
+                if min_size_widget and min_size_widget.text().strip():
+                    size_args.append(min_size_widget.text().strip())
+                if max_size_widget and max_size_widget.text().strip():
+                    size_args.append(max_size_widget.text().strip())
+                
+                if size_args:
+                    pos_args = [','.join(size_args)]  # Pass as single comma-separated string
+                    
+            elif filter_type == 'name-length':
+                min_length_widget = config_area.findChild(QSpinBox, "min_length")
+                max_length_widget = config_area.findChild(QSpinBox, "max_length")
+                
+                if min_length_widget and max_length_widget:
+                    pos_args = [f"{min_length_widget.value()},{max_length_widget.value()}"]
+                    
+            elif filter_type == 'date-modified':
+                date_widget = config_area.findChild(QLineEdit, "date_threshold")
+                
+                if date_widget and date_widget.text().strip():
+                    pos_args = [date_widget.text().strip()]
+                    
+            elif filter_type == 'custom':
+                file_widget = config_area.findChild(QLineEdit, "custom_file")
+                args_widget = config_area.findChild(QLineEdit, "custom_args")
+                
+                if file_widget and file_widget.text().strip():
+                    filter_name = file_widget.text().strip()
+                    kwargs = {}
+                    
+                    # Parse custom arguments if provided
+                    if args_widget and args_widget.text().strip():
+                        args_text = args_widget.text().strip()
+                        for arg in args_text.split(','):
+                            if '=' in arg:
+                                key, value = arg.split('=', 1)
+                                kwargs[key.strip()] = value.strip()
+                            else:
+                                pos_args.append(arg.strip())
+                    
+                    configs.append({
+                        'name': filter_name,  # Use file path as name for custom
+                        'positional': pos_args,
+                        'keyword': kwargs,
+                        'inverted': invert_check.isChecked()
+                    })
+                    continue  # Skip the standard config addition below
+            
+            # Only add filter if we have valid configuration
+            if pos_args:
                 configs.append({
                     'name': filter_type,
                     'positional': pos_args,
                     'keyword': {},
                     'inverted': invert_check.isChecked()
                 })
+        
         return configs
 
 
@@ -421,6 +850,10 @@ class BatchRenameGUI(QMainWindow):
         # Converter tab
         self.converter_panel = ConverterPanel()
         config_panel.addTab(self.converter_panel, "Converters")
+        
+        # Template tab (new, after converters)
+        self.template_panel = TemplatePanel()
+        config_panel.addTab(self.template_panel, "Template")
         
         # Filter tab
         self.filter_panel = FilterPanel()
@@ -580,8 +1013,15 @@ class BatchRenameGUI(QMainWindow):
         
         # Get converter configurations
         converters = self.converter_panel.get_converter_configs()
+        
+        # Get template configuration and add to converters if enabled
+        template_config = self.template_panel.get_template_config()
+        if template_config:
+            converters.append(template_config)
+        
+        # Require at least one converter (including template)
         if not converters:
-            raise ValueError("At least one converter is required")
+            raise ValueError("At least one converter or template is required")
         
         # Get filter configurations
         filters = self.filter_panel.get_filter_configs()

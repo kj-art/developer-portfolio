@@ -10,6 +10,32 @@ from typing import Dict, Any, Callable
 from .function_loader import load_custom_function
 
 
+def uppercase_converter(extracted_data: Dict[str, Any], filename: str, file_path: Path, metadata: Dict[str, Any], **args) -> Dict[str, Any]:
+    """
+    Convert specified fields to uppercase.
+    
+    Args:
+        fields: Comma-separated list of fields to convert
+        
+    Example:
+        extracted_data: {"dept": "hr", "type": "report"}
+        fields: "dept"
+        result: {"dept": "HR", "type": "report"}
+    """
+    fields_str = args.get('fields', '')
+    if not fields_str:
+        raise ValueError("uppercase converter requires 'fields' argument")
+    
+    field_names = [f.strip() for f in fields_str.split(',')]
+    result = extracted_data.copy()
+    
+    for field_name in field_names:
+        if field_name in result and result[field_name]:
+            result[field_name] = str(result[field_name]).upper()
+    
+    return result
+
+
 """
 Built-in converters for transforming extracted data.
 
