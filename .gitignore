@@ -6,3 +6,4 @@ __pycache__/
 *.pyo
 *.pyd
 shared_utils/.pytest_cache/
+test_files/
