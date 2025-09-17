@@ -190,11 +190,9 @@ def stringsmith_converter(extracted_data: Dict[str, Any], filename: str, file_pa
         raise ValueError("stringsmith converter requires template")
     
     try:
-        # Import StringSmith from the correct location
         import sys
         from pathlib import Path
         
-        # Add the shared_utils path (from debug we know it's in the project root)
         stringsmith_path = Path.cwd()
         if stringsmith_path.exists():
             sys.path.insert(0, str(stringsmith_path))
@@ -202,7 +200,7 @@ def stringsmith_converter(extracted_data: Dict[str, Any], filename: str, file_pa
         from shared_utils.stringsmith import TemplateFormatter
         
         # Create formatter and apply template
-        formatter = TemplateFormatter(template_str)
+        formatter = TemplateFormatter(template_str, skip_empty=True)
         
         # Clean data - convert None to empty string for StringSmith
         clean_data = {}

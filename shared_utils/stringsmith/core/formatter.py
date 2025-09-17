@@ -92,7 +92,8 @@ class TemplateFormatter:
                  template: str, 
                  delimiter: str = ';', 
                  escape_char: str = '\\', 
-                 functions: list[Callable] | dict[str, Callable] | None = None):
+                 functions: list[Callable] | dict[str, Callable] | None = None,
+                 skip_empty=False):
         """
         Initialize a template formatter with conditional sections and rich formatting.
         
@@ -103,11 +104,14 @@ class TemplateFormatter:
         Args:
             template (str): Template string using {{}} sections for conditional content.
             delimiter (str, optional): Character(s) separating parts within sections. 
-                                     Defaults to ';'.
+                                    Defaults to ';'.
             escape_char (str, optional): Character(s) for escaping special sequences.
-                                       Defaults to '\\'.
+                                    Defaults to '\\'.
             functions (Dict[str, Callable], optional): Custom functions for formatting
-                                                     and conditionals.
+                                                    and conditionals.
+            skip_empty (bool, optional): If True, treat empty strings the same as None
+                                    for section visibility. If False, only None values
+                                    cause sections to disappear. Defaults to False.
         
         Raises:
             StringSmithError: If template contains invalid formatting tokens or syntax errors.
@@ -116,6 +120,7 @@ class TemplateFormatter:
         self.template = template
         self.delimiter = delimiter
         self.escape_char = escape_char
+        self.skip_empty = skip_empty
         if functions is None:
             self._functions = {}
         elif isinstance(functions, list):
@@ -300,7 +305,7 @@ class TemplateFormatter:
 
             # Get field value for this section
             field_value = get_var(section.field_name)
-            if field_value is None:
+            if field_value is None or (field_value == '' and self.skip_empty):
                 # No value provided for this section's field
                 if section.is_mandatory:
                     raise MissingMandatoryFieldError(f"Required field '{section.field_name}' not provided")

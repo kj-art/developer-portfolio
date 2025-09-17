@@ -121,6 +121,12 @@ Examples:
     )
     
     parser.add_argument(
+        '--verbose',
+        action='store_true',
+        help='Show detailed preview of all file changes'
+    )
+    
+    parser.add_argument(
         '--execute',
         action='store_true',
         help='Actually perform the renames (overrides --preview)'
@@ -261,6 +267,33 @@ def main():
             print(f"Would rename {result.files_to_rename} files")
             if result.collisions:
                 print(f"Found {result.collisions} naming conflicts")
+            
+            # Show detailed preview only if --verbose is specified
+            if args.verbose and result.preview_data:
+                # Filter to only show files that would actually change
+                changes = [entry for entry in result.preview_data if entry['old_name'] != entry['new_name']]
+                
+                if changes:
+                    # Check if there are too many changes to display
+                    if len(changes) > 10:
+                        response = input(f"\nFound {len(changes)} files to rename. Display all changes? (y/N): ")
+                        if response.lower() not in ['y', 'yes']:
+                            print("Skipping detailed preview.")
+                        else:
+                            print(f"\nDetailed preview ({len(changes)} changes):")
+                            print("-" * 60)
+                            for entry in changes:
+                                print(f"{entry['old_name']} → {entry['new_name']}")
+                            print("-" * 60)
+                    else:
+                        print(f"\nDetailed preview ({len(changes)} changes):")
+                        print("-" * 60)
+                        for entry in changes:
+                            print(f"{entry['old_name']} → {entry['new_name']}")
+                        print("-" * 60)
+                else:
+                    print("\nNo files would be changed.")
+            
             print("\nUse --execute to perform the renames")
         else:
             print(f"\nRename completed: {result.files_renamed} files renamed")
