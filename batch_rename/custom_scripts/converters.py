@@ -34,9 +34,12 @@ def convert_data(context: ProcessingContext) -> Dict[str, Any]:
     
     Formats department codes and standardizes document types.
     Creates clean, professional business filenames.
+    
+    Returns:
+        Dictionary with formatted fields including dept_full, type_formatted, date_iso, formatted_name
     """
     if not context.has_extracted_data():
-        return {'formatted_name': context.base_name}
+        return {'formatted_name': context.file_path.stem}
     
     result = context.extracted_data.copy()
     
@@ -104,7 +107,7 @@ def convert_data(context: ProcessingContext) -> Dict[str, Any]:
     elif all(k in result for k in ['dept_full', 'type_formatted']):
         result['formatted_name'] = f"{result['dept_full']}_{result['type_formatted']}"
     else:
-        result['formatted_name'] = context.base_name
+        result['formatted_name'] = context.file_path.stem
     
     return result
 
@@ -114,9 +117,15 @@ def convert_invoice_data(context: ProcessingContext, company_prefix: bool = True
     Invoice formatter with company prefix option.
     
     Creates standardized invoice filenames with optional company prefixes.
+    
+    Args:
+        company_prefix: Whether to include company name as prefix in filename
+    
+    Returns:
+        Dictionary with formatted invoice fields including company_clean, number_padded, formatted_name
     """
     if not context.has_extracted_data():
-        return {'formatted_name': context.base_name}
+        return {'formatted_name': context.file_path.stem}
     
     result = context.extracted_data.copy()
     
@@ -177,194 +186,232 @@ def convert_photo_data(context: ProcessingContext, include_device: bool = False,
     Photo organizer with device and grouping options.
     
     Creates organized photo filenames with optional device info and monthly grouping.
+    
+    Args:
+        include_device: Whether to include device/camera model in filename
+        group_by_month: Whether to organize photos by year-month format
+    
+    Returns:
+        Dictionary with formatted photo fields including organized folder structure and clean filename
     """
     if not context.has_extracted_data():
-        return {'formatted_name': context.base_name}
+        return {'formatted_name': context.file_path.stem}
     
     result = context.extracted_data.copy()
-    
-    # Format the date for folder organization
-    date_str = context.get_extracted_field('date')
-    if date_str and date_str != 'unknown':
-        try:
-            if len(date_str) == 8:  # YYYYMMDD
-                parsed_date = datetime.datetime.strptime(date_str, '%Y%m%d')
-                result['year'] = parsed_date.strftime('%Y')
-                result['month'] = parsed_date.strftime('%m')
-                result['month_name'] = parsed_date.strftime('%B')
-                result['date_readable'] = parsed_date.strftime('%Y-%m-%d')
-            else:
-                result['year'] = 'unknown'
-                result['month'] = 'unknown'
-                result['month_name'] = 'unknown'
-                result['date_readable'] = date_str
-        except ValueError:
-            result['year'] = 'unknown'
-            result['month'] = 'unknown'
-            result['month_name'] = 'unknown'
-            result['date_readable'] = date_str
-    
-    # Create sequence number based on time if available
-    time_str = context.get_extracted_field('time')
-    if time_str and time_str != 'unknown':
-        result['time_formatted'] = time_str
-    else:
-        # Use a simple counter based on filename
-        import hashlib
-        hash_obj = hashlib.md5(context.filename.encode())
-        result['time_formatted'] = hash_obj.hexdigest()[:6]
-    
-    # Build the filename components
-    components = []
-    
-    # Add date
-    if result.get('date_readable', 'unknown') != 'unknown':
-        components.append(result['date_readable'])
-    
-    # Add time/sequence
-    if result.get('time_formatted'):
-        components.append(result['time_formatted'])
-    
-    # Add device info if requested
-    device = context.get_extracted_field('device')
-    if include_device and device and device != 'unknown':
-        components.append(device.title())
-    
-    # Add type
-    media_type = context.get_extracted_field('type')
-    if media_type:
-        components.append(media_type.title())
-    
-    # Add size category as suffix
-    size_cat = context.get_extracted_field('size_cat')
-    if size_cat:
-        components.append(size_cat.upper())
-    
-    result['formatted_name'] = '_'.join(components) if components else context.base_name
-    
-    # Create folder path if grouping by month
-    if group_by_month and result.get('year', 'unknown') != 'unknown':
-        if result.get('month_name', 'unknown') != 'unknown':
-            result['folder_path'] = f"{result['year']}/{result['month_name']}"
-        else:
-            result['folder_path'] = f"{result['year']}/Unknown"
-    else:
-        result['folder_path'] = ""
-    
-    return result
-
-
-def convert_project_data(context: ProcessingContext, include_category: bool = True, 
-                        version_format: str = "v{version}") -> Dict[str, Any]:
-    """
-    Project file formatter with category and version formatting options.
-    
-    Creates consistent project filenames with customizable version formatting.
-    """
-    if not context.has_extracted_data():
-        return {'formatted_name': context.base_name}
-    
-    result = context.extracted_data.copy()
-    
-    # Format project code
-    project = context.get_extracted_field('project')
-    if project and project != 'unknown':
-        # Ensure project codes are uppercase and well-formatted
-        project_code = project.upper().replace(' ', '-')
-        result['project_formatted'] = project_code
-    else:
-        result['project_formatted'] = 'UNKNOWN'
-    
-    # Format document type
-    doc_type = context.get_extracted_field('type')
-    if doc_type:
-        doc_type_formatted = doc_type.title().replace('_', '-').replace(' ', '-')
-        result['type_formatted'] = doc_type_formatted
-    else:
-        result['type_formatted'] = 'Document'
-    
-    # Format version
-    version = context.get_extracted_field('version')
-    if version and version not in ['none', 'unknown']:
-        try:
-            # Handle versions like "1.0", "2", "1.2.3"
-            version_str = str(version)
-            if '.' not in version_str:
-                version_str += '.0'  # Add .0 to single numbers
-            result['version_formatted'] = version_format.format(version=version_str)
-        except:
-            result['version_formatted'] = version_format.format(version='1.0')
-    else:
-        result['version_formatted'] = ''
     
     # Build filename components
-    components = [result['project_formatted'], result['type_formatted']]
+    components = []
     
-    # Add category if requested and available
-    category = context.get_extracted_field('category')
-    if include_category and category and category != 'other':
-        components.append(category.title())
+    # Date component
+    date_str = context.get_extracted_field('date')
+    if date_str and date_str != 'unknown':
+        if group_by_month:
+            # Create YYYY-MM format for folder organization
+            try:
+                if '-' in date_str:
+                    year_month = '-'.join(date_str.split('-')[:2])  # YYYY-MM
+                else:
+                    year_month = f"{date_str[:4]}-{date_str[4:6]}"  # YYYYMMDD -> YYYY-MM
+                result['folder_date'] = year_month
+                components.append(date_str.replace('-', ''))  # YYYYMMDD for filename
+            except:
+                components.append(date_str)
+        else:
+            components.append(date_str.replace('-', ''))
     
-    # Add version if present
-    if result['version_formatted']:
-        components.append(result['version_formatted'])
+    # Time component
+    time_str = context.get_extracted_field('time')
+    if time_str and time_str != 'unknown':
+        components.append(time_str.replace('-', ''))
     
-    result['formatted_name'] = '_'.join(components)
+    # Device component
+    if include_device:
+        device = context.get_extracted_field('device')
+        if device and device != 'unknown':
+            components.append(device)
     
-    # Create project folder structure
-    result['folder_path'] = f"Projects/{result['project_formatted']}"
-    if category and category != 'other':
-        result['folder_path'] += f"/{category.title()}"
+    # Photo type
+    photo_type = context.get_extracted_field('type')
+    if photo_type and photo_type != 'Photo':  # Only add if not default
+        components.append(photo_type)
+    
+    # Build formatted filename
+    if components:
+        result['formatted_name'] = '_'.join(components)
+    else:
+        result['formatted_name'] = context.file_path.stem
+    
+    # Add folder organization info
+    if group_by_month and 'folder_date' in result:
+        result['suggested_folder'] = f"Photos/{result['folder_date']}"
+    else:
+        year = context.get_extracted_field('year')
+        if year:
+            result['suggested_folder'] = f"Photos/{year}"
+        else:
+            result['suggested_folder'] = "Photos/Unsorted"
     
     return result
 
 
-def convert_cleanup_data(context: ProcessingContext, remove_special: bool = True, 
-                        max_length: int = 100) -> Dict[str, Any]:
+def convert_project_data(context: ProcessingContext, use_client_prefix: bool = True,
+                        include_status: bool = False, version_format: str = "v") -> Dict[str, Any]:
     """
-    General cleanup converter.
+    Project file converter for creative work.
     
-    Cleans up any filename by removing special characters, limiting length,
-    and applying consistent formatting rules.
+    Creates organized project filenames with client, project, version, and status information.
+    
+    Args:
+        use_client_prefix: Whether to include client name as prefix in filename
+        include_status: Whether to include status indicators (draft, final, etc.) in filename
+        version_format: Version prefix format - "v" for v1.2, "r" for r1.2, or "" for 1.2
+    
+    Returns:
+        Dictionary with formatted project fields including organized filename and folder structure
     """
-    result = {}
+    if not context.has_extracted_data():
+        return {'formatted_name': context.file_path.stem}
     
-    # Start with the original filename stem
-    base_name = context.base_name
+    result = context.extracted_data.copy()
     
-    if remove_special:
-        # Remove or replace special characters
-        clean_name = re.sub(r'[^\w\s.-]', '', base_name)  # Keep word chars, spaces, dots, hyphens
-        clean_name = re.sub(r'\s+', '_', clean_name)      # Replace spaces with underscores
-        clean_name = re.sub(r'[._-]+', '_', clean_name)   # Consolidate separators
-        clean_name = clean_name.strip('_')                # Remove leading/trailing underscores
+    # Build filename components
+    components = []
+    
+    # Client prefix
+    client = context.get_extracted_field('client')
+    if use_client_prefix and client and client != 'unknown':
+        components.append(client.replace(' ', '-'))
+    
+    # Project name (always include)
+    project = context.get_extracted_field('project')
+    if project and project != 'unknown':
+        components.append(project.replace(' ', '-'))
     else:
-        clean_name = base_name
+        components.append('Project')
     
-    # Limit length
-    if len(clean_name) > max_length:
-        clean_name = clean_name[:max_length].rstrip('_')
-    
-    # Apply title case to each component
-    components = clean_name.split('_')
-    formatted_components = []
-    
-    for component in components:
-        if component.isdigit():
-            # Keep numbers as-is
-            formatted_components.append(component)
-        elif re.match(r'\d+\.\d+', component):
-            # Keep version numbers as-is
-            formatted_components.append(component)
+    # Version
+    version = context.get_extracted_field('version')
+    if version and version != 'unknown':
+        if version_format:
+            components.append(f"{version_format}{version}")
         else:
-            # Title case for text
-            formatted_components.append(component.title())
+            components.append(version)
     
-    result['formatted_name'] = '_'.join(formatted_components)
+    # Status
+    if include_status:
+        status = context.get_extracted_field('status')
+        if status and status != 'unknown':
+            components.append(status.title())
     
-    # Add metadata
-    result['original_length'] = len(base_name)
-    result['new_length'] = len(result['formatted_name'])
-    result['cleaned'] = base_name != result['formatted_name']
+    # Date
+    date_str = context.get_extracted_field('date')
+    if date_str and date_str != 'unknown':
+        # Clean up date format
+        clean_date = date_str.replace('-', '').replace('_', '')
+        components.append(clean_date)
+    
+    # Build formatted filename
+    result['formatted_name'] = '_'.join(components)
+    
+    # Create folder organization
+    folder_parts = []
+    if client and client != 'unknown':
+        folder_parts.append(client)
+    if project and project != 'unknown':
+        folder_parts.append(project)
+    
+    if folder_parts:
+        result['suggested_folder'] = '/'.join(folder_parts)
+    else:
+        result['suggested_folder'] = 'Projects'
+    
+    # Add status-based subfolder
+    status = context.get_extracted_field('status')
+    if status and status != 'unknown':
+        if status == 'archive':
+            result['suggested_folder'] += '/Archive'
+        elif status == 'final':
+            result['suggested_folder'] += '/Final'
+        elif status == 'draft':
+            result['suggested_folder'] += '/Work-in-Progress'
+    
+    return result
+
+
+def convert_document_data(context: ProcessingContext, department_folders: bool = True,
+                         date_folders: bool = False, max_filename_length: int = 50) -> Dict[str, Any]:
+    """
+    General document converter with folder organization.
+    
+    Creates clean document names with optional department and date-based folder organization.
+    
+    Args:
+        department_folders: Whether to organize files into department-based folders
+        date_folders: Whether to create date-based subfolders (YYYY/MM structure)
+        max_filename_length: Maximum length for generated filenames (truncates if longer)
+    
+    Returns:
+        Dictionary with formatted document fields including folder structure and length-limited filename
+    """
+    if not context.has_extracted_data():
+        return {'formatted_name': context.file_path.stem[:max_filename_length]}
+    
+    result = context.extracted_data.copy()
+    
+    # Build base filename
+    components = []
+    
+    # Department (if not using department folders)
+    dept = context.get_extracted_field('dept')
+    if dept and dept != 'unknown' and not department_folders:
+        components.append(dept.upper())
+    
+    # Document type
+    doc_type = context.get_extracted_field('type')
+    if doc_type and doc_type != 'unknown':
+        components.append(doc_type.replace(' ', '-'))
+    
+    # Date
+    date_str = context.get_extracted_field('date')
+    if date_str and date_str != 'unknown':
+        clean_date = date_str.replace('-', '')
+        components.append(clean_date)
+    
+    # Build filename and apply length limit
+    if components:
+        filename = '_'.join(components)
+        if len(filename) > max_filename_length:
+            filename = filename[:max_filename_length-3] + '...'
+        result['formatted_name'] = filename
+    else:
+        original = context.file_path.stem
+        result['formatted_name'] = original[:max_filename_length]
+    
+    # Build folder structure
+    folder_parts = []
+    
+    # Department folder
+    if department_folders and dept and dept != 'unknown':
+        folder_parts.append(dept.upper())
+    
+    # Date folders
+    if date_folders and date_str and date_str != 'unknown':
+        try:
+            if '-' in date_str:
+                date_parts = date_str.split('-')
+                folder_parts.extend([date_parts[0], date_parts[1]])  # YYYY/MM
+            elif len(date_str) >= 6:
+                folder_parts.extend([date_str[:4], date_str[4:6]])  # YYYY/MM
+        except:
+            pass  # Skip date folders if parsing fails
+    
+    # Document type folder
+    if doc_type and doc_type != 'unknown':
+        folder_parts.append(doc_type.replace(' ', '-'))
+    
+    if folder_parts:
+        result['suggested_folder'] = '/'.join(folder_parts)
+    else:
+        result['suggested_folder'] = 'Documents'
     
     return result

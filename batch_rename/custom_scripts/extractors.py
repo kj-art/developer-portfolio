@@ -34,8 +34,11 @@ def extract_data(context: ProcessingContext) -> Dict[str, str]:
     
     Extracts department, document type, and date from business filenames.
     Example: "HR_PolicyDocument_20240315.pdf" → {dept: "HR", type: "PolicyDocument", date: "20240315"}
+    
+    Returns:
+        Dictionary with extracted fields: dept, type, date
     """
-    base_name = context.base_name
+    base_name = context.file_path.stem
     
     # Split on underscores and extract known positions
     parts = base_name.split('_')
@@ -65,8 +68,11 @@ def extract_invoice_data(context: ProcessingContext) -> Dict[str, str]:
     - "Invoice_12345_CompanyName_2024-03-15.pdf"
     - "INV-12345-CompanyName.pdf" 
     - "12345_Invoice_CompanyName.pdf"
+    
+    Returns:
+        Dictionary with extracted fields: type, number, company, date
     """
-    base_name = context.base_name
+    base_name = context.file_path.stem
     result = {}
     
     # Pattern 1: Invoice_12345_CompanyName_2024-03-15
@@ -108,133 +114,192 @@ def extract_invoice_data(context: ProcessingContext) -> Dict[str, str]:
     return result
 
 
-def extract_photo_data(context: ProcessingContext) -> Dict[str, str]:
+def extract_photo_data(context: ProcessingContext, include_location: bool = False, 
+                      extract_device: bool = True) -> Dict[str, str]:
     """
     Photo filename and metadata extractor.
     
     Combines filename parsing with file metadata to extract photo information.
     Handles phone camera names, timestamps, and location info.
+    
+    Args:
+        include_location: Whether to attempt location extraction from EXIF data
+        extract_device: Whether to extract device/camera model from metadata
+    
+    Returns:
+        Dictionary with extracted photo fields: date, time, device, location, etc.
     """
-    base_name = context.base_name
+    base_name = context.file_path.stem
     result = {}
     
     # Try to extract date from filename first
     # Pattern: IMG_20240315_123456, DSC_20240315_123456, etc.
     date_pattern = r'(\d{8})'
+    time_pattern = r'(\d{6})'
+    
     date_match = re.search(date_pattern, base_name)
+    time_match = re.search(time_pattern, base_name)
     
     if date_match:
-        result['date'] = date_match.group(1)
+        date_str = date_match.group(1)
+        try:
+            parsed_date = datetime.datetime.strptime(date_str, '%Y%m%d')
+            result['date'] = parsed_date.strftime('%Y-%m-%d')
+            result['year'] = parsed_date.strftime('%Y')
+            result['month'] = parsed_date.strftime('%m')
+            result['day'] = parsed_date.strftime('%d')
+        except ValueError:
+            result['date'] = 'unknown'
     else:
-        # Fall back to file creation date
-        created_date = datetime.datetime.fromtimestamp(context.created_timestamp)
-        result['date'] = created_date.strftime('%Y%m%d')
+        # Try to get from file metadata
+        try:
+            file_stat = context.file_path.stat()
+            mod_time = datetime.datetime.fromtimestamp(file_stat.st_mtime)
+            result['date'] = mod_time.strftime('%Y-%m-%d')
+            result['year'] = mod_time.strftime('%Y')
+            result['month'] = mod_time.strftime('%m')
+            result['day'] = mod_time.strftime('%d')
+        except:
+            result['date'] = 'unknown'
     
-    # Detect camera/device type from filename patterns
-    if re.match(r'IMG_\d+', base_name, re.IGNORECASE):
-        result['device'] = 'phone'
-        result['type'] = 'photo'
-    elif re.match(r'DSC_\d+', base_name, re.IGNORECASE):
-        result['device'] = 'camera'
-        result['type'] = 'photo'
-    elif re.match(r'VID_\d+', base_name, re.IGNORECASE):
-        result['device'] = 'phone'
-        result['type'] = 'video'
-    elif any(ext in context.extension.lower() for ext in ['.jpg', '.jpeg', '.png', '.heic']):
-        result['device'] = 'unknown'
-        result['type'] = 'photo'
-    elif any(ext in context.extension.lower() for ext in ['.mp4', '.mov', '.avi']):
-        result['device'] = 'unknown'
-        result['type'] = 'video'
-    else:
-        result['device'] = 'unknown'
-        result['type'] = 'media'
-    
-    # Extract time if present
-    time_pattern = r'(\d{6})'
-    time_match = re.search(time_pattern, base_name.replace(result.get('date', ''), ''))
     if time_match:
-        result['time'] = time_match.group(1)
+        time_str = time_match.group(1)
+        try:
+            parsed_time = datetime.datetime.strptime(time_str, '%H%M%S')
+            result['time'] = parsed_time.strftime('%H-%M-%S')
+            result['hour'] = parsed_time.strftime('%H')
+        except ValueError:
+            result['time'] = 'unknown'
     else:
         result['time'] = 'unknown'
     
-    # File size category
-    size_mb = context.file_size / (1024 * 1024)
-    if size_mb < 1:
-        result['size_cat'] = 'small'
-    elif size_mb < 10:
-        result['size_cat'] = 'medium'
+    # Extract camera/device info from filename
+    if extract_device:
+        device_patterns = [
+            r'^(IMG|DSC|DCIM|P\d+)_',  # Camera prefixes
+            r'(iPhone|Samsung|Pixel|Canon|Nikon|Sony)',  # Device names
+        ]
+        
+        for pattern in device_patterns:
+            match = re.search(pattern, base_name, re.IGNORECASE)
+            if match:
+                result['device'] = match.group(1)
+                break
+        else:
+            result['device'] = 'unknown'
+    
+    # Location extraction placeholder
+    if include_location:
+        # In a real implementation, this would read EXIF GPS data
+        result['location'] = 'unknown'
+        result['city'] = 'unknown'
+        result['country'] = 'unknown'
+    
+    # Determine photo type
+    if 'IMG' in base_name.upper():
+        result['type'] = 'Photo'
+    elif 'VID' in base_name.upper():
+        result['type'] = 'Video'
+    elif 'SCR' in base_name.upper() or 'Screenshot' in base_name:
+        result['type'] = 'Screenshot'
     else:
-        result['size_cat'] = 'large'
+        result['type'] = 'Media'
     
     return result
 
 
-def extract_project_data(context: ProcessingContext, project_prefix: str = "PROJ", 
-                        version_required: bool = True) -> Dict[str, str]:
+def extract_project_data(context: ProcessingContext, client_list: str = "",
+                        extract_version: bool = True) -> Dict[str, str]:
     """
-    Project file extractor with parameters.
+    Project file extractor for creative work.
     
-    Extracts project code, version, and file type from project filenames.
-    Supports custom project prefixes and optional version enforcement.
+    Extracts client, project name, version, and date from project filenames.
+    Handles various creative industry naming conventions.
     
-    Example: "PROJ-2024-001_Requirements_v2.1.docx" → 
-             {project: "2024-001", type: "Requirements", version: "2.1"}
+    Args:
+        client_list: Comma-separated list of known client names to match against
+        extract_version: Whether to extract version numbers from filenames
+    
+    Returns:
+        Dictionary with extracted project fields: client, project, version, date, status
     """
-    base_name = context.base_name
+    base_name = context.file_path.stem
     result = {}
     
-    # Build pattern based on project prefix
-    pattern = rf'{re.escape(project_prefix)}[_-]([^_-]+)[_-]([^_-]+)(?:[_-]v?(\d+(?:\.\d+)?))?' 
-    match = re.search(pattern, base_name, re.IGNORECASE)
+    # Parse client list if provided
+    known_clients = []
+    if client_list:
+        known_clients = [c.strip() for c in client_list.split(',')]
     
-    if match:
-        result['project'] = match.group(1)
-        result['type'] = match.group(2)
-        version = match.group(3)
+    # Try to identify client from known list
+    result['client'] = 'unknown'
+    for client in known_clients:
+        if client.lower() in base_name.lower():
+            result['client'] = client
+            break
+    
+    # Extract version information
+    if extract_version:
+        version_patterns = [
+            r'[vV](\d+)\.(\d+)',  # v1.2, V1.2
+            r'[vV](\d+)',         # v1, V1
+            r'_(\d+)\.(\d+)_',    # _1.2_
+            r'_(\d+)_',           # _1_
+            r'rev(\d+)',          # rev1, rev2
+            r'r(\d+)',            # r1, r2
+        ]
         
-        if version:
-            result['version'] = version
-        elif version_required:
-            result['version'] = '1.0'  # Default version
+        for pattern in version_patterns:
+            match = re.search(pattern, base_name)
+            if match:
+                if len(match.groups()) == 2:
+                    result['version'] = f"{match.group(1)}.{match.group(2)}"
+                else:
+                    result['version'] = match.group(1)
+                break
         else:
-            result['version'] = 'none'
-    else:
-        # Fallback parsing without prefix
-        parts = base_name.split('_')
-        if len(parts) >= 2:
-            result['project'] = parts[0]
-            result['type'] = parts[1]
-            
-            # Look for version in remaining parts
-            version_found = False
-            for part in parts[2:]:
-                version_match = re.search(r'v?(\d+(?:\.\d+)?)', part, re.IGNORECASE)
-                if version_match:
-                    result['version'] = version_match.group(1)
-                    version_found = True
-                    break
-            
-            if not version_found:
-                result['version'] = '1.0' if version_required else 'none'
-        else:
-            result['project'] = 'unknown'
-            result['type'] = base_name
-            result['version'] = '1.0' if version_required else 'none'
+            result['version'] = 'unknown'
     
-    # Add file category based on extension
-    ext = context.extension.lower()
-    if ext in ['.doc', '.docx', '.txt', '.md']:
-        result['category'] = 'document'
-    elif ext in ['.xls', '.xlsx', '.csv']:
-        result['category'] = 'spreadsheet'
-    elif ext in ['.ppt', '.pptx']:
-        result['category'] = 'presentation'
-    elif ext in ['.pdf']:
-        result['category'] = 'pdf'
-    elif ext in ['.jpg', '.png', '.gif', '.svg']:
-        result['category'] = 'image'
+    # Extract status indicators
+    status_keywords = {
+        'draft': ['draft', 'wip', 'work'],
+        'review': ['review', 'rev', 'check'],
+        'final': ['final', 'approved', 'delivery'],
+        'archive': ['old', 'archive', 'backup']
+    }
+    
+    result['status'] = 'unknown'
+    for status, keywords in status_keywords.items():
+        if any(keyword in base_name.lower() for keyword in keywords):
+            result['status'] = status
+            break
+    
+    # Extract date
+    date_patterns = [
+        r'(\d{4}[-_]\d{2}[-_]\d{2})',  # YYYY-MM-DD or YYYY_MM_DD
+        r'(\d{8})',                    # YYYYMMDD
+        r'(\d{2}[-_]\d{2}[-_]\d{4})',  # MM-DD-YYYY or MM_DD_YYYY
+    ]
+    
+    for pattern in date_patterns:
+        match = re.search(pattern, base_name)
+        if match:
+            result['date'] = match.group(1)
+            break
     else:
-        result['category'] = 'other'
+        result['date'] = 'unknown'
+    
+    # Extract project name (everything else)
+    # Remove client, version, status, and date to get core project name
+    project_name = base_name
+    for remove_item in [result.get('client', ''), result.get('version', ''), 
+                       result.get('status', ''), result.get('date', '')]:
+        if remove_item and remove_item != 'unknown':
+            project_name = project_name.replace(remove_item, '')
+    
+    # Clean up project name
+    project_name = re.sub(r'[_\-\.]+', '_', project_name)
+    project_name = project_name.strip('_-.')
+    result['project'] = project_name if project_name else 'unknown'
     
     return result

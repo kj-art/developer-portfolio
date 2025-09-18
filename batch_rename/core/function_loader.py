@@ -5,9 +5,8 @@ Handles loading and validation of custom extractor, converter, and filter functi
 """
 
 import importlib.util
-import sys
 from pathlib import Path
-from typing import Callable, Any
+from typing import Callable
 
 
 def load_custom_function(file_path: str, function_name: str) -> Callable:
