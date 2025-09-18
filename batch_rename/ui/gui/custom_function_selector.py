@@ -142,6 +142,7 @@ class CustomFunctionSelector(QWidget):
     
     def on_function_index_changed(self, index):
         """Handle function combo box index changes - this fires even for initial selection."""
+        print(f"DEBUG: on_function_selected called for: {self.function_combo.currentText()}")
         if index >= 0:  # Valid index selected
             self.on_function_selected()
     
@@ -161,9 +162,10 @@ class CustomFunctionSelector(QWidget):
             validation_result = self.validate_function(function)
             
             if validation_result['valid']:
+                self.current_function = function
                 self.validation_label.setText(f"✓ {validation_result['message']}")
                 self.create_argument_inputs(validation_result['parameters'])
-                self.current_function = function
+                
             else:
                 self.validation_label.setText(f"❌ {validation_result['message']}")
                 self.args_group.setVisible(False)
@@ -200,7 +202,7 @@ class CustomFunctionSelector(QWidget):
                     'message': 'Function must accept at least one parameter (ProcessingContext)'
                 }
             
-            validation_points.append(f"✓ Function has {len(params)} parameter(s)")
+            #validation_points.append(f"✓ Function has {len(params)} parameter(s)")
             
             # Check first parameter name/type hint for ProcessingContext
             first_param = params[0]
