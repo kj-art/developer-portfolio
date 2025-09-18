@@ -36,14 +36,12 @@ class BatchRenameGUI(QMainWindow):
     
     def __init__(self):
         super().__init__()
-        print("BatchRenameGUI.__init__ called - Version 3.0")  # Debug version check
         self.input_folder = None
         self.processing_thread = None
         self.init_ui()
         
     def init_ui(self):
         """Initialize the user interface."""
-        print("=== STARTING INIT_UI - VERSION 3.0 ===")
         self.setWindowTitle("Batch File Rename Tool")
         self.setGeometry(100, 100, 1200, 800)
         
@@ -55,7 +53,6 @@ class BatchRenameGUI(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
         
         # Folder selection
-        print("Creating folder selection")
         folder_layout = QHBoxLayout()
         folder_layout.addWidget(QLabel("Input Folder:"))
         self.folder_label = QLabel("No folder selected")
@@ -72,7 +69,6 @@ class BatchRenameGUI(QMainWindow):
         main_layout.addLayout(folder_layout)
         
         # Mode selection at the top
-        print("Creating mode selection")
         mode_layout = QHBoxLayout()
         mode_layout.addWidget(QLabel("Processing Mode:"))
         
@@ -84,9 +80,7 @@ class BatchRenameGUI(QMainWindow):
         self.modular_radio.blockSignals(True)
         self.allinone_radio.blockSignals(True)
         
-        print("Setting modular radio checked")
         self.modular_radio.setChecked(True)  # Default to modular
-        print("Modular radio checked")
         
         self.mode_group.addButton(self.modular_radio)
         self.mode_group.addButton(self.allinone_radio)
@@ -97,22 +91,15 @@ class BatchRenameGUI(QMainWindow):
         
         main_layout.addLayout(mode_layout)
 
-        # Debug: Test if radio button changes are detected
-        self.modular_radio.clicked.connect(lambda: print("Modular radio clicked"))
-        self.allinone_radio.clicked.connect(lambda: print("All-in-one radio clicked"))
-
         # Main content area with splitter
-        print("Creating main content area")
         splitter = QSplitter(Qt.Orientation.Horizontal)
         
         # Left panel - Use QStackedWidget for clean mode switching
         self.config_stack = QStackedWidget()
         
         # Create and add both config panels
-        print("About to create config panels")
         self.modular_config = self.create_modular_config()
         self.allinone_config = self.create_allinone_config()
-        print("Config panels created")
         
         self.config_stack.addWidget(self.modular_config)  # Index 0
         self.config_stack.addWidget(self.allinone_config)  # Index 1
@@ -121,7 +108,6 @@ class BatchRenameGUI(QMainWindow):
         splitter.addWidget(self.config_stack)
         
         # Right panel - Preview
-        print("Creating preview panel")
         preview_widget = QWidget()
         preview_layout = QVBoxLayout(preview_widget)
         
@@ -152,25 +138,20 @@ class BatchRenameGUI(QMainWindow):
         main_layout.addWidget(splitter)
         
         # Status bar
-        print("Creating status bar")
         self.statusbar = QStatusBar()
         self.setStatusBar(self.statusbar)
         self.statusbar.showMessage("Ready")
         
         # Connect mode change signals AFTER everything is initialized
         # Unblock signals and connect them
-        print("Connecting mode change signals")
         self.modular_radio.blockSignals(False)
         self.allinone_radio.blockSignals(False)
         
         self.modular_radio.toggled.connect(self.on_mode_changed)
         self.allinone_radio.toggled.connect(self.on_mode_changed)
-        
-        print("GUI initialization complete - signals connected")
     
     def create_modular_config(self):
         """Create the modular configuration tab widget."""
-        print("Creating modular config")
         config_panel = QTabWidget()
         
         # Extractor tab
@@ -189,12 +170,10 @@ class BatchRenameGUI(QMainWindow):
         self.filter_panel = FilterPanel()
         config_panel.addTab(self.filter_panel, "Filters")
         
-        print("Modular config created")
         return config_panel
     
     def create_allinone_config(self):
         """Create the all-in-one script configuration panel."""
-        print("Creating all-in-one config")
         panel = QWidget()
         layout = QVBoxLayout(panel)
         
@@ -210,71 +189,21 @@ class BatchRenameGUI(QMainWindow):
         layout.addWidget(desc_label)
         
         # Custom function selector
-        self.allinone_selector = FunctionSelector("all-in-one processing function", 1)
+        self.allinone_selector = FunctionSelector("all-in-one processing function", skip_arguments=1)
         layout.addWidget(self.allinone_selector)
         
         layout.addStretch()
-        print("All-in-one config created")
-        return panel
-        
-        file_layout.addLayout(file_select_layout)
-        layout.addWidget(file_group)
-        
-        # Function selection
-        func_group = QGroupBox("Function Selection")
-        func_layout = QVBoxLayout(func_group)
-        
-        func_select_layout = QHBoxLayout()
-        func_select_layout.addWidget(QLabel("Function:"))
-        self.allinone_function_combo = QComboBox()
-        self.allinone_function_combo.setEnabled(False)
-        self.allinone_function_combo.currentTextChanged.connect(self.on_function_selected)
-        func_select_layout.addWidget(self.allinone_function_combo)
-        func_select_layout.addStretch()
-        func_layout.addLayout(func_select_layout)
-        
-        # Validation status
-        self.validation_label = QLabel("")
-        self.validation_label.setWordWrap(True)
-        func_layout.addWidget(self.validation_label)
-        
-        layout.addWidget(func_group)
-        
-        # Function arguments
-        self.args_group = QGroupBox("Function Arguments")
-        self.args_layout = QFormLayout(self.args_group)
-        self.args_group.setVisible(False)
-        layout.addWidget(self.args_group)
-        
-        layout.addStretch()
-        print("All-in-one config created")
         return panel
     
     def on_mode_changed(self, checked):
         """Handle switching between modular and all-in-one modes."""
-        print(f"on_mode_changed called: checked={checked}, modular_checked={self.modular_radio.isChecked()}")
         
         # Use QStackedWidget for clean switching
         if hasattr(self, 'config_stack'):
             if self.modular_radio.isChecked():
                 self.config_stack.setCurrentIndex(0)  # Modular config
-                print("Switched to modular config")
             else:
                 self.config_stack.setCurrentIndex(1)  # All-in-one config
-                print("Switched to all-in-one config")
-        else:
-            print("config_stack not ready yet")
-    
-    def browse_folder(self):
-        """Open folder selection dialog."""
-        folder = QFileDialog.getExistingDirectory(
-            self, "Select Input Folder", str(Path.home())
-        )
-        if folder:
-            self.input_folder = Path(folder)
-            self.folder_label.setText(str(self.input_folder))
-            self.preview_btn.setEnabled(True)
-            self.statusbar.showMessage(f"Selected folder: {folder}")
     
     def browse_folder(self):
         """Open folder selection dialog."""
@@ -424,6 +353,8 @@ class BatchRenameGUI(QMainWindow):
             recursive=self.recursive_check.isChecked(),
             preview_mode=preview_mode
         )
+    
+    def build_allinone_config(self, preview_mode=True) -> RenameConfig:
         """Build config for all-in-one mode."""
         if not self.allinone_selector.is_configured():
             raise ValueError("All-in-one script function must be selected")

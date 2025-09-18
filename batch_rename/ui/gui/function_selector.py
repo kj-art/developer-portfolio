@@ -41,10 +41,17 @@ class FunctionSelector(QWidget):
         self.file_path = QLineEdit()
         self.file_path.textChanged.connect(self.on_file_changed)
         file_layout.addWidget(self.file_path)
-        
+
         browse_btn = QPushButton("Browse...")
         browse_btn.clicked.connect(self.browse_file)
         file_layout.addWidget(browse_btn)
+
+        # Add the open button
+        '''self.open_btn = QPushButton("Open")
+        self.open_btn.clicked.connect(self.open_file_in_editor)
+        self.open_btn.setEnabled(False)
+        file_layout.addWidget(self.open_btn)'''
+
         layout.addLayout(file_layout)
         
         # Function selection
@@ -70,7 +77,27 @@ class FunctionSelector(QWidget):
         layout.addWidget(self.args_group)
         
         self.setLayout(layout)
-    
+
+    def open_file_in_editor(self):
+        """Open the selected Python file in the default editor."""
+        file_path = self.file_path.text().strip()
+        
+        if not file_path or not Path(file_path).exists():
+            return
+        
+        import subprocess
+        import platform
+        
+        try:
+            if platform.system() == "Windows":
+                subprocess.run(["start", file_path], shell=True)
+            elif platform.system() == "Darwin":  # macOS
+                subprocess.run(["open", file_path])
+            else:  # Linux
+                subprocess.run(["xdg-open", file_path])
+        except Exception as e:
+            print(f"Could not open file: {e}")
+        
     def browse_file(self):
         """Open file dialog to select Python script."""
         file_path, _ = QFileDialog.getOpenFileName(
@@ -79,6 +106,7 @@ class FunctionSelector(QWidget):
         )
         if file_path:
             self.file_path.setText(file_path)
+            #self.open_btn.setEnabled(True)
     
     def on_file_changed(self):
         """Handle file path changes."""
