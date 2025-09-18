@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
 
 # Import our existing core logic
 sys.path.append(str(Path(__file__).parent.parent))
-from .custom_function_selector import CustomFunctionSelector
+from .function_selector import FunctionSelector
 
 class ExtractorPanel(QWidget):
     """Panel for configuring file name extraction."""
@@ -80,7 +80,7 @@ class ExtractorPanel(QWidget):
             
         elif extractor_type == 'custom':
             # Use the reusable custom function selector
-            self.custom_selector = CustomFunctionSelector("extractor function")
+            self.custom_selector = FunctionSelector("extractor function", 1)
             self.config_layout.addWidget(self.custom_selector)
     
     def get_extractor_config(self) -> tuple:

@@ -7,7 +7,7 @@ Handles the main processing pipeline: extraction, conversion, and filtering.
 import os
 import shutil
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from dataclasses import dataclass
 
 from .config import RenameConfig, RenameResult

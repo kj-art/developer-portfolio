@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QTimer
 
 
-class CustomFunctionSelector(QWidget):
+class FunctionSelector(QWidget):
     """
     Reusable widget for selecting custom Python functions from files.
     
@@ -25,10 +25,11 @@ class CustomFunctionSelector(QWidget):
     and parameter input widgets for custom extractors, converters, and filters.
     """
     
-    def __init__(self, function_description="custom function"):
+    def __init__(self, function_description="custom function", skip_arguments=0):
         super().__init__()
         self.function_description = function_description
         self.current_function = None
+        self.skip_args = skip_arguments
         self.init_ui()
     
     def init_ui(self):
@@ -163,7 +164,7 @@ class CustomFunctionSelector(QWidget):
             if validation_result['valid']:
                 self.current_function = function
                 self.validation_label.setText(f"✓ {validation_result['message']}")
-                self.create_argument_inputs(validation_result['parameters'])
+                self.create_argument_inputs(validation_result['parameters'][self.skip_args:])
                 
             else:
                 self.validation_label.setText(f"❌ {validation_result['message']}")

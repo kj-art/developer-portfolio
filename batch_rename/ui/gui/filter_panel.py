@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
 
 # Import our existing core logic
 sys.path.append(str(Path(__file__).parent.parent))
-from .custom_function_selector import CustomFunctionSelector
+from .function_selector import FunctionSelector
 
 class FilterPanel(QWidget):
     """Panel for configuring file filters."""
@@ -154,7 +154,7 @@ class FilterPanel(QWidget):
             
         elif filter_type == 'custom':
             # Use the reusable custom function selector
-            custom_selector = CustomFunctionSelector("filter function")
+            custom_selector = FunctionSelector("filter function", 1)
             custom_selector.setObjectName("custom_selector")
             config_layout.addRow("Custom Function:", custom_selector)
     
@@ -216,7 +216,7 @@ class FilterPanel(QWidget):
                     pos_args = [date_widget.text().strip()]
                     
             elif filter_type == 'custom':
-                custom_selector = config_area.findChild(CustomFunctionSelector, "custom_selector")
+                custom_selector = config_area.findChild(FunctionSelector, "custom_selector")
                 
                 if custom_selector and custom_selector.is_configured():
                     config = custom_selector.get_config()

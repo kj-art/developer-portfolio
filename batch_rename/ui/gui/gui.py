@@ -23,7 +23,7 @@ from PyQt6.QtCore import Qt
 sys.path.append(str(Path(__file__).parent.parent))
 from ...core.config import RenameConfig
 from .converter_panel import ConverterPanel
-from .custom_function_selector import CustomFunctionSelector
+from .function_selector import FunctionSelector
 from .extractor_panel import ExtractorPanel
 from .filter_panel import FilterPanel
 from .preview_table import PreviewTable
@@ -210,7 +210,7 @@ class BatchRenameGUI(QMainWindow):
         layout.addWidget(desc_label)
         
         # Custom function selector
-        self.allinone_selector = CustomFunctionSelector("all-in-one processing function")
+        self.allinone_selector = FunctionSelector("all-in-one processing function", 1)
         layout.addWidget(self.allinone_selector)
         
         layout.addStretch()
