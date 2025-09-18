@@ -142,7 +142,6 @@ class CustomFunctionSelector(QWidget):
     
     def on_function_index_changed(self, index):
         """Handle function combo box index changes - this fires even for initial selection."""
-        print(f"DEBUG: on_function_selected called for: {self.function_combo.currentText()}")
         if index >= 0:  # Valid index selected
             self.on_function_selected()
     
@@ -286,9 +285,6 @@ class CustomFunctionSelector(QWidget):
         
         # Add debug print to see what we're working with
         docstring = inspect.getdoc(self.current_function)
-        print(f"DEBUG: Parsing docstring for {self.current_function.__name__}")
-        print(f"DEBUG: Docstring content:\n{docstring}")
-        
         try:
             # Try using docstring_parser if available
             try:
@@ -297,22 +293,18 @@ class CustomFunctionSelector(QWidget):
                 descriptions = {}
                 for param in parsed.params:
                     descriptions[param.arg_name] = param.description
-                print(f"DEBUG: docstring_parser found: {descriptions}")
                 return descriptions
             except ImportError:
-                print("DEBUG: docstring_parser not available, using manual parsing")
                 # Fallback to manual parsing
                 return self.manual_parse_docstring()
                 
         except Exception as e:
-            print(f"DEBUG: Error in parse_docstring_params: {e}")
             return {}
     
     def manual_parse_docstring(self) -> Dict[str, str]:
         """Manually parse docstring for Args: section."""
         docstring = inspect.getdoc(self.current_function)
         if not docstring:
-            print("DEBUG: No docstring found")
             return {}
         
         descriptions = {}
@@ -323,21 +315,17 @@ class CustomFunctionSelector(QWidget):
         current_param = None
         current_desc = []
         
-        print(f"DEBUG: Processing {len(lines)} lines")
         
         for i, line in enumerate(lines):
             line = line.strip()
-            print(f"DEBUG: Line {i}: '{line}' (in_args: {in_args_section})")
             
             # Check if we're entering Args section
             if line.lower() in ['args:', 'arguments:', 'parameters:']:
-                print(f"DEBUG: Found Args section at line {i}")
                 in_args_section = True
                 continue
             
             # Check if we're leaving Args section
             if in_args_section and line.lower() in ['returns:', 'yields:', 'raises:', 'examples:', 'note:', 'notes:']:
-                print(f"DEBUG: Leaving Args section at line {i}")
                 # Save any pending parameter
                 if current_param and current_desc:
                     descriptions[current_param] = ' '.join(current_desc).strip()
@@ -346,28 +334,22 @@ class CustomFunctionSelector(QWidget):
             if in_args_section and line:
                 # Check if this is a new parameter (starts with identifier:)
                 if ':' in line and not line.startswith(' '):
-                    print(f"DEBUG: Found parameter line: '{line}'")
                     # Save previous parameter if exists
                     if current_param and current_desc:
                         descriptions[current_param] = ' '.join(current_desc).strip()
-                        print(f"DEBUG: Saved param '{current_param}': '{descriptions[current_param]}'")
                     
                     # Start new parameter
                     parts = line.split(':', 1)
                     current_param = parts[0].strip()
                     current_desc = [parts[1].strip()] if len(parts) > 1 else []
-                    print(f"DEBUG: Starting new param '{current_param}' with desc: {current_desc}")
                 elif current_param and line.startswith(' '):
                     # Continuation of current parameter description
                     current_desc.append(line.strip())
-                    print(f"DEBUG: Added continuation to '{current_param}': '{line.strip()}'")
         
         # Save final parameter
         if current_param and current_desc:
             descriptions[current_param] = ' '.join(current_desc).strip()
-            print(f"DEBUG: Saved final param '{current_param}': '{descriptions[current_param]}'")
         
-        print(f"DEBUG: Final descriptions: {descriptions}")
         return descriptions
     
     def create_parameter_input(self, param):
