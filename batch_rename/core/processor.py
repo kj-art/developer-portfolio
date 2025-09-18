@@ -1,92 +1,146 @@
 """
-Main processing engine for batch rename operations.
+Core batch rename processor with ProcessingContext integration.
 
-Coordinates file discovery, extraction, conversion, and renaming.
+Handles the main processing pipeline: extraction, conversion, and filtering.
 """
 
-import time
+import os
+import shutil
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+from dataclasses import dataclass
 
 from .config import RenameConfig, RenameResult
+from .processing_context import ProcessingContext
 from .extractors import get_extractor
 from .converters import get_converter
-from .filters import apply_filters
-from .function_loader import load_custom_function
+from .filters import get_filter
 
 
 class BatchRenameProcessor:
-    """Main processor for batch rename operations."""
+    """
+    Main processor for batch rename operations.
+    
+    Coordinates extraction, conversion, filtering, and renaming using ProcessingContext.
+    """
     
     def __init__(self):
-        """Initialize the processor."""
-        pass
+        self.results = None
     
     def process(self, config: RenameConfig) -> RenameResult:
         """
-        Process files according to configuration.
+        Process files according to the configuration.
         
         Args:
-            config: Rename operation configuration
+            config: RenameConfig object with all processing settings
             
         Returns:
-            Results of the operation
+            RenameResult with operation results and statistics
         """
-        start_time = time.time()
-        result = RenameResult()
+        # Initialize result tracking
+        result = RenameResult(
+            files_analyzed=0,
+            files_to_rename=0,
+            files_renamed=0,
+            errors=0,
+            collisions=0,
+            preview_data=[],
+            error_details=[]
+        )
         
         try:
-            # Discover files to process
-            files = self._discover_files(config)
+            # Get file list
+            files = self._get_file_list(config)
             result.files_analyzed = len(files)
             
-            # Apply filters
-            filtered_files = self._apply_filters(files, config)
-            result.files_filtered_out = len(files) - len(filtered_files)
+            if len(files) == 0:
+                return result
             
-            # Process each file to generate rename mappings
-            rename_mappings = []
-            for file_path in filtered_files:
+            # Set up processing functions
+            extractor = get_extractor(config.extractor, config.extractor_args)
+            converters = [get_converter(conv['name'], conv) for conv in config.converters]
+            filters = [get_filter(filt['name'], filt) for filt in config.filters]
+            
+            # Process each file
+            rename_plan = []
+            for file_path in files:
                 try:
-                    new_name = self._process_single_file(file_path, config)
-                    if new_name and new_name != file_path.name:
-                        rename_mappings.append((file_path, file_path.parent / new_name))
+                    # Get file metadata
+                    metadata = self._get_file_metadata(file_path)
+                    
+                    # Create processing context
+                    context = ProcessingContext(
+                        filename=file_path.name,
+                        file_path=file_path,
+                        metadata=metadata
+                    )
+                    
+                    # Apply filters first
+                    if not self._should_process_file(context, filters):
+                        continue
+                    
+                    # Extract data
+                    extracted_data = extractor(context)
+                    
+                    # Update context with extracted data for converters
+                    context.extracted_data = extracted_data
+                    
+                    # Apply converters
+                    converted_data = extracted_data.copy()
+                    for converter in converters:
+                        converter_result = converter(context)
+                        converted_data.update(converter_result)
+                        # Update context for next converter
+                        context.extracted_data = converted_data
+                    
+                    # Generate new filename
+                    new_name = self._generate_new_filename(converted_data, file_path)
+                    
+                    if new_name != file_path.name:
+                        rename_plan.append({
+                            'old_path': file_path,
+                            'new_name': new_name,
+                            'old_name': file_path.name,
+                            'context': context,
+                            'converted_data': converted_data
+                        })
+                    
                 except Exception as e:
-                    print(f"Warning: Failed to process {file_path}: {e}")
                     result.errors += 1
+                    result.error_details.append({
+                        'file': str(file_path),
+                        'error': str(e)
+                    })
             
-            result.files_to_rename = len(rename_mappings)
+            # Check for naming conflicts
+            result.collisions = self._check_collisions(rename_plan)
+            result.files_to_rename = len(rename_plan)
             
-            # Check for collisions
-            collisions = self._detect_collisions(rename_mappings, config.input_folder)
-            result.collisions = len(collisions['existing_file_collisions']) + len(collisions['internal_collisions'])
-            result.existing_file_collisions = collisions['existing_file_collisions']
-            result.internal_collisions = collisions['internal_collisions']
-            
-            # Store preview data
+            # Prepare preview data
             result.preview_data = [
                 {
-                    'old_name': str(old_path.name),
-                    'new_name': str(new_path.name),
-                    'old_path': str(old_path),
-                    'new_path': str(new_path)
+                    'old_name': item['old_name'],
+                    'new_name': item['new_name']
                 }
-                for old_path, new_path in rename_mappings
+                for item in rename_plan
             ]
             
             # Execute renames if not in preview mode
             if not config.preview_mode:
-                result.files_renamed = self._execute_renames(rename_mappings, config)
+                result.files_renamed = self._execute_renames(rename_plan, result)
+            
+            return result
             
         except Exception as e:
-            print(f"Processing error: {e}")
+            result.error_details.append({
+                'file': 'GENERAL',
+                'error': f"Processing failed: {str(e)}"
+            })
             result.errors += 1
-        
-        result.processing_time = time.time() - start_time
-        return result
+            return result
     
-    def _discover_files(self, config: RenameConfig) -> List[Path]:
-        """Discover all files to potentially process."""
+    def _get_file_list(self, config: RenameConfig) -> List[Path]:
+        """Get list of files to process based on config."""
         files = []
         
         if config.recursive:
@@ -102,138 +156,77 @@ class BatchRenameProcessor:
         
         return sorted(files)
     
-    def _apply_filters(self, files: List[Path], config: RenameConfig) -> List[Path]:
-        """Apply filtering rules to file list."""
-        if not config.filters:
-            return files
-        
-        filtered_files = []
-        for file_path in files:
-            if apply_filters(file_path, config.filters):
-                filtered_files.append(file_path)
-        
-        return filtered_files
-    
-    def _process_single_file(self, file_path: Path, config: RenameConfig) -> str:
-        """
-        Process a single file to generate new filename.
-        
-        Args:
-            file_path: Path to file to process
-            config: Processing configuration
-            
-        Returns:
-            New filename (just the name, not full path)
-        """
-        # Gather file metadata
-        stat = file_path.stat()
-        metadata = {
-            'size': stat.st_size,
-            'created': stat.st_ctime,
-            'modified': stat.st_mtime,
-            'extension': file_path.suffix
-        }
-        
-        # Extract and convert data
-        if config.extract_and_convert:
-            # Single function handles both
-            extract_convert_func = load_custom_function(config.extract_and_convert, 'extract_and_convert')
-            data = extract_convert_func(file_path.name, file_path, metadata)
-        else:
-            # Separate extraction and conversion
-            # Extract data
-            extractor = get_extractor(config.extractor, config.extractor_args)
-            data = extractor(file_path.name, file_path, metadata)
-            
-            # Apply converters in sequence
-            for converter_config in config.converters:
-                converter_args = {
-                    'positional': converter_config.get('positional', []),
-                    'keyword': converter_config.get('keyword', {})
-                }
-                converter = get_converter(converter_config['name'], converter_args)
-                data = converter(data, file_path.name, file_path, metadata)
-        
-        # Generate final filename
-        if 'formatted_name' in data:
-            # One of the converters (template/stringsmith) generated the final name
-            base_name = data['formatted_name']
-        else:
-            # Use simple formatting - reconstruct from data fields
-            base_name = self._simple_format(data, file_path)
-        
-        # Ensure we have the extension
-        if not base_name.endswith(file_path.suffix):
-            base_name += file_path.suffix
-            
-        return base_name
-    
-    def _apply_template(self, template: str, data: Dict[str, Any], file_path: Path) -> str:
-        """Apply template to generate filename."""
-        # Simple Python format string for now
-        # TODO: Add StringSmith integration
+    def _get_file_metadata(self, file_path: Path) -> Dict[str, Any]:
+        """Extract metadata from a file."""
         try:
-            base_name = template.format(**data)
-            # Preserve the original extension
-            return base_name + file_path.suffix
-        except KeyError as e:
-            raise ValueError(f"Template references missing field: {e}")
+            stat = file_path.stat()
+            return {
+                'size': stat.st_size,
+                'created': stat.st_ctime,
+                'modified': stat.st_mtime
+            }
+        except OSError:
+            return {
+                'size': 0,
+                'created': 0,
+                'modified': 0
+            }
     
-    def _simple_format(self, data: Dict[str, Any], file_path: Path) -> str:
-        """Simple fallback formatting when no template provided."""
-        # Join non-empty values with underscores, preserve extension
-        values = [str(v) for v in data.values() if v]
-        base_name = '_'.join(values) if values else file_path.stem
-        return base_name + file_path.suffix
+    def _should_process_file(self, context: ProcessingContext, filters: List) -> bool:
+        """Check if file should be processed based on filters."""
+        for filter_func in filters:
+            if not filter_func(context):
+                return False
+        return True
     
-    def _detect_collisions(self, rename_mappings: List[tuple], input_folder: Path) -> Dict[str, List]:
-        """Detect naming collisions."""
-        collisions = {
-            'existing_file_collisions': [],
-            'internal_collisions': []
-        }
-        
-        # Get existing files
-        existing_files = {f.name for f in input_folder.rglob('*') if f.is_file()}
-        
-        # Track target names for internal collision detection
-        target_names = {}
-        
-        for old_path, new_path in rename_mappings:
-            new_name = new_path.name
+    def _generate_new_filename(self, converted_data: Dict[str, Any], original_path: Path) -> str:
+        """Generate new filename from converted data."""
+        # Look for formatted_name in converted data
+        if 'formatted_name' in converted_data:
+            new_name = str(converted_data['formatted_name'])
             
-            # Check collision with existing files
-            if new_name in existing_files and new_name != old_path.name:
-                collisions['existing_file_collisions'].append({
-                    'source': str(old_path),
-                    'target': new_name,
-                    'existing_file': new_name
-                })
+            # Ensure we preserve the file extension
+            if not new_name.endswith(original_path.suffix):
+                new_name += original_path.suffix
             
-            # Check internal collisions
-            if new_name in target_names:
-                collisions['internal_collisions'].append({
-                    'sources': [target_names[new_name], str(old_path)],
-                    'target': new_name
-                })
-            else:
-                target_names[new_name] = str(old_path)
-        
-        return collisions
+            return new_name
+        else:
+            # Fallback: use original filename
+            return original_path.name
     
-    def _execute_renames(self, rename_mappings: List[tuple], config: RenameConfig) -> int:
+    def _check_collisions(self, rename_plan: List[Dict]) -> int:
+        """Check for naming conflicts in the rename plan."""
+        new_names = [item['new_name'] for item in rename_plan]
+        unique_names = set(new_names)
+        return len(new_names) - len(unique_names)
+    
+    def _execute_renames(self, rename_plan: List[Dict], result: RenameResult) -> int:
         """Execute the actual file renames."""
         renamed_count = 0
         
-        # TODO: Implement collision handling strategies
-        # TODO: Create backup manifest for rollback
-        
-        for old_path, new_path in rename_mappings:
+        for item in rename_plan:
             try:
+                old_path = item['old_path']
+                new_path = old_path.parent / item['new_name']
+                
+                # Check if target already exists
+                if new_path.exists() and new_path != old_path:
+                    result.errors += 1
+                    result.error_details.append({
+                        'file': str(old_path),
+                        'error': f"Target file already exists: {new_path.name}"
+                    })
+                    continue
+                
+                # Perform the rename
                 old_path.rename(new_path)
                 renamed_count += 1
-                print(f"Renamed: {old_path.name} -> {new_path.name}")
+                
             except Exception as e:
-                print(f"Failed to rename {old_path.name}: {e}")
+                result.errors += 1
+                result.error_details.append({
+                    'file': str(item['old_path']),
+                    'error': f"Rename failed: {str(e)}"
+                })
         
         return renamed_count

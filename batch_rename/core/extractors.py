@@ -1,30 +1,19 @@
 """
 Built-in extractors for parsing filenames and extracting data fields.
 
-Extractors take filenames and return dictionaries of extracted data.
-"""
-
-import re
-from pathlib import Path
-from typing import Dict, Any, Callable
-
-from .function_loader import load_custom_function
-
-
-"""
-Built-in extractors for parsing filenames and extracting data fields.
-
-Extractors take filenames and return dictionaries of extracted data.
+Extractors take a ProcessingContext and return dictionaries of extracted data.
 """
 
 import re
 from pathlib import Path
 from typing import Dict, Any, Callable, List
+import datetime
 
+from .processing_context import ProcessingContext
 from .function_loader import load_custom_function
 
 
-def split_extractor(filename: str, file_path: Path, metadata: Dict[str, Any], positional_args: List[str], **kwargs) -> Dict[str, Any]:
+def split_extractor(context: ProcessingContext, positional_args: List[str], **kwargs) -> Dict[str, Any]:
     """
     Split filename on delimiter and map to field names.
     
@@ -49,7 +38,7 @@ def split_extractor(filename: str, file_path: Path, metadata: Dict[str, Any], po
         raise ValueError("split extractor requires field names (either as positional args or 'fields' keyword)")
     
     # Remove extension and split
-    base_name = Path(filename).stem
+    base_name = context.base_name
     parts = base_name.split(split_on)
     
     # Map parts to field names
@@ -66,7 +55,7 @@ def split_extractor(filename: str, file_path: Path, metadata: Dict[str, Any], po
     return result
 
 
-def regex_extractor(filename: str, file_path: Path, metadata: Dict[str, Any], positional_args: List[str], **kwargs) -> Dict[str, Any]:
+def regex_extractor(context: ProcessingContext, positional_args: List[str], **kwargs) -> Dict[str, Any]:
     """
     Extract data using named regex groups.
     
@@ -87,7 +76,7 @@ def regex_extractor(filename: str, file_path: Path, metadata: Dict[str, Any], po
     if not pattern:
         raise ValueError("regex extractor requires pattern (either as positional arg or 'pattern' keyword)")
     
-    base_name = Path(filename).stem
+    base_name = context.base_name
     match = re.search(pattern, base_name)
     
     if match:
@@ -96,7 +85,7 @@ def regex_extractor(filename: str, file_path: Path, metadata: Dict[str, Any], po
         return {}
 
 
-def position_extractor(filename: str, file_path: Path, metadata: Dict[str, Any], positional_args: List[str], **kwargs) -> Dict[str, Any]:
+def position_extractor(context: ProcessingContext, positional_args: List[str], **kwargs) -> Dict[str, Any]:
     """
     Extract data by character positions.
     
@@ -117,7 +106,7 @@ def position_extractor(filename: str, file_path: Path, metadata: Dict[str, Any],
     if not positions_str:
         raise ValueError("position extractor requires position mappings")
     
-    base_name = Path(filename).stem
+    base_name = context.base_name
     result = {}
     
     for mapping in positions_str.split(','):
@@ -139,7 +128,7 @@ def position_extractor(filename: str, file_path: Path, metadata: Dict[str, Any],
     return result
 
 
-def metadata_extractor(filename: str, file_path: Path, metadata: Dict[str, Any], positional_args: List[str], **kwargs) -> Dict[str, Any]:
+def metadata_extractor(context: ProcessingContext, positional_args: List[str], **kwargs) -> Dict[str, Any]:
     """
     Extract data from file metadata.
     
@@ -162,17 +151,15 @@ def metadata_extractor(filename: str, file_path: Path, metadata: Dict[str, Any],
     
     # Process metadata extraction
     if kwargs.get('created_date'):
-        import datetime
-        created_dt = datetime.datetime.fromtimestamp(metadata['created'])
+        created_dt = datetime.datetime.fromtimestamp(context.created_timestamp)
         result[kwargs['created_date']] = created_dt.strftime('%Y-%m-%d')
     
     if kwargs.get('modified_date'):
-        import datetime
-        modified_dt = datetime.datetime.fromtimestamp(metadata['modified'])
+        modified_dt = datetime.datetime.fromtimestamp(context.modified_timestamp)
         result[kwargs['modified_date']] = modified_dt.strftime('%Y-%m-%d')
     
     if kwargs.get('file_size'):
-        result[kwargs['file_size']] = metadata['size']
+        result[kwargs['file_size']] = context.file_size
     
     return result
 
@@ -195,7 +182,7 @@ def get_extractor(extractor_name: str, extractor_args: Dict[str, Any]) -> Callab
         extractor_args: Dict with 'positional' and 'keyword' args
         
     Returns:
-        Extractor function ready to call
+        Extractor function ready to call with ProcessingContext
     """
     if extractor_name in BUILTIN_EXTRACTORS:
         # Built-in extractor
@@ -205,14 +192,23 @@ def get_extractor(extractor_name: str, extractor_args: Dict[str, Any]) -> Callab
         pos_args = extractor_args.get('positional', [])
         kwargs = extractor_args.get('keyword', {})
         
-        def configured_extractor(filename: str, file_path: Path, metadata: Dict[str, Any]) -> Dict[str, Any]:
-            return extractor_func(filename, file_path, metadata, pos_args, **kwargs)
+        def configured_extractor(context: ProcessingContext) -> Dict[str, Any]:
+            return extractor_func(context, pos_args, **kwargs)
         
         return configured_extractor
     
     elif Path(extractor_name).suffix == '.py':
         # Custom extractor function
-        return load_custom_function(extractor_name, 'extract_data')
+        custom_func = load_custom_function(extractor_name, extractor_args.get('positional', [None])[0])
+        
+        # Get additional arguments (excluding function name)
+        pos_args = extractor_args.get('positional', [])[1:]  # Skip function name
+        kwargs = extractor_args.get('keyword', {})
+        
+        def configured_custom_extractor(context: ProcessingContext) -> Dict[str, Any]:
+            return custom_func(context, *pos_args, **kwargs)
+        
+        return configured_custom_extractor
     
     else:
         raise ValueError(f"Unknown extractor: {extractor_name}")

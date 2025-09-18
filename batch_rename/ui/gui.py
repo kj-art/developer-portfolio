@@ -9,6 +9,8 @@ import sys
 import json
 from pathlib import Path
 from typing import Dict, List, Any, Optional
+import importlib.util
+import inspect
 
 # PyQt imports
 from PyQt6.QtWidgets import (
@@ -17,7 +19,7 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem, QTabWidget, QComboBox, QCheckBox, QTextEdit,
     QMessageBox, QProgressBar, QStatusBar, QGroupBox, QSpinBox,
     QSplitter, QHeaderView, QScrollArea, QFrame, QRadioButton,
-    QButtonGroup, QFormLayout
+    QButtonGroup, QFormLayout, QStackedWidget, QSizePolicy
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont, QIcon
@@ -29,6 +31,397 @@ from core.config import RenameConfig
 from core.extractors import BUILTIN_EXTRACTORS
 from core.converters import BUILTIN_CONVERTERS
 from core.filters import BUILTIN_FILTERS
+
+
+class CustomFunctionSelector(QWidget):
+    """
+    Reusable widget for selecting custom Python functions from files.
+    
+    Handles the flow: File selection → Function dropdown → Argument inputs
+    """
+    
+    def __init__(self, function_description: str = "processing function"):
+        super().__init__()
+        self.function_description = function_description
+        self.current_function = None
+        self.init_ui()
+    
+    def init_ui(self):
+        layout = QVBoxLayout()
+        
+        # File selection
+        file_layout = QHBoxLayout()
+        self.file_path = QLineEdit()
+        self.file_path.setPlaceholderText(f"Select a .py file containing your {self.function_description}")
+        self.file_path.textChanged.connect(self.on_file_changed)
+        file_layout.addWidget(self.file_path)
+        
+        browse_btn = QPushButton("Browse...")
+        browse_btn.clicked.connect(self.browse_file)
+        file_layout.addWidget(browse_btn)
+        
+        layout.addLayout(file_layout)
+        
+        # Function selection
+        func_layout = QHBoxLayout()
+        func_layout.addWidget(QLabel("Function:"))
+        self.function_combo = QComboBox()
+        self.function_combo.setEnabled(False)
+        self.function_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.function_combo.setMinimumWidth(200)
+        self.function_combo.currentTextChanged.connect(self.on_function_selected)
+        self.function_combo.currentIndexChanged.connect(self.on_function_index_changed)
+        func_layout.addWidget(self.function_combo)
+        layout.addLayout(func_layout)
+        
+        # Validation status
+        self.validation_label = QLabel("")
+        self.validation_label.setWordWrap(True)
+        self.validation_label.setStyleSheet("QLabel { color: #666; font-size: 11px; }")
+        layout.addWidget(self.validation_label)
+        
+        # Function arguments
+        self.args_group = QGroupBox("Function Arguments")
+        self.args_layout = QFormLayout(self.args_group)
+        self.args_group.setVisible(False)
+        layout.addWidget(self.args_group)
+        
+        self.setLayout(layout)
+    
+    def browse_file(self):
+        """Open file dialog to select custom function file."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, f"Select {self.function_description.title()} Script", 
+            str(Path.home()), "Python Files (*.py)"
+        )
+        if file_path:
+            self.file_path.setText(file_path)
+    
+    def on_file_changed(self):
+        """Handle file path changes."""
+        file_path = self.file_path.text().strip()
+        
+        if not file_path:
+            self.function_combo.clear()
+            self.function_combo.setEnabled(False)
+            self.validation_label.setText("")
+            self.args_group.setVisible(False)
+            self.current_function = None
+            return
+        
+        if not Path(file_path).exists():
+            self.validation_label.setText("❌ File does not exist")
+            self.function_combo.clear()
+            self.function_combo.setEnabled(False)
+            self.args_group.setVisible(False)
+            self.current_function = None
+            return
+        
+        # Load functions from the file
+        try:
+            functions = self.load_functions_from_file(file_path)
+            self.function_combo.clear()
+            self.function_combo.addItems(functions)
+            self.function_combo.setEnabled(len(functions) > 0)
+            
+            if len(functions) == 0:
+                self.validation_label.setText("❌ No functions found in file")
+                self.current_function = None
+            else:
+                self.validation_label.setText(f"✓ Found {len(functions)} function(s)")
+                # Use QTimer to ensure the UI is fully updated before triggering function selection
+                from PyQt6.QtCore import QTimer
+                QTimer.singleShot(100, self.on_function_selected)
+                
+        except Exception as e:
+            self.validation_label.setText(f"❌ Error loading file: {str(e)}")
+            self.function_combo.clear()
+            self.function_combo.setEnabled(False)
+            self.current_function = None
+        
+        self.args_group.setVisible(False)
+    
+    def load_functions_from_file(self, file_path):
+        """Load and return list of function names from a Python file."""
+        spec = importlib.util.spec_from_file_location("custom_module", file_path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"Could not load module from {file_path}")
+        
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        
+        # Get all functions defined in the module (not imported)
+        functions = []
+        for name, obj in inspect.getmembers(module, inspect.isfunction):
+            # Only include functions defined in this module
+            if obj.__module__ == module.__name__:
+                functions.append(name)
+        
+        return functions
+    
+    def on_function_index_changed(self, index):
+        """Handle function combo box index changes - this fires even for initial selection."""
+        if index >= 0:  # Valid index selected
+            self.on_function_selected()
+    
+    def on_function_selected(self):
+        """Handle function selection and validate signature."""
+        function_name = self.function_combo.currentText()
+        file_path = self.file_path.text().strip()
+        
+        if not function_name or not file_path:
+            self.args_group.setVisible(False)
+            self.current_function = None
+            return
+        
+        try:
+            # Load the function and validate
+            function = self.load_function_from_file(file_path, function_name)
+            validation_result = self.validate_function(function)
+            
+            if validation_result['valid']:
+                self.validation_label.setText(f"✓ {validation_result['message']}")
+                self.create_argument_inputs(validation_result['parameters'])
+                self.current_function = function
+            else:
+                self.validation_label.setText(f"❌ {validation_result['message']}")
+                self.args_group.setVisible(False)
+                self.current_function = None
+                
+        except Exception as e:
+            self.validation_label.setText(f"❌ Error validating function: {str(e)}")
+            self.args_group.setVisible(False)
+            self.current_function = None
+    
+    def load_function_from_file(self, file_path, function_name):
+        """Load a specific function from a Python file."""
+        spec = importlib.util.spec_from_file_location("custom_module", file_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        
+        if not hasattr(module, function_name):
+            raise ValueError(f"Function '{function_name}' not found in {file_path}")
+        
+        return getattr(module, function_name)
+    
+    def validate_function(self, function):
+        """Validate function signature. Override in subclasses for specific validation."""
+        try:
+            sig = inspect.signature(function)
+            params = list(sig.parameters.values())
+            
+            # Check: at least one parameter (should be ProcessingContext)
+            if len(params) == 0:
+                return {
+                    'valid': False,
+                    'message': 'Function must accept at least one parameter (ProcessingContext)'
+                }
+            
+            # Check first parameter name/type hint for ProcessingContext
+            first_param = params[0]
+            context_hints = ['ProcessingContext', 'context']
+            if (first_param.annotation != first_param.empty and 
+                'ProcessingContext' in str(first_param.annotation)) or \
+               any(hint in first_param.name.lower() for hint in context_hints):
+                param_info = f"✓ First parameter '{first_param.name}' appears to be ProcessingContext"
+            else:
+                param_info = f"⚠ First parameter '{first_param.name}' should be ProcessingContext"
+            
+            # Success - return all parameters except the first one (ProcessingContext)
+            param_names = [p.name for p in params]
+            message = f"Valid signature: {function.__name__}({', '.join(param_names)}). {param_info}"
+            
+            return {
+                'valid': True,
+                'message': message,
+                'parameters': params[1:]  # Skip first parameter (ProcessingContext)
+            }
+            
+                    
+        except Exception as e:
+            return {
+                'valid': False,
+                'message': f'Error inspecting function: {str(e)}'
+            }
+        except Exception as e:
+            return {
+                'valid': False,
+                'message': f'Error inspecting function: {str(e)}'
+            }
+    
+    def create_argument_inputs(self, parameters):
+        """Create input widgets for function parameters with descriptions from docstring."""
+        # Clear existing argument inputs
+        for i in reversed(range(self.args_layout.count())):
+            item = self.args_layout.itemAt(i)
+            if item.widget():
+                item.widget().setParent(None)
+        
+        if len(parameters) == 0:
+            self.args_group.setVisible(False)
+            return
+        
+        # Parse docstring to get parameter descriptions
+        param_descriptions = self.parse_docstring_params()
+        
+        # Create inputs for each parameter
+        for param in parameters:
+            input_widget = self.create_parameter_input(param)
+            
+            # Create label with description if available
+            description = param_descriptions.get(param.name, "")
+            if description:
+                label_text = f"{param.name}:"
+                help_text = f"{description}"
+                
+                # Create a label with tooltip
+                label = QLabel(label_text)
+                label.setToolTip(help_text)
+                
+                # Also set tooltip on the input widget
+                input_widget.setToolTip(help_text)
+                
+                # Add a small help indicator
+                label.setStyleSheet("QLabel:hover { color: #0066cc; }")
+                
+                self.args_layout.addRow(label, input_widget)
+            else:
+                self.args_layout.addRow(f"{param.name}:", input_widget)
+        
+        self.args_group.setVisible(True)
+    
+    def parse_docstring_params(self) -> Dict[str, str]:
+        """Parse docstring to extract parameter descriptions."""
+        if not self.current_function:
+            return {}
+        
+        try:
+            # Try using docstring_parser if available
+            try:
+                from docstring_parser import parse
+                docstring = parse(inspect.getdoc(self.current_function))
+                descriptions = {}
+                for param in docstring.params:
+                    descriptions[param.arg_name] = param.description
+                return descriptions
+            except ImportError:
+                # Fallback to manual parsing
+                return self.manual_parse_docstring()
+                
+        except Exception:
+            return {}
+    
+    def manual_parse_docstring(self) -> Dict[str, str]:
+        """Manually parse docstring for Args: section."""
+        docstring = inspect.getdoc(self.current_function)
+        if not docstring:
+            return {}
+        
+        descriptions = {}
+        lines = docstring.split('\n')
+        
+        # Look for Args: section
+        in_args_section = False
+        current_param = None
+        current_desc = []
+        
+        for line in lines:
+            line = line.strip()
+            
+            # Check if we're entering Args section
+            if line.lower() in ['args:', 'arguments:', 'parameters:']:
+                in_args_section = True
+                continue
+            
+            # Check if we're leaving Args section
+            if in_args_section and line.lower() in ['returns:', 'yields:', 'raises:', 'examples:', 'note:', 'notes:']:
+                # Save any pending parameter
+                if current_param and current_desc:
+                    descriptions[current_param] = ' '.join(current_desc).strip()
+                break
+            
+            if in_args_section and line:
+                # Check if this is a new parameter (starts with identifier:)
+                if ':' in line and not line.startswith(' '):
+                    # Save previous parameter if exists
+                    if current_param and current_desc:
+                        descriptions[current_param] = ' '.join(current_desc).strip()
+                    
+                    # Start new parameter
+                    parts = line.split(':', 1)
+                    current_param = parts[0].strip()
+                    current_desc = [parts[1].strip()] if len(parts) > 1 else []
+                elif current_param and line.startswith(' '):
+                    # Continuation of current parameter description
+                    current_desc.append(line.strip())
+        
+        # Save final parameter
+        if current_param and current_desc:
+            descriptions[current_param] = ' '.join(current_desc).strip()
+        
+        return descriptions
+    
+    def create_parameter_input(self, param):
+        """Create appropriate input widget for a function parameter."""
+        # Create input based on parameter annotation and default
+        if param.annotation == int:
+            widget = QSpinBox()
+            widget.setRange(-999999, 999999)
+            if param.default != param.empty:
+                widget.setValue(param.default)
+        elif param.annotation == float:
+            widget = QLineEdit()
+            widget.setPlaceholderText("Enter number (e.g., 1.5)")
+            if param.default != param.empty:
+                widget.setText(str(param.default))
+        elif param.annotation == bool:
+            widget = QCheckBox()
+            if param.default != param.empty:
+                widget.setChecked(param.default)
+        else:
+            # Default to string input
+            widget = QLineEdit()
+            if param.default != param.empty:
+                widget.setText(str(param.default))
+            else:
+                widget.setPlaceholderText(f"Enter {param.name}")
+        
+        widget.setObjectName(param.name)
+        return widget
+    
+    def get_config(self) -> tuple:
+        """Return (file_path, function_name, positional_args, keyword_args) or None if not configured."""
+        file_path = self.file_path.text().strip()
+        function_name = self.function_combo.currentText()
+        
+        if not file_path or not function_name or not self.current_function:
+            return None
+        
+        # Collect function arguments
+        pos_args = []
+        kwargs = {}
+        
+        if self.args_group.isVisible():
+            for i in range(self.args_layout.count()):
+                item = self.args_layout.itemAt(i)
+                if item.labelItem() and item.fieldItem():
+                    label_text = item.labelItem().widget().text().rstrip(':')
+                    field_widget = item.fieldItem().widget()
+                    
+                    # Get value based on widget type
+                    if isinstance(field_widget, QSpinBox):
+                        kwargs[label_text] = field_widget.value()
+                    elif isinstance(field_widget, QCheckBox):
+                        kwargs[label_text] = field_widget.isChecked()
+                    elif isinstance(field_widget, QLineEdit):
+                        if field_widget.text().strip():
+                            kwargs[label_text] = field_widget.text().strip()
+        
+        return file_path, function_name, pos_args, kwargs
+    
+    def is_configured(self) -> bool:
+        """Return True if a valid function is selected."""
+        return self.current_function is not None
 
 
 class ProcessingThread(QThread):
@@ -118,31 +511,9 @@ class ExtractorPanel(QWidget):
             self.config_layout.addWidget(self.file_size)
             
         elif extractor_type == 'custom':
-            # File path selection
-            file_layout = QHBoxLayout()
-            self.custom_file_path = QLineEdit()
-            self.custom_file_path.setPlaceholderText("Select a .py file containing extract_data function")
-            file_layout.addWidget(self.custom_file_path)
-            
-            browse_btn = QPushButton("Browse...")
-            browse_btn.clicked.connect(self.browse_custom_extractor)
-            file_layout.addWidget(browse_btn)
-            
-            self.config_layout.addLayout(file_layout)
-            
-            # Function arguments (optional)
-            self.config_layout.addWidget(QLabel("Custom Arguments (optional):"))
-            self.custom_args = QLineEdit()
-            self.custom_args.setPlaceholderText("e.g., arg1,arg2,key=value")
-            self.config_layout.addWidget(self.custom_args)
-    
-    def browse_custom_extractor(self):
-        """Open file dialog to select custom extractor .py file."""
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Select Custom Extractor", str(Path.home()), "Python Files (*.py)"
-        )
-        if file_path:
-            self.custom_file_path.setText(file_path)
+            # Use the reusable custom function selector
+            self.custom_selector = CustomFunctionSelector("extractor function")
+            self.config_layout.addWidget(self.custom_selector)
     
     def get_extractor_config(self) -> tuple:
         """Return (extractor_name, positional_args, keyword_args)."""
@@ -170,23 +541,17 @@ class ExtractorPanel(QWidget):
             return extractor_type, fields, {}
             
         elif extractor_type == 'custom':
-            if not self.custom_file_path.text().strip():
-                raise ValueError("Custom extractor requires a .py file")
+            if not hasattr(self, 'custom_selector') or not self.custom_selector.is_configured():
+                raise ValueError("Custom extractor requires a valid function selection")
             
-            # Parse custom arguments if provided
-            pos_args = []
-            kwargs = {}
-            if self.custom_args.text().strip():
-                # Simple parsing - this could be enhanced
-                args_text = self.custom_args.text().strip()
-                for arg in args_text.split(','):
-                    if '=' in arg:
-                        key, value = arg.split('=', 1)
-                        kwargs[key.strip()] = value.strip()
-                    else:
-                        pos_args.append(arg.strip())
+            config = self.custom_selector.get_config()
+            if config is None:
+                raise ValueError("Custom extractor is not properly configured")
             
-            return self.custom_file_path.text().strip(), pos_args, kwargs
+            file_path, function_name, pos_args, kwargs = config
+            # For custom extractors, we pass the function name as a positional arg
+            custom_pos_args = [function_name] + pos_args
+            return file_path, custom_pos_args, kwargs
 
 
 class ConverterPanel(QWidget):
@@ -301,32 +666,10 @@ class ConverterPanel(QWidget):
             config_layout.addRow("Output Format:", output_format)
             
         elif converter_type == 'custom':
-            # File path selection
-            file_layout = QHBoxLayout()
-            file_input = QLineEdit()
-            file_input.setPlaceholderText("Select a .py file containing convert_data function")
-            file_input.setObjectName("custom_file")
-            file_layout.addWidget(file_input)
-            
-            browse_btn = QPushButton("Browse...")
-            browse_btn.clicked.connect(lambda: self.browse_custom_converter(file_input))
-            file_layout.addWidget(browse_btn)
-            
-            config_layout.addRow("Python File:", file_layout)
-            
-            # Function arguments (optional)
-            args_input = QLineEdit()
-            args_input.setPlaceholderText("e.g., arg1,arg2,key=value")
-            args_input.setObjectName("custom_args")
-            config_layout.addRow("Arguments:", args_input)
-    
-    def browse_custom_converter(self, file_input):
-        """Open file dialog to select custom converter .py file."""
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Select Custom Converter", str(Path.home()), "Python Files (*.py)"
-        )
-        if file_path:
-            file_input.setText(file_path)
+            # Use the reusable custom function selector
+            custom_selector = CustomFunctionSelector("converter function")
+            custom_selector.setObjectName("custom_selector")
+            config_layout.addRow("Custom Function:", custom_selector)
     
     def remove_converter(self, widget):
         """Remove a converter widget."""
@@ -364,28 +707,19 @@ class ConverterPanel(QWidget):
                     ]
                     
             elif converter_type == 'custom':
-                file_widget = config_area.findChild(QLineEdit, "custom_file")
-                args_widget = config_area.findChild(QLineEdit, "custom_args")
+                custom_selector = config_area.findChild(CustomFunctionSelector, "custom_selector")
                 
-                if file_widget and file_widget.text().strip():
-                    converter_name = file_widget.text().strip()
-                    
-                    # Parse custom arguments if provided
-                    if args_widget and args_widget.text().strip():
-                        args_text = args_widget.text().strip()
-                        for arg in args_text.split(','):
-                            if '=' in arg:
-                                key, value = arg.split('=', 1)
-                                kwargs[key.strip()] = value.strip()
-                            else:
-                                pos_args.append(arg.strip())
-                    
-                    configs.append({
-                        'name': converter_name,  # Use file path as name for custom
-                        'positional': pos_args,
-                        'keyword': kwargs
-                    })
-                    continue  # Skip the standard config addition below
+                if custom_selector and custom_selector.is_configured():
+                    config = custom_selector.get_config()
+                    if config:
+                        file_path, function_name, pos_args, kwargs = config
+                        
+                        configs.append({
+                            'name': file_path,  # Use file path as name for custom
+                            'positional': [function_name] + pos_args,  # Function name as first arg
+                            'keyword': kwargs
+                        })
+                        continue  # Skip the standard config addition below
             
             # Only add converter if we have valid configuration
             if pos_args:
@@ -639,32 +973,10 @@ class FilterPanel(QWidget):
             config_layout.addRow("Date Threshold:", date_input)
             
         elif filter_type == 'custom':
-            # File path selection
-            file_layout = QHBoxLayout()
-            file_input = QLineEdit()
-            file_input.setPlaceholderText("Select a .py file containing filter_files function")
-            file_input.setObjectName("custom_file")
-            file_layout.addWidget(file_input)
-            
-            browse_btn = QPushButton("Browse...")
-            browse_btn.clicked.connect(lambda: self.browse_custom_filter(file_input))
-            file_layout.addWidget(browse_btn)
-            
-            config_layout.addRow("Python File:", file_layout)
-            
-            # Function arguments (optional)
-            args_input = QLineEdit()
-            args_input.setPlaceholderText("e.g., arg1,arg2,key=value")
-            args_input.setObjectName("custom_args")
-            config_layout.addRow("Arguments:", args_input)
-    
-    def browse_custom_filter(self, file_input):
-        """Open file dialog to select custom filter .py file."""
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Select Custom Filter", str(Path.home()), "Python Files (*.py)"
-        )
-        if file_path:
-            file_input.setText(file_path)
+            # Use the reusable custom function selector
+            custom_selector = CustomFunctionSelector("filter function")
+            custom_selector.setObjectName("custom_selector")
+            config_layout.addRow("Custom Function:", custom_selector)
     
     def remove_filter(self, widget):
         """Remove a filter widget."""
@@ -724,30 +1036,20 @@ class FilterPanel(QWidget):
                     pos_args = [date_widget.text().strip()]
                     
             elif filter_type == 'custom':
-                file_widget = config_area.findChild(QLineEdit, "custom_file")
-                args_widget = config_area.findChild(QLineEdit, "custom_args")
+                custom_selector = config_area.findChild(CustomFunctionSelector, "custom_selector")
                 
-                if file_widget and file_widget.text().strip():
-                    filter_name = file_widget.text().strip()
-                    kwargs = {}
-                    
-                    # Parse custom arguments if provided
-                    if args_widget and args_widget.text().strip():
-                        args_text = args_widget.text().strip()
-                        for arg in args_text.split(','):
-                            if '=' in arg:
-                                key, value = arg.split('=', 1)
-                                kwargs[key.strip()] = value.strip()
-                            else:
-                                pos_args.append(arg.strip())
-                    
-                    configs.append({
-                        'name': filter_name,  # Use file path as name for custom
-                        'positional': pos_args,
-                        'keyword': kwargs,
-                        'inverted': invert_check.isChecked()
-                    })
-                    continue  # Skip the standard config addition below
+                if custom_selector and custom_selector.is_configured():
+                    config = custom_selector.get_config()
+                    if config:
+                        file_path, function_name, pos_args, kwargs = config
+                        
+                        configs.append({
+                            'name': file_path,  # Use file path as name for custom
+                            'positional': [function_name] + pos_args,  # Function name as first arg
+                            'keyword': kwargs,
+                            'inverted': invert_check.isChecked()
+                        })
+                        continue  # Skip the standard config addition below
             
             # Only add filter if we have valid configuration
             if pos_args:
@@ -805,12 +1107,14 @@ class BatchRenameGUI(QMainWindow):
     
     def __init__(self):
         super().__init__()
+        print("BatchRenameGUI.__init__ called - Version 3.0")  # Debug version check
         self.input_folder = None
         self.processing_thread = None
         self.init_ui()
         
     def init_ui(self):
         """Initialize the user interface."""
+        print("=== STARTING INIT_UI - VERSION 3.0 ===")
         self.setWindowTitle("Batch File Rename Tool")
         self.setGeometry(100, 100, 1200, 800)
         
@@ -822,6 +1126,7 @@ class BatchRenameGUI(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
         
         # Folder selection
+        print("Creating folder selection")
         folder_layout = QHBoxLayout()
         folder_layout.addWidget(QLabel("Input Folder:"))
         self.folder_label = QLabel("No folder selected")
@@ -837,31 +1142,57 @@ class BatchRenameGUI(QMainWindow):
         
         main_layout.addLayout(folder_layout)
         
+        # Mode selection at the top
+        print("Creating mode selection")
+        mode_layout = QHBoxLayout()
+        mode_layout.addWidget(QLabel("Processing Mode:"))
+        
+        self.mode_group = QButtonGroup()
+        self.modular_radio = QRadioButton("Modular Components")
+        self.allinone_radio = QRadioButton("All-in-One Script")
+        
+        # Block signals during initialization to prevent early firing
+        self.modular_radio.blockSignals(True)
+        self.allinone_radio.blockSignals(True)
+        
+        print("Setting modular radio checked")
+        self.modular_radio.setChecked(True)  # Default to modular
+        print("Modular radio checked")
+        
+        self.mode_group.addButton(self.modular_radio)
+        self.mode_group.addButton(self.allinone_radio)
+        
+        mode_layout.addWidget(self.modular_radio)
+        mode_layout.addWidget(self.allinone_radio)
+        mode_layout.addStretch()
+        
+        main_layout.addLayout(mode_layout)
+
+        # Debug: Test if radio button changes are detected
+        self.modular_radio.clicked.connect(lambda: print("Modular radio clicked"))
+        self.allinone_radio.clicked.connect(lambda: print("All-in-one radio clicked"))
+
         # Main content area with splitter
+        print("Creating main content area")
         splitter = QSplitter(Qt.Orientation.Horizontal)
         
-        # Left panel - Configuration
-        config_panel = QTabWidget()
+        # Left panel - Use QStackedWidget for clean mode switching
+        self.config_stack = QStackedWidget()
         
-        # Extractor tab
-        self.extractor_panel = ExtractorPanel()
-        config_panel.addTab(self.extractor_panel, "Extractor")
+        # Create and add both config panels
+        print("About to create config panels")
+        self.modular_config = self.create_modular_config()
+        self.allinone_config = self.create_allinone_config()
+        print("Config panels created")
         
-        # Converter tab
-        self.converter_panel = ConverterPanel()
-        config_panel.addTab(self.converter_panel, "Converters")
+        self.config_stack.addWidget(self.modular_config)  # Index 0
+        self.config_stack.addWidget(self.allinone_config)  # Index 1
+        self.config_stack.setCurrentIndex(0)  # Default to modular
         
-        # Template tab (new, after converters)
-        self.template_panel = TemplatePanel()
-        config_panel.addTab(self.template_panel, "Template")
-        
-        # Filter tab
-        self.filter_panel = FilterPanel()
-        config_panel.addTab(self.filter_panel, "Filters")
-        
-        splitter.addWidget(config_panel)
+        splitter.addWidget(self.config_stack)
         
         # Right panel - Preview
+        print("Creating preview panel")
         preview_widget = QWidget()
         preview_layout = QVBoxLayout(preview_widget)
         
@@ -892,9 +1223,129 @@ class BatchRenameGUI(QMainWindow):
         main_layout.addWidget(splitter)
         
         # Status bar
+        print("Creating status bar")
         self.statusbar = QStatusBar()
         self.setStatusBar(self.statusbar)
         self.statusbar.showMessage("Ready")
+        
+        # Connect mode change signals AFTER everything is initialized
+        # Unblock signals and connect them
+        print("Connecting mode change signals")
+        self.modular_radio.blockSignals(False)
+        self.allinone_radio.blockSignals(False)
+        
+        self.modular_radio.toggled.connect(self.on_mode_changed)
+        self.allinone_radio.toggled.connect(self.on_mode_changed)
+        
+        print("GUI initialization complete - signals connected")
+    
+    def create_modular_config(self):
+        """Create the modular configuration tab widget."""
+        print("Creating modular config")
+        config_panel = QTabWidget()
+        
+        # Extractor tab
+        self.extractor_panel = ExtractorPanel()
+        config_panel.addTab(self.extractor_panel, "Extractor")
+        
+        # Converter tab
+        self.converter_panel = ConverterPanel()
+        config_panel.addTab(self.converter_panel, "Converters")
+        
+        # Template tab
+        self.template_panel = TemplatePanel()
+        config_panel.addTab(self.template_panel, "Template")
+        
+        # Filter tab
+        self.filter_panel = FilterPanel()
+        config_panel.addTab(self.filter_panel, "Filters")
+        
+        print("Modular config created")
+        return config_panel
+    
+    def create_allinone_config(self):
+        """Create the all-in-one script configuration panel."""
+        print("Creating all-in-one config")
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        
+        # Title
+        title_label = QLabel("All-in-One Script Configuration")
+        title_label.setStyleSheet("QLabel { font-weight: bold; font-size: 14px; }")
+        layout.addWidget(title_label)
+        
+        # Description
+        desc_label = QLabel("Select a Python file and function that handles extraction, conversion, and formatting in one step.")
+        desc_label.setWordWrap(True)
+        desc_label.setStyleSheet("QLabel { color: #666; }")
+        layout.addWidget(desc_label)
+        
+        # Custom function selector
+        self.allinone_selector = CustomFunctionSelector("all-in-one processing function")
+        layout.addWidget(self.allinone_selector)
+        
+        layout.addStretch()
+        print("All-in-one config created")
+        return panel
+        
+        file_layout.addLayout(file_select_layout)
+        layout.addWidget(file_group)
+        
+        # Function selection
+        func_group = QGroupBox("Function Selection")
+        func_layout = QVBoxLayout(func_group)
+        
+        func_select_layout = QHBoxLayout()
+        func_select_layout.addWidget(QLabel("Function:"))
+        self.allinone_function_combo = QComboBox()
+        self.allinone_function_combo.setEnabled(False)
+        self.allinone_function_combo.currentTextChanged.connect(self.on_function_selected)
+        func_select_layout.addWidget(self.allinone_function_combo)
+        func_select_layout.addStretch()
+        func_layout.addLayout(func_select_layout)
+        
+        # Validation status
+        self.validation_label = QLabel("")
+        self.validation_label.setWordWrap(True)
+        func_layout.addWidget(self.validation_label)
+        
+        layout.addWidget(func_group)
+        
+        # Function arguments
+        self.args_group = QGroupBox("Function Arguments")
+        self.args_layout = QFormLayout(self.args_group)
+        self.args_group.setVisible(False)
+        layout.addWidget(self.args_group)
+        
+        layout.addStretch()
+        print("All-in-one config created")
+        return panel
+    
+    def on_mode_changed(self, checked):
+        """Handle switching between modular and all-in-one modes."""
+        print(f"on_mode_changed called: checked={checked}, modular_checked={self.modular_radio.isChecked()}")
+        
+        # Use QStackedWidget for clean switching
+        if hasattr(self, 'config_stack'):
+            if self.modular_radio.isChecked():
+                self.config_stack.setCurrentIndex(0)  # Modular config
+                print("Switched to modular config")
+            else:
+                self.config_stack.setCurrentIndex(1)  # All-in-one config
+                print("Switched to all-in-one config")
+        else:
+            print("config_stack not ready yet")
+    
+    def browse_folder(self):
+        """Open folder selection dialog."""
+        folder = QFileDialog.getExistingDirectory(
+            self, "Select Input Folder", str(Path.home())
+        )
+        if folder:
+            self.input_folder = Path(folder)
+            self.folder_label.setText(str(self.input_folder))
+            self.preview_btn.setEnabled(True)
+            self.statusbar.showMessage(f"Selected folder: {folder}")
     
     def browse_folder(self):
         """Open folder selection dialog."""
@@ -1004,6 +1455,15 @@ class BatchRenameGUI(QMainWindow):
         if not self.input_folder:
             raise ValueError("No input folder selected")
         
+        if self.modular_radio.isChecked():
+            # Modular mode - use existing logic
+            return self.build_modular_config(preview_mode)
+        else:
+            # All-in-one mode
+            return self.build_allinone_config(preview_mode)
+    
+    def build_modular_config(self, preview_mode=True) -> RenameConfig:
+        """Build config for modular mode."""
         # Get extractor configuration
         extractor_name, pos_args, kwargs = self.extractor_panel.get_extractor_config()
         extractor_args = {
@@ -1032,6 +1492,30 @@ class BatchRenameGUI(QMainWindow):
             extractor_args=extractor_args,
             converters=converters,
             filters=filters,
+            recursive=self.recursive_check.isChecked(),
+            preview_mode=preview_mode
+        )
+        """Build config for all-in-one mode."""
+        if not self.allinone_selector.is_configured():
+            raise ValueError("All-in-one script function must be selected")
+        
+        config = self.allinone_selector.get_config()
+        if config is None:
+            raise ValueError("All-in-one script is not properly configured")
+        
+        file_path, function_name, pos_args, kwargs = config
+        
+        # For all-in-one mode, we use a special extractor that calls the custom function
+        # The custom function will handle extraction, conversion, and formatting
+        return RenameConfig(
+            input_folder=self.input_folder,
+            extractor=file_path,  # Use file path as extractor
+            extractor_args={
+                'positional': [function_name] + pos_args,  # Function name as first arg
+                'keyword': kwargs  # Additional function arguments
+            },
+            converters=[],  # No separate converters needed
+            filters=[],  # No filters in all-in-one mode for now
             recursive=self.recursive_check.isChecked(),
             preview_mode=preview_mode
         )

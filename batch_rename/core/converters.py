@@ -1,54 +1,17 @@
 """
 Built-in converters for transforming extracted data.
 
-Converters take extracted data and return formatted data for filename generation.
-"""
-
-from pathlib import Path
-from typing import Dict, Any, Callable
-
-from .function_loader import load_custom_function
-
-
-def uppercase_converter(extracted_data: Dict[str, Any], filename: str, file_path: Path, metadata: Dict[str, Any], **args) -> Dict[str, Any]:
-    """
-    Convert specified fields to uppercase.
-    
-    Args:
-        fields: Comma-separated list of fields to convert
-        
-    Example:
-        extracted_data: {"dept": "hr", "type": "report"}
-        fields: "dept"
-        result: {"dept": "HR", "type": "report"}
-    """
-    fields_str = args.get('fields', '')
-    if not fields_str:
-        raise ValueError("uppercase converter requires 'fields' argument")
-    
-    field_names = [f.strip() for f in fields_str.split(',')]
-    result = extracted_data.copy()
-    
-    for field_name in field_names:
-        if field_name in result and result[field_name]:
-            result[field_name] = str(result[field_name]).upper()
-    
-    return result
-
-
-"""
-Built-in converters for transforming extracted data.
-
-Converters take extracted data and return formatted data for filename generation.
+Converters take a ProcessingContext (with extracted_data) and return formatted data for filename generation.
 """
 
 from pathlib import Path
 from typing import Dict, Any, Callable, List
 
+from .processing_context import ProcessingContext
 from .function_loader import load_custom_function
 
 
-def pad_numbers_converter(extracted_data: Dict[str, Any], filename: str, file_path: Path, metadata: Dict[str, Any], positional_args: List[str], **kwargs) -> Dict[str, Any]:
+def pad_numbers_converter(context: ProcessingContext, positional_args: List[str], **kwargs) -> Dict[str, Any]:
     """
     Zero-pad numbers in specified fields.
     
@@ -72,7 +35,10 @@ def pad_numbers_converter(extracted_data: Dict[str, Any], filename: str, file_pa
     if not field:
         raise ValueError("pad_numbers converter requires field name")
     
-    result = extracted_data.copy()
+    if not context.has_extracted_data():
+        return {'formatted_name': context.base_name}
+    
+    result = context.extracted_data.copy()
     
     if field in result and result[field]:
         # Extract numeric part and pad
@@ -92,7 +58,7 @@ def pad_numbers_converter(extracted_data: Dict[str, Any], filename: str, file_pa
     return result
 
 
-def template_converter(extracted_data: Dict[str, Any], filename: str, file_path: Path, metadata: Dict[str, Any], positional_args: List[str], **kwargs) -> Dict[str, Any]:
+def template_converter(context: ProcessingContext, positional_args: List[str], **kwargs) -> Dict[str, Any]:
     """
     Apply Python format string template.
     
@@ -113,10 +79,13 @@ def template_converter(extracted_data: Dict[str, Any], filename: str, file_path:
     if not pattern:
         raise ValueError("template converter requires pattern")
     
+    if not context.has_extracted_data():
+        return {'formatted_name': context.base_name}
+    
     try:
         # Convert string numbers to integers for formatting
         format_data = {}
-        for key, value in extracted_data.items():
+        for key, value in context.extracted_data.items():
             if value and str(value).isdigit():
                 format_data[key] = int(value)
             else:
@@ -129,7 +98,7 @@ def template_converter(extracted_data: Dict[str, Any], filename: str, file_path:
         raise ValueError(f"Template formatting failed: {e}")
 
 
-def date_format_converter(extracted_data: Dict[str, Any], filename: str, file_path: Path, metadata: Dict[str, Any], positional_args: List[str], **kwargs) -> Dict[str, Any]:
+def date_format_converter(context: ProcessingContext, positional_args: List[str], **kwargs) -> Dict[str, Any]:
     """
     Format date fields.
     
@@ -155,7 +124,10 @@ def date_format_converter(extracted_data: Dict[str, Any], filename: str, file_pa
     if not field:
         raise ValueError("date_format converter requires field name")
     
-    result = extracted_data.copy()
+    if not context.has_extracted_data():
+        return {'formatted_name': context.base_name}
+    
+    result = context.extracted_data.copy()
     
     if field in result and result[field]:
         try:
@@ -168,7 +140,7 @@ def date_format_converter(extracted_data: Dict[str, Any], filename: str, file_pa
     return result
 
 
-def stringsmith_converter(extracted_data: Dict[str, Any], filename: str, file_path: Path, metadata: Dict[str, Any], positional_args: List[str], **kwargs) -> Dict[str, Any]:
+def stringsmith_converter(context: ProcessingContext, positional_args: List[str], **kwargs) -> Dict[str, Any]:
     """
     Apply StringSmith template for conditional formatting.
     
@@ -189,6 +161,9 @@ def stringsmith_converter(extracted_data: Dict[str, Any], filename: str, file_pa
     if not template_str:
         raise ValueError("stringsmith converter requires template")
     
+    if not context.has_extracted_data():
+        return {'formatted_name': context.base_name}
+    
     try:
         import sys
         from pathlib import Path
@@ -204,7 +179,7 @@ def stringsmith_converter(extracted_data: Dict[str, Any], filename: str, file_pa
         
         # Clean data - convert None to empty string for StringSmith
         clean_data = {}
-        for key, value in extracted_data.items():
+        for key, value in context.extracted_data.items():
             if value is None:
                 clean_data[key] = ""  # StringSmith will make section disappear
             else:
@@ -237,7 +212,7 @@ def get_converter(converter_name: str, converter_args: Dict[str, Any]) -> Callab
         converter_args: Dict with 'positional' and 'keyword' args
         
     Returns:
-        Converter function ready to call
+        Converter function ready to call with ProcessingContext
     """
     if converter_name in BUILTIN_CONVERTERS:
         # Built-in converter
@@ -247,14 +222,23 @@ def get_converter(converter_name: str, converter_args: Dict[str, Any]) -> Callab
         pos_args = converter_args.get('positional', [])
         kwargs = converter_args.get('keyword', {})
         
-        def configured_converter(extracted_data: Dict[str, Any], filename: str, file_path: Path, metadata: Dict[str, Any]) -> Dict[str, Any]:
-            return converter_func(extracted_data, filename, file_path, metadata, pos_args, **kwargs)
+        def configured_converter(context: ProcessingContext) -> Dict[str, Any]:
+            return converter_func(context, pos_args, **kwargs)
         
         return configured_converter
     
     elif Path(converter_name).suffix == '.py':
         # Custom converter function
-        return load_custom_function(converter_name, 'convert_data')
+        custom_func = load_custom_function(converter_name, converter_args.get('positional', [None])[0])
+        
+        # Get additional arguments (excluding function name)
+        pos_args = converter_args.get('positional', [])[1:]  # Skip function name
+        kwargs = converter_args.get('keyword', {})
+        
+        def configured_custom_converter(context: ProcessingContext) -> Dict[str, Any]:
+            return custom_func(context, *pos_args, **kwargs)
+        
+        return configured_custom_converter
     
     else:
         raise ValueError(f"Unknown converter: {converter_name}")
