@@ -329,11 +329,15 @@ def print_operation_results(args, result):
     
     # Print preview sample if requested
     if args.verbose and result.preview_data and (args.preview and not args.execute):
-        print_preview_sample(result.preview_data)
+        print_preview_sample(result.preview_data, enable_colors=not args.no_colors)
 
 
-def print_preview_sample(preview_data):
+def print_preview_sample(preview_data, enable_colors=None):
     """Print sample of preview changes with collision highlighting."""
+    
+    # Auto-detect if we should use colors
+    if enable_colors is None:
+        enable_colors = sys.stdout.isatty()  # True if terminal, False if piped
     
     # Filter to only show actual changes
     changes = [item for item in preview_data if item['old_name'] != item['new_name']]
@@ -346,9 +350,13 @@ def print_preview_sample(preview_data):
     new_names = [change['new_name'] for change in changes]
     collision_names = {name for name in new_names if new_names.count(name) > 1}
     
-    # ANSI color codes
-    RED = '\033[91m'
-    RESET = '\033[0m'
+    # ANSI color codes (only if colors enabled)
+    if enable_colors:
+        RED = '\033[91m'
+        RESET = '\033[0m'
+    else:
+        RED = ''
+        RESET = ''
     
     def format_change(change):
         """Format a change with red highlighting for collisions."""
@@ -356,7 +364,10 @@ def print_preview_sample(preview_data):
         new_name = change['new_name']
         
         if new_name in collision_names:
-            return f"  {old_name} → {RED}{new_name}{RESET}"
+            if enable_colors:
+                return f"  {old_name} → {RED}{new_name}{RESET}"
+            else:
+                return f"  {old_name} → {new_name} [COLLISION]"
         else:
             return f"  {old_name} → {new_name}"
     
@@ -378,7 +389,10 @@ def print_preview_sample(preview_data):
                 print("-" * 60)
                 
                 if collision_names:
-                    print(f"\n{RED}Files in red have naming conflicts{RESET}")
+                    if enable_colors:
+                        print(f"\n{RED}Files in red have naming conflicts{RESET}")
+                    else:
+                        print("\nFiles marked [COLLISION] have naming conflicts")
 
 
 def main():
