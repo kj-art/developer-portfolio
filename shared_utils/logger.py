@@ -334,7 +334,9 @@ class EnterpriseLogger:
             )
             self.logger.handle(record)
         else:
-            self.logger.log(level, message, exc_info=exc_info, **kwargs)
+            # Remove exc_info from kwargs to avoid passing it twice
+            filtered_kwargs = {k: v for k, v in kwargs.items() if k != 'exc_info'}
+            self.logger.log(level, message, exc_info=exc_info, **filtered_kwargs)
 
 
 def set_up_logging(
