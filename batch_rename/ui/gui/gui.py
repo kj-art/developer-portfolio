@@ -1,14 +1,13 @@
 """
-PyQt GUI for Batch Rename Tool
+Main GUI application for batch rename tool.
 
-Provides a visual interface for the batch file renaming functionality,
-wrapping around the existing CLI core logic.
+Provides intuitive interface for configuring and executing batch rename operations.
 """
 
 import sys
 from pathlib import Path
+from typing import Optional
 
-# PyQt imports
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout,
     QWidget, QLabel, QPushButton, QFileDialog,
@@ -225,7 +224,7 @@ class BatchRenameGUI(QMainWindow):
         
         try:
             config = self.build_config(preview_mode=True)
-            self.statusbar.showMessage("Updating preview...")
+            self.statusbar.showMessage("Generating preview...")
             
             # Run processing in background thread
             self.processing_thread = ProcessingThread(config)
@@ -239,21 +238,22 @@ class BatchRenameGUI(QMainWindow):
             QMessageBox.critical(self, "Configuration Error", str(e))
     
     def on_preview_finished(self, result):
-        """Handle preview processing completion."""
+        """Handle preview completion."""
         self.preview_table.update_preview(result.preview_data)
         
-        message = f"Preview: {result.files_analyzed} files analyzed, {result.files_to_rename} would be renamed"
-        if result.collisions > 0:
-            message += f", {result.collisions} conflicts detected"
+        if result.files_to_rename > 0:
+            self.execute_btn.setEnabled(True)
+            self.statusbar.showMessage(f"Preview: {result.files_to_rename} files to rename")
+        else:
+            self.execute_btn.setEnabled(False)
+            self.statusbar.showMessage("No files to rename")
         
-        self.statusbar.showMessage(message)
-        self.preview_btn.setEnabled(True)
-        self.execute_btn.setEnabled(result.files_to_rename > 0)
-        
-        if result.collisions > 0:
-            QMessageBox.warning(self, "Conflicts Detected", 
-                              f"Found {result.collisions} naming conflicts. "
+        if result.errors > 0:
+            QMessageBox.warning(self, "Preview Errors", 
+                              f"Preview completed with {result.errors} errors. "
                               "Please review the configuration.")
+        
+        self.preview_btn.setEnabled(True)
     
     def execute_rename(self):
         """Execute the actual file renames."""
@@ -330,16 +330,14 @@ class BatchRenameGUI(QMainWindow):
             'keyword': kwargs
         }
         
-        # Get converter configurations
+        # Get converter configurations (excluding templates)
         converters = self.converter_panel.get_converter_configs()
         
-        # Get template configuration and add to converters if enabled
-        template_config = self.template_panel.get_template_config()
-        if template_config:
-            converters.append(template_config)
+        # Get template configuration (separate from converters)
+        template = self.template_panel.get_template_config()
         
-        # Require at least one converter (including template)
-        if not converters:
+        # Require at least one converter OR template
+        if not converters and not template:
             raise ValueError("At least one converter or template is required")
         
         # Get filter configurations
@@ -350,6 +348,7 @@ class BatchRenameGUI(QMainWindow):
             extractor=extractor_name,
             extractor_args=extractor_args,
             converters=converters,
+            template=template,
             filters=filters,
             recursive=self.recursive_check.isChecked(),
             preview_mode=preview_mode
@@ -376,6 +375,7 @@ class BatchRenameGUI(QMainWindow):
                 'keyword': kwargs  # Additional function arguments
             },
             converters=[],  # No separate converters needed
+            template=None,  # No separate template needed
             filters=[],  # No filters in all-in-one mode for now
             recursive=self.recursive_check.isChecked(),
             preview_mode=preview_mode
@@ -387,15 +387,17 @@ def main():
     app = QApplication(sys.argv)
     
     # Set application properties
-    app.setApplicationName("Batch File Rename Tool")
+    app.setApplicationName("Batch Rename Tool")
     app.setApplicationVersion("1.0")
+    app.setOrganizationName("Portfolio Tools")
     
     # Create and show main window
     window = BatchRenameGUI()
     window.show()
     
-    return app.exec()
+    # Start event loop
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

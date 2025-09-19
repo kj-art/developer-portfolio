@@ -23,6 +23,9 @@ class RenameConfig:
     # Conversion configuration (list of converters)
     converters: List[Dict[str, Any]] = None
     
+    # Template configuration (separate from converters, optional, max one)
+    template: Optional[Dict[str, Any]] = None
+    
     # Combined extraction/conversion
     extract_and_convert: Optional[str] = None
     
@@ -58,9 +61,15 @@ class RenameConfig:
         if self.extractor and self.extract_and_convert:
             raise ValueError("Cannot specify both --extractor and --extract-and-convert")
         
-        # If using separate extractor, need at least one converter
-        if self.extractor and not self.converters:
-            raise ValueError("When using --extractor, must provide at least one --converter")
+        # If using separate extractor, need at least one converter OR template
+        if self.extractor and not self.converters and not self.template:
+            raise ValueError("When using --extractor, must provide at least one --converter or --template")
+        
+        # Template validation: only template and stringsmith are allowed as templates
+        if self.template:
+            template_name = self.template.get('name', '')
+            if template_name not in ['template', 'stringsmith']:
+                raise ValueError(f"Invalid template type '{template_name}'. Only 'template' and 'stringsmith' are allowed as templates.")
 
 
 @dataclass
@@ -95,46 +104,27 @@ class ProcessingContext:
     This encapsulates file information and extracted data for use by
     extractors, converters, and filters.
     """
+    filename: str
     file_path: Path
     metadata: Dict[str, Any]
-    extracted_data: Optional[Dict[str, Any]] = None
-    
-    @property
-    def filename(self) -> str:
-        """Get the filename."""
-        return self.file_path.name
+    extracted_data: Dict[str, Any] = None
     
     @property
     def base_name(self) -> str:
-        """Get filename without extension."""
+        """Return filename without extension."""
         return self.file_path.stem
     
     @property
     def extension(self) -> str:
-        """Get file extension."""
+        """Return file extension including the dot."""
         return self.file_path.suffix
     
-    @property
-    def file_size(self) -> int:
-        """Get file size in bytes."""
-        return self.metadata.get('size', 0)
-    
-    @property
-    def created_timestamp(self) -> float:
-        """Get creation timestamp."""
-        return self.metadata.get('created', 0)
-    
-    @property
-    def modified_timestamp(self) -> float:
-        """Get modification timestamp."""
-        return self.metadata.get('modified', 0)
-    
     def has_extracted_data(self) -> bool:
-        """Check if extracted data is available (for converter functions)."""
-        return self.extracted_data is not None
+        """Check if extraction has been performed and has data."""
+        return self.extracted_data is not None and len(self.extracted_data) > 0
     
     def get_extracted_field(self, field_name: str, default: Any = None) -> Any:
-        """Safely get a field from extracted data."""
-        if self.extracted_data is None:
+        """Get a specific field from extracted data."""
+        if not self.has_extracted_data():
             return default
         return self.extracted_data.get(field_name, default)

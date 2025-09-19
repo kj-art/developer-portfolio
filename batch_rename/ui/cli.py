@@ -63,19 +63,27 @@ def create_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Basic split extraction with template conversion
+  # Basic split extraction with template
   python batch_rename.py --input-folder ./docs \\
     --extractor split,_,dept,type,date \\
-    --converter template,"{dept}_{type}_{date}" \\
+    --template template,"{dept}_{type}_{date}" \\
     --preview
 
-  # With detailed logging to file
+  # Multiple converters with template formatting
   python batch_rename.py --input-folder ./docs \\
     --extractor split,_,dept,type,date \\
-    --converter template,"{dept}_{type}_{date}" \\
-    --execute --log-level DEBUG --log-file operations.log
+    --converter pad_numbers,date,4 \\
+    --converter date_format,date,%Y%m%d,%Y-%m-%d \\
+    --template stringsmith,"{{;dept;}}{{_;type;}}{{_;date;}}" \\
+    --preview
 
-  # Quiet execution for scripts
+  # StringSmith template for graceful missing field handling
+  python batch_rename.py --input-folder ./files \\
+    --extractor regex,"(?P<dept>\\w+)_(?P<type>\\w+)" \\
+    --template stringsmith,"{{;dept;}}{{_;type;}}{{_report;}}" \\
+    --execute
+
+  # All-in-one function (no converters or templates needed)
   python batch_rename.py --input-folder ./files \\
     --extract-and-convert my_logic.py \\
     --execute --quiet --log-file batch.log
@@ -108,11 +116,17 @@ Examples:
         help='Converter function call: "function,arg1,arg2,key=value" (can be repeated)'
     )
     
+    # Template formatting (separate from converters, optional, max one)
+    parser.add_argument(
+        '--template',
+        help='Template formatter: "template,{pattern}" or "stringsmith,{{;pattern;}}" (applied after all converters)'
+    )
+    
     # Filtering options (can have multiple)
     parser.add_argument(
         '--filter',
         action='append',
-        help='Filter function call: "function,arg1,arg2,key=value" (use ! prefix to exclude)'
+        help='Filter function call: "function,arg1,arg2,key=value" (use !function to invert, can be repeated)'
     )
     
     # Processing options
@@ -202,9 +216,19 @@ def validate_args(args) -> Optional[str]:
     if not args.input_folder.is_dir():
         return f"Input path is not a directory: {args.input_folder}"
     
-    # If using separate extractor, need converters
-    if args.extractor and not args.converter:
-        return "When using --extractor, must provide at least one --converter"
+    # Template constraints validation
+    if args.template:
+        template_name, _, _, _ = parse_function_call(args.template)
+        if template_name not in ['template', 'stringsmith']:
+            return f"Invalid template type '{template_name}'. Only 'template' and 'stringsmith' are allowed."
+    
+    # Extractor + converter/template requirement
+    if args.extractor and not args.converter and not args.template:
+        return "When using --extractor, must provide at least one --converter or --template"
+    
+    # Extract-and-convert should be standalone
+    if args.extract_and_convert and (args.converter or args.template):
+        return "Cannot use --converter or --template with --extract-and-convert"
     
     # Check custom function files exist
     if args.extractor:
@@ -276,64 +300,49 @@ def print_operation_header(args):
         converter_summary = " -> ".join(args.converter)
         print(f"Converters: {converter_summary}")
     
+    if args.template:
+        print(f"Template: {args.template}")
+    
     if args.filter:
         filter_summary = []
         for filt in args.filter:
             if filt.startswith('!'):
-                filter_summary.append(f"!{filt[1:]}")
+                filter_summary.append(f"NOT {filt[1:]}")
             else:
                 filter_summary.append(filt)
-        print(f"Filters: {', '.join(filter_summary)}")
+        print(f"Filters: {' AND '.join(filter_summary)}")
     
-    print(f"Recursive: {'Yes' if args.recursive else 'No'}")
+    print(f"Recursive: {args.recursive}")
     print()
 
 
 def print_operation_results(args, result):
-    """Print operation results in CLI-friendly format if not in quiet mode."""
+    """Print operation results unless in quiet mode."""
     if args.quiet:
         return
-        
-    print(f"\n=== RESULTS ===")
-    print(f"Files analyzed: {result.files_analyzed}")
     
-    if args.preview and not args.execute:
-        print(f"Files to rename: {result.files_to_rename}")
-        
-        if result.files_to_rename > 0:
-            print(f"\nTo execute these changes, add --execute to your command.")
-    else:
-        print(f"Files renamed: {result.files_renamed}")
-        
-        if result.files_renamed > 0:
-            success_rate = (result.files_renamed / result.files_to_rename * 100) if result.files_to_rename > 0 else 0
-            print(f"Success rate: {success_rate:.1f}%")
+    # Print summary
+    print(f"\nFiles analyzed: {result.files_analyzed}")
+    print(f"Files to rename: {result.files_to_rename}")
     
-    # Print warnings/errors
+    if result.files_filtered_out > 0:
+        print(f"Files filtered out: {result.files_filtered_out}")
+    
     if result.collisions > 0:
-        print(f"\n⚠️  Warning: {result.collisions} naming conflicts detected!")
-        print("   Some files would have the same new name.")
+        print(f"Collisions detected: {result.collisions}")
     
-    if result.errors > 0:
-        print(f"\n❌ Errors: {result.errors} files failed to process")
-        
-        # Show first few errors if not using file logging
-        if not args.log_file and result.error_details:
-            print("\nError details:")
-            for error in result.error_details[:3]:
-                print(f"  • {error['file']}: {error['error']}")
-            
-            if len(result.error_details) > 3:
-                print(f"  ... and {len(result.error_details) - 3} more errors")
-                print("  Use --log-file or --log-level DEBUG for full error details")
+    if args.execute:
+        print(f"Files renamed: {result.files_renamed}")
+        if result.errors > 0:
+            print(f"Errors: {result.errors}")
     
-    # Print preview sample if requested
-    if args.verbose and result.preview_data and (args.preview and not args.execute):
-        print_preview_sample(result.preview_data, enable_colors=not args.no_colors)
+    # Print preview data for preview mode
+    if not args.execute and result.preview_data:
+        print_preview_sample(result.preview_data, enable_colors=not args.no_colors, verbose=args.verbose)
 
 
-def print_preview_sample(preview_data, enable_colors=None):
-    """Print sample of preview changes with collision highlighting."""
+def print_preview_sample(preview_data, enable_colors=None, verbose=False):
+    """Print sample of preview changes with collision highlighting and interactive confirmation."""
     
     # Auto-detect if we should use colors
     if enable_colors is None:
@@ -371,6 +380,7 @@ def print_preview_sample(preview_data, enable_colors=None):
         else:
             return f"  {old_name} → {new_name}"
     
+    # Show initial sample
     print(f"\nSample changes (showing first {min(5, len(changes))} of {len(changes)}):")
     
     for change in changes[:5]:
@@ -379,24 +389,42 @@ def print_preview_sample(preview_data, enable_colors=None):
     if len(changes) > 5:
         print(f"  ... and {len(changes) - 5} more changes")
         
-        if len(changes) > 10:
-            response = input(f"\nFound {len(changes)} files to rename. Display all changes? (y/N): ")
-            if response.lower() in ['y', 'yes']:
-                print(f"\nDetailed preview ({len(changes)} changes):")
-                print("-" * 60)
-                for entry in changes:
-                    print(format_change(entry))
-                print("-" * 60)
-                
-                if collision_names:
-                    if enable_colors:
-                        print(f"\n{RED}Files in red have naming conflicts{RESET}")
-                    else:
-                        print("\nFiles marked [COLLISION] have naming conflicts")
+        # Interactive confirmation for large operations
+        if len(changes) > 10 and not verbose:
+            try:
+                response = input(f"\nFound {len(changes)} files to rename. Display all changes? (y/N): ")
+                if response.lower() in ['y', 'yes']:
+                    print(f"\nDetailed preview ({len(changes)} changes):")
+                    print("-" * 60)
+                    for entry in changes:
+                        print(format_change(entry))
+                    print("-" * 60)
+                    
+                    if collision_names:
+                        if enable_colors:
+                            print(f"\n{RED}Files in red have naming conflicts{RESET}")
+                        else:
+                            print("\nFiles marked [COLLISION] have naming conflicts")
+            except KeyboardInterrupt:
+                print("\nPreview cancelled.")
+                return
+        elif verbose:
+            # Show all changes if verbose mode
+            print(f"\nDetailed preview ({len(changes)} changes):")
+            print("-" * 60)
+            for entry in changes:
+                print(format_change(entry))
+            print("-" * 60)
+            
+            if collision_names:
+                if enable_colors:
+                    print(f"\n{RED}Files in red have naming conflicts{RESET}")
+                else:
+                    print("\nFiles marked [COLLISION] have naming conflicts")
 
 
 def main():
-    """Main CLI entry point with integrated logging."""
+    """Main CLI entry point."""
     parser = create_parser()
     args = parser.parse_args()
     
@@ -426,7 +454,7 @@ def main():
                 sys.exit(1)
             extractor_args = {'positional': pos_args, 'keyword': kwargs}
         
-        # Parse converters
+        # Parse converters (excluding template functions)
         converters = []
         if args.converter:
             for converter_call in args.converter:
@@ -434,11 +462,31 @@ def main():
                 if inverted:
                     print("Error: Converters cannot be inverted with !", file=sys.stderr)
                     sys.exit(1)
+                
+                # Prevent template functions from being used as converters
+                if conv_name in ['template', 'stringsmith']:
+                    print(f"Error: '{conv_name}' must be used with --template, not --converter", file=sys.stderr)
+                    sys.exit(1)
+                
                 converters.append({
                     'name': conv_name,
                     'positional': pos_args,
                     'keyword': kwargs
                 })
+        
+        # Parse template (separate from converters)
+        template = None
+        if args.template:
+            template_name, pos_args, kwargs, inverted = parse_function_call(args.template)
+            if inverted:
+                print("Error: Templates cannot be inverted with !", file=sys.stderr)
+                sys.exit(1)
+            
+            template = {
+                'name': template_name,
+                'positional': pos_args,
+                'keyword': kwargs
+            }
         
         # Parse filters
         filters = []
@@ -458,6 +506,7 @@ def main():
             extractor=extractor_name,
             extractor_args=extractor_args,
             converters=converters,
+            template=template,
             extract_and_convert=args.extract_and_convert,
             filters=filters,
             recursive=args.recursive,
@@ -493,11 +542,11 @@ def main():
     except KeyboardInterrupt:
         cli_logger.warning("Operation cancelled by user")
         if not args.quiet:
-            print("\nOperation cancelled by user.", file=sys.stderr)
-        sys.exit(130)  # Standard exit code for SIGINT
-        
+            print("\nOperation cancelled by user.")
+        sys.exit(1)
+    
     except Exception as e:
-        cli_logger.error("CLI execution failed", exception=e)
+        cli_logger.error("Unexpected error occurred", error=str(e), error_type=type(e).__name__)
         if not args.quiet:
             print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
