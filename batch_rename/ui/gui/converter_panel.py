@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
 # Import our existing core logic
 sys.path.append(str(Path(__file__).parent.parent))
 from .function_selector import FunctionSelector
+from .validators import batch_rename_validator
 
 class ConverterPanel(QWidget):
     """Panel for configuring data conversion."""
@@ -126,7 +127,7 @@ class ConverterPanel(QWidget):
             
         elif converter_type == 'custom':
             # Use the reusable custom function selector
-            custom_selector = FunctionSelector("converter function", 1)
+            custom_selector = FunctionSelector("converter function", 1, batch_rename_validator)
             custom_selector.setObjectName("custom_selector")
             config_layout.addRow("Custom Function:", custom_selector)
     

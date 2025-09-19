@@ -7,14 +7,25 @@ from files, with signature validation and parameter input generation.
 
 import importlib.util
 import inspect
+import subprocess
+import platform
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Callable, Optional, List
+from dataclasses import dataclass
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QFileDialog, QComboBox, QGroupBox, QFormLayout, QCheckBox, QSpinBox
 )
 from PyQt6.QtCore import QTimer
+
+
+@dataclass
+class ValidationResult:
+    """Result of function validation."""
+    valid: bool
+    message: str
+    parameters: List[inspect.Parameter]
 
 
 class FunctionSelector(QWidget):
@@ -25,11 +36,14 @@ class FunctionSelector(QWidget):
     and parameter input widgets for custom extractors, converters, and filters.
     """
     
-    def __init__(self, function_description="custom function", skip_arguments=0):
+    def __init__(self, function_description="custom function", skip_arguments=0, 
+                 validator: Optional[Callable] = None):
         super().__init__()
         self.function_description = function_description
         self.current_function = None
         self.skip_args = skip_arguments
+        # No default validator - force users to provide one explicitly
+        self.validator = validator
         self.init_ui()
     
     def init_ui(self):
@@ -46,11 +60,11 @@ class FunctionSelector(QWidget):
         browse_btn.clicked.connect(self.browse_file)
         file_layout.addWidget(browse_btn)
 
-        # Add the open button
-        '''self.open_btn = QPushButton("Open")
-        self.open_btn.clicked.connect(self.open_file_in_editor)
-        self.open_btn.setEnabled(False)
-        file_layout.addWidget(self.open_btn)'''
+        # Add open button (commented out for safety as discussed)
+        # self.open_btn = QPushButton("Open")
+        # self.open_btn.clicked.connect(self.open_file_in_editor)
+        # self.open_btn.setEnabled(False)
+        # file_layout.addWidget(self.open_btn)
 
         layout.addLayout(file_layout)
         
@@ -78,26 +92,6 @@ class FunctionSelector(QWidget):
         
         self.setLayout(layout)
 
-    def open_file_in_editor(self):
-        """Open the selected Python file in the default editor."""
-        file_path = self.file_path.text().strip()
-        
-        if not file_path or not Path(file_path).exists():
-            return
-        
-        import subprocess
-        import platform
-        
-        try:
-            if platform.system() == "Windows":
-                subprocess.run(["start", file_path], shell=True)
-            elif platform.system() == "Darwin":  # macOS
-                subprocess.run(["open", file_path])
-            else:  # Linux
-                subprocess.run(["xdg-open", file_path])
-        except Exception as e:
-            print(f"Could not open file: {e}")
-        
     def browse_file(self):
         """Open file dialog to select Python script."""
         file_path, _ = QFileDialog.getOpenFileName(
@@ -106,7 +100,6 @@ class FunctionSelector(QWidget):
         )
         if file_path:
             self.file_path.setText(file_path)
-            #self.open_btn.setEnabled(True)
     
     def on_file_changed(self):
         """Handle file path changes."""
@@ -185,17 +178,18 @@ class FunctionSelector(QWidget):
             return
         
         try:
-            # Load the function and validate
+            # Load the function and validate using the callback validator
             function = self.load_function_from_file(file_path, function_name)
-            validation_result = self.validate_function(function)
+            validation_result = self.validator(function)
             
-            if validation_result['valid']:
+            if validation_result.valid:
                 self.current_function = function
-                self.validation_label.setText(f"✓ {validation_result['message']}")
-                self.create_argument_inputs(validation_result['parameters'][self.skip_args:])
+                self.validation_label.setText(f"✓ {validation_result.message}")
+                # Apply skip_args to the parameters returned by the validator
+                self.create_argument_inputs(validation_result.parameters[self.skip_args:])
                 
             else:
-                self.validation_label.setText(f"❌ {validation_result['message']}")
+                self.validation_label.setText(f"❌ {validation_result.message}")
                 self.args_group.setVisible(False)
                 self.current_function = None
                 
@@ -214,57 +208,6 @@ class FunctionSelector(QWidget):
             raise ValueError(f"Function '{function_name}' not found in {file_path}")
         
         return getattr(module, function_name)
-    
-    def validate_function(self, function):
-        """Validate function signature. Override in subclasses for specific validation."""
-        try:
-            sig = inspect.signature(function)
-            params = list(sig.parameters.values())
-            
-            validation_points = []
-            
-            # Check: at least one parameter (should be ProcessingContext)
-            if len(params) == 0:
-                return {
-                    'valid': False,
-                    'message': 'Function must accept at least one parameter (ProcessingContext)'
-                }
-            
-            #validation_points.append(f"✓ Function has {len(params)} parameter(s)")
-            
-            # Check first parameter name/type hint for ProcessingContext
-            first_param = params[0]
-            context_hints = ['ProcessingContext', 'context']
-            if (first_param.annotation != first_param.empty and 
-                'ProcessingContext' in str(first_param.annotation)) or \
-               any(hint in first_param.name.lower() for hint in context_hints):
-                validation_points.append(f"✓ First parameter '{first_param.name}' appears to be ProcessingContext")
-            else:
-                validation_points.append(f"⚠ First parameter '{first_param.name}' should be ProcessingContext")
-            
-            # Get additional parameters for return value
-            additional_params = params[1:]
-            
-            # Build multi-line message (removed the additional parameters line)
-            message = f"Valid signature: {function.__name__}()\n" + "\n".join(validation_points)
-            
-            return {
-                'valid': True,
-                'message': message,
-                'parameters': additional_params  # Skip first parameter (ProcessingContext)
-            }
-            
-            return {
-                'valid': True,
-                'message': message,
-                'parameters': additional_params  # Skip first parameter (ProcessingContext)
-            }
-                    
-        except Exception as e:
-            return {
-                'valid': False,
-                'message': f'Error inspecting function: {str(e)}'
-            }
     
     def create_argument_inputs(self, parameters):
         """Create input widgets for function parameters with descriptions from docstring."""
@@ -312,8 +255,12 @@ class FunctionSelector(QWidget):
         if not self.current_function:
             return {}
         
-        # Add debug print to see what we're working with
+        # Get the docstring
         docstring = inspect.getdoc(self.current_function)
+        
+        if not docstring:
+            return {}
+        
         try:
             # Try using docstring_parser if available
             try:
@@ -344,36 +291,41 @@ class FunctionSelector(QWidget):
         current_param = None
         current_desc = []
         
-        
-        for i, line in enumerate(lines):
-            line = line.strip()
+        for i, raw_line in enumerate(lines):
+            # Keep original indentation for continuation detection
+            stripped_line = raw_line.strip()
+            leading_whitespace = len(raw_line) - len(raw_line.lstrip())
             
             # Check if we're entering Args section
-            if line.lower() in ['args:', 'arguments:', 'parameters:']:
+            if stripped_line.lower() in ['args:', 'arguments:', 'parameters:']:
                 in_args_section = True
                 continue
             
             # Check if we're leaving Args section
-            if in_args_section and line.lower() in ['returns:', 'yields:', 'raises:', 'examples:', 'note:', 'notes:']:
+            if in_args_section and stripped_line.lower() in ['returns:', 'yields:', 'raises:', 'examples:', 'note:', 'notes:']:
                 # Save any pending parameter
                 if current_param and current_desc:
                     descriptions[current_param] = ' '.join(current_desc).strip()
                 break
             
-            if in_args_section and line:
-                # Check if this is a new parameter (starts with identifier:)
-                if ':' in line and not line.startswith(' '):
+            if in_args_section and stripped_line:
+                # Check if this is a new parameter (contains colon and starts at beginning or has minimal indent)
+                if ':' in stripped_line and (leading_whitespace <= 4 or not current_param):
                     # Save previous parameter if exists
                     if current_param and current_desc:
                         descriptions[current_param] = ' '.join(current_desc).strip()
                     
                     # Start new parameter
-                    parts = line.split(':', 1)
+                    parts = stripped_line.split(':', 1)
                     current_param = parts[0].strip()
-                    current_desc = [parts[1].strip()] if len(parts) > 1 else []
-                elif current_param and line.startswith(' '):
-                    # Continuation of current parameter description
-                    current_desc.append(line.strip())
+                    current_desc = [parts[1].strip()] if len(parts) > 1 and parts[1].strip() else []
+                elif current_param and leading_whitespace > 4:
+                    # Continuation of current parameter description (indented more than param line)
+                    current_desc.append(stripped_line)
+                elif current_param and not stripped_line.startswith(current_param + ':'):
+                    # Also treat non-indented lines as continuation if they don't look like new params
+                    if not (':' in stripped_line and any(stripped_line.startswith(word) for word in stripped_line.split(':')[0].split())):
+                        current_desc.append(stripped_line)
         
         # Save final parameter
         if current_param and current_desc:
