@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
 # Import our existing core logic
 sys.path.append(str(Path(__file__).parent.parent))
 from .function_selector import FunctionSelector
-from .validators import batch_rename_validator
+from ...core.validators import validate_converter_function
 
 class ConverterPanel(QWidget):
     """Panel for configuring data conversion."""
@@ -42,45 +42,45 @@ class ConverterPanel(QWidget):
     
     def add_converter(self):
         """Add a new converter configuration widget."""
-        converter_widget = QGroupBox(f"Converter {len(self.converters) + 1}")
-        main_layout = QVBoxLayout(converter_widget)
+        converter_widget = QGroupBox(f"Converter #{len(self.converters) + 1}")
+        converter_layout = QVBoxLayout(converter_widget)
         
-        # Header with type selection and remove button
-        header_layout = QHBoxLayout()
-        
-        # Converter type (removed template and stringsmith)
-        type_combo = QComboBox()
-        type_combo.addItems(['pad_numbers', 'date_format', 'custom'])
-        header_layout.addWidget(QLabel("Type:"))
-        header_layout.addWidget(type_combo)
-        
-        header_layout.addStretch()
+        # Converter type selection
+        type_layout = QHBoxLayout()
+        type_layout.addWidget(QLabel("Type:"))
+        converter_combo = QComboBox()
+        converter_combo.addItems(['pad_numbers', 'date_format', 'custom'])
+        type_layout.addWidget(converter_combo)
         
         # Remove button
         remove_btn = QPushButton("Remove")
         remove_btn.clicked.connect(lambda: self.remove_converter(converter_widget))
-        header_layout.addWidget(remove_btn)
+        type_layout.addWidget(remove_btn)
+        type_layout.addStretch()
         
-        main_layout.addLayout(header_layout)
+        converter_layout.addLayout(type_layout)
         
-        # Configuration area that changes based on converter type
+        # Configuration area
         config_area = QWidget()
         config_layout = QFormLayout(config_area)
-        main_layout.addWidget(config_area)
+        converter_layout.addWidget(config_area)
         
-        # Connect type change to update config area
-        type_combo.currentTextChanged.connect(
-            lambda converter_type: self.update_converter_config(config_area, config_layout, converter_type)
+        # Connect type change to update config
+        converter_combo.currentTextChanged.connect(
+            lambda t: self.update_converter_config(t, config_layout)
         )
         
-        # Initialize with first converter type
-        self.update_converter_config(config_area, config_layout, type_combo.currentText())
+        # Initialize with pad_numbers
+        self.update_converter_config('pad_numbers', config_layout)
         
+        # Track this converter
+        self.converters.append((converter_combo, config_area))
+        
+        # Add to scroll layout
         self.scroll_layout.addWidget(converter_widget)
-        self.converters.append((type_combo, config_area))
     
-    def update_converter_config(self, config_area, config_layout, converter_type):
-        """Update configuration UI based on selected converter type."""
+    def update_converter_config(self, converter_type, config_layout):
+        """Update converter configuration UI based on type."""
         # Clear existing config widgets
         for i in reversed(range(config_layout.count())):
             item = config_layout.itemAt(i)
@@ -126,8 +126,8 @@ class ConverterPanel(QWidget):
             config_layout.addRow("Output Format:", output_format)
             
         elif converter_type == 'custom':
-            # Use the reusable custom function selector
-            custom_selector = FunctionSelector("converter function", 1, batch_rename_validator)
+            # Use the reusable custom function selector with CONVERTER validator
+            custom_selector = FunctionSelector("converter function", 1, validate_converter_function)
             custom_selector.setObjectName("custom_selector")
             config_layout.addRow("Custom Function:", custom_selector)
     
@@ -140,10 +140,14 @@ class ConverterPanel(QWidget):
     def get_converter_configs(self) -> List[Dict]:
         """Return list of converter configurations."""
         configs = []
-        for type_combo, config_area in self.converters:
-            converter_type = type_combo.currentText()
+        
+        for combo, config_area in self.converters:
+            if combo.parent() is None:  # Widget was removed
+                continue
+                
+            converter_type = combo.currentText()
+            config_layout = config_area.layout()
             
-            # Extract values from input widgets in config area
             pos_args = []
             kwargs = {}
             
@@ -162,12 +166,12 @@ class ConverterPanel(QWidget):
                 if field_widget and field_widget.text().strip():
                     pos_args = [
                         field_widget.text().strip(),
-                        input_format_widget.text().strip() or "%Y%m%d",
-                        output_format_widget.text().strip() or "%Y-%m-%d"
+                        input_format_widget.text() if input_format_widget else "%Y%m%d",
+                        output_format_widget.text() if output_format_widget else "%Y-%m-%d"
                     ]
                     
             elif converter_type == 'custom':
-                custom_selector = config_area.findChild(FunctionSelector, "custom_selector", 1)
+                custom_selector = config_area.findChild(FunctionSelector, "custom_selector")
                 
                 if custom_selector and custom_selector.is_configured():
                     config = custom_selector.get_config()

@@ -65,11 +65,12 @@ class RenameConfig:
         if self.extractor and not self.converters and not self.template:
             raise ValueError("When using --extractor, must provide at least one --converter or --template")
         
-        # Template validation: only template and stringsmith are allowed as templates
+        # Template validation updated for custom .py support
         if self.template:
             template_name = self.template.get('name', '')
-            if template_name not in ['template', 'stringsmith']:
-                raise ValueError(f"Invalid template type '{template_name}'. Only 'template' and 'stringsmith' are allowed as templates.")
+            # Allow built-in templates or custom .py files
+            if template_name not in ['template', 'stringsmith'] and not template_name.endswith('.py'):
+                raise ValueError(f"Invalid template '{template_name}'. Must be 'template', 'stringsmith', or a .py file.")
 
 
 @dataclass

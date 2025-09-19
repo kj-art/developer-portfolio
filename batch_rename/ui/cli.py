@@ -12,6 +12,10 @@ from typing import Optional
 from ..core.processor import BatchRenameProcessor
 from ..core.config import RenameConfig
 from ..core.logging_processor import LoggingBatchRenameProcessor, create_logging_processor
+from ..core.templates import is_template_function
+from ..core.converters import is_converter_function
+from ..core.validators import get_validator
+from ..core.function_loader import load_custom_function
 from shared_utils.logger import get_logger
 
 
@@ -219,8 +223,8 @@ def validate_args(args) -> Optional[str]:
     # Template constraints validation
     if args.template:
         template_name, _, _, _ = parse_function_call(args.template)
-        if template_name not in ['template', 'stringsmith']:
-            return f"Invalid template type '{template_name}'. Only 'template' and 'stringsmith' are allowed."
+        if not is_template_function(template_name) and not Path(template_name).suffix == '.py':
+            return f"Invalid template type '{template_name}'. Only 'template', 'stringsmith', or custom .py files are allowed."
     
     # Extractor + converter/template requirement
     if args.extractor and not args.converter and not args.template:
@@ -230,29 +234,73 @@ def validate_args(args) -> Optional[str]:
     if args.extract_and_convert and (args.converter or args.template):
         return "Cannot use --converter or --template with --extract-and-convert"
     
-    # Check custom function files exist
-    if args.extractor:
+    # Check custom function files exist and validate them
+    if args.extractor and Path(args.extractor.split(',')[0]).suffix == '.py':
         try:
-            func_name, _, _, _ = parse_function_call(args.extractor)
-            if func_name and Path(func_name).suffix == '.py':
-                if not Path(func_name).exists():
-                    return f"Extractor file not found: {func_name}"
-        except:
-            pass  # Skip validation if parsing fails
-    
-    if args.extract_and_convert:
-        if not Path(args.extract_and_convert).exists():
-            return f"Extract-and-convert file not found: {args.extract_and_convert}"
+            extractor_path = args.extractor.split(',')[0]
+            function_name = args.extractor.split(',')[1] if ',' in args.extractor else None
+            if not function_name:
+                return f"Custom extractor requires function name: {extractor_path},function_name"
+            
+            # Load and validate function
+            func = load_custom_function(extractor_path, function_name)
+            validator = get_validator('extractor')
+            result = validator(func)
+            if not result.valid:
+                return f"Extractor function validation failed: {result.message}"
+                
+        except Exception as e:
+            return f"Extractor validation error: {e}"
     
     if args.converter:
         for converter_call in args.converter:
+            parts = converter_call.split(',')
+            if len(parts) > 0 and Path(parts[0]).suffix == '.py':
+                try:
+                    converter_path = parts[0]
+                    function_name = parts[1] if len(parts) > 1 else None
+                    if not function_name:
+                        return f"Custom converter requires function name: {converter_path},function_name"
+                    
+                    # Load and validate function
+                    func = load_custom_function(converter_path, function_name)
+                    validator = get_validator('converter')
+                    result = validator(func)
+                    if not result.valid:
+                        return f"Converter function validation failed: {result.message}"
+                        
+                except Exception as e:
+                    return f"Converter validation error: {e}"
+    
+    if args.template:
+        parts = args.template.split(',')
+        if len(parts) > 0 and Path(parts[0]).suffix == '.py':
             try:
-                func_name, _, _, _ = parse_function_call(converter_call)
-                if func_name and Path(func_name).suffix == '.py':
-                    if not Path(func_name).exists():
-                        return f"Converter file not found: {func_name}"
-            except:
-                pass  # Skip validation if parsing fails
+                template_path = parts[0]
+                function_name = parts[1] if len(parts) > 1 else None
+                if not function_name:
+                    return f"Custom template requires function name: {template_path},function_name"
+                
+                # Load and validate function
+                func = load_custom_function(template_path, function_name)
+                validator = get_validator('template')
+                result = validator(func)
+                if not result.valid:
+                    return f"Template function validation failed: {result.message}"
+                    
+            except Exception as e:
+                return f"Template validation error: {e}"
+    
+    
+    if args.extract_and_convert and Path(args.extract_and_convert).suffix == '.py':
+        # For extract_and_convert, we need the function name from the first positional arg
+        try:
+            # This is trickier - the function name isn't in the path, it's in args
+            # For now, just check file exists
+            if not Path(args.extract_and_convert).exists():
+                return f"Extract-and-convert file not found: {args.extract_and_convert}"
+        except Exception as e:
+            return f"Extract-and-convert validation error: {e}"
     
     # Validate log file path
     if args.log_file:
@@ -464,8 +512,8 @@ def main():
                     sys.exit(1)
                 
                 # Prevent template functions from being used as converters
-                if conv_name in ['template', 'stringsmith']:
-                    print(f"Error: '{conv_name}' must be used with --template, not --converter", file=sys.stderr)
+                if is_template_function(conv_name):
+                    print(f"Error: '{conv_name}' is a template function. Use --template, not --converter", file=sys.stderr)
                     sys.exit(1)
                 
                 converters.append({

@@ -14,6 +14,7 @@ from .config import RenameConfig, RenameResult
 from .processing_context import ProcessingContext
 from .extractors import get_extractor
 from .converters import get_converter
+from .templates import get_template
 from .filters import get_filter
 
 
@@ -65,7 +66,7 @@ class BatchRenameProcessor:
             # Set up template formatter (separate from converters)
             template_formatter = None
             if config.template:
-                template_formatter = get_converter(config.template['name'], config.template)
+                template_formatter = get_template(config.template['name'], config.template)
             
             # Process each file
             rename_plan = []
@@ -93,29 +94,36 @@ class BatchRenameProcessor:
                     
                     # Apply converters (but not templates)
                     converted_data = extracted_data.copy()
-                    for converter in converters:
-                        converter_result = converter(context)
-                        converted_data.update(converter_result)
-                        # Update context for next converter
-                        context.extracted_data = converted_data
+                    for i, converter in enumerate(converters):
+                        try:
+                            input_fields = set(converted_data.keys())
+                            
+                            # Update context for this converter
+                            context.extracted_data = converted_data
+                            converter_result = converter(context)
+                            
+                            # Validate field consistency
+                            self._validate_converter_fields(
+                                input_fields, converter_result, f"converter #{i+1}"
+                            )
+                            
+                            # Update data for next converter
+                            converted_data = converter_result
+                            
+                        except Exception as e:
+                            raise ValueError(f"Converter #{i+1} failed: {e}")
                     
                     # Apply template formatter AFTER all converters (if specified)
-                    final_data = converted_data
                     if template_formatter:
                         # Update context with final converter data
                         context.extracted_data = converted_data
-                        template_result = template_formatter(context)
+                        formatted_filename = template_formatter(context)  # Returns string directly
                         
-                        # Template result should contain formatted_name
-                        if 'formatted_name' in template_result:
-                            final_data = template_result
-                        else:
-                            # If template doesn't return formatted_name, merge with converted data
-                            final_data = converted_data.copy()
-                            final_data.update(template_result)
-                    
-                    # Generate new filename
-                    new_name = self._generate_new_filename(final_data, file_path)
+                        # Generate new filename from template result
+                        new_name = self._generate_new_filename_from_template(formatted_filename, file_path)
+                    else:
+                        # No template - generate filename from converter data
+                        new_name = self._generate_new_filename_from_data(converted_data, file_path)
                     
                     if new_name != file_path.name:
                         rename_plan.append({
@@ -123,7 +131,7 @@ class BatchRenameProcessor:
                             'new_name': new_name,
                             'old_name': file_path.name,
                             'context': context,
-                            'converted_data': final_data
+                            'converted_data': converted_data
                         })
                     
                 except Exception as e:
@@ -201,6 +209,50 @@ class BatchRenameProcessor:
         """Check if file should be processed based on filters."""
         if not filters:
             return True
+    
+    def _validate_converter_fields(self, input_fields: set, output_data: Dict[str, Any], converter_name: str):
+        """Validate that converter preserved field structure properly."""
+        if not isinstance(output_data, dict):
+            raise ValueError(f"{converter_name} must return a dictionary, got {type(output_data).__name__}")
+        
+        output_fields = set(output_data.keys())
+        
+        # Check for missing fields (fields that were removed)
+        missing_fields = input_fields - output_fields
+        if missing_fields:
+            available_fields = list(output_fields)
+            raise ValueError(
+                f"{converter_name} removed fields: {missing_fields}. "
+                f"Available fields after conversion: {available_fields}. "
+                f"Hint: Converters should preserve all fields using 'result = context.extracted_data.copy()'"
+            )
+        
+        # Allow new fields but warn if it looks suspicious
+        new_fields = output_fields - input_fields
+        if len(new_fields) > 0:
+            # This might be OK (derived fields) but could indicate problems
+            # For now, just log it - don't error
+            pass
+    
+    def _generate_new_filename_from_template(self, formatted_filename: str, original_path: Path) -> str:
+        """Generate new filename from template result (string)."""
+        # Template returns just the filename without extension
+        # Add the original extension if not already present
+        if not formatted_filename.endswith(original_path.suffix) and original_path.suffix:
+            return formatted_filename + original_path.suffix
+        return formatted_filename
+    
+    def _generate_new_filename_from_data(self, data: Dict[str, Any], original_path: Path) -> str:
+        """Generate new filename from converter data (fallback when no template)."""
+        # Look for formatted_name in data (legacy converter support)
+        if 'formatted_name' in data:
+            new_name = str(data['formatted_name'])
+            if not new_name.endswith(original_path.suffix) and original_path.suffix:
+                new_name += original_path.suffix
+            return new_name
+        
+        # Fallback: use original filename
+        return original_path.name
         
         # All filters must pass (AND logic)
         for filter_func in filters:
