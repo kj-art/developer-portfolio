@@ -4,7 +4,7 @@ Configuration classes for batch rename operations.
 Handles validation and storage of rename operation parameters.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
@@ -78,18 +78,63 @@ class RenameResult:
     
     # Collision information
     collisions: int = 0
-    existing_file_collisions: List[Dict] = None
-    internal_collisions: List[Dict] = None
+    existing_file_collisions: List[Dict] = field(default_factory=list)
+    internal_collisions: List[Dict] = field(default_factory=list)
     
     # Operation details
     processing_time: float = 0.0
-    preview_data: List[Dict] = None  # For showing rename preview
+    preview_data: List[Dict] = field(default_factory=list)  # For showing rename preview
+    error_details: List[Dict] = field(default_factory=list)  # For detailed error information
+
+
+@dataclass
+class ProcessingContext:
+    """
+    Context object containing all data for processing functions.
     
-    def __post_init__(self):
-        """Initialize list fields."""
-        if self.existing_file_collisions is None:
-            self.existing_file_collisions = []
-        if self.internal_collisions is None:
-            self.internal_collisions = []
-        if self.preview_data is None:
-            self.preview_data = []
+    This encapsulates file information and extracted data for use by
+    extractors, converters, and filters.
+    """
+    file_path: Path
+    metadata: Dict[str, Any]
+    extracted_data: Optional[Dict[str, Any]] = None
+    
+    @property
+    def filename(self) -> str:
+        """Get the filename."""
+        return self.file_path.name
+    
+    @property
+    def base_name(self) -> str:
+        """Get filename without extension."""
+        return self.file_path.stem
+    
+    @property
+    def extension(self) -> str:
+        """Get file extension."""
+        return self.file_path.suffix
+    
+    @property
+    def file_size(self) -> int:
+        """Get file size in bytes."""
+        return self.metadata.get('size', 0)
+    
+    @property
+    def created_timestamp(self) -> float:
+        """Get creation timestamp."""
+        return self.metadata.get('created', 0)
+    
+    @property
+    def modified_timestamp(self) -> float:
+        """Get modification timestamp."""
+        return self.metadata.get('modified', 0)
+    
+    def has_extracted_data(self) -> bool:
+        """Check if extracted data is available (for converter functions)."""
+        return self.extracted_data is not None
+    
+    def get_extracted_field(self, field_name: str, default: Any = None) -> Any:
+        """Safely get a field from extracted data."""
+        if self.extracted_data is None:
+            return default
+        return self.extracted_data.get(field_name, default)

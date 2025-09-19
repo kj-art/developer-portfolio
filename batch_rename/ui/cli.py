@@ -9,8 +9,8 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from core.processor import BatchRenameProcessor
-from core.config import RenameConfig
+from ..core.processor import BatchRenameProcessor
+from ..core.config import RenameConfig
 
 
 def parse_function_call(call_string: str) -> tuple:
