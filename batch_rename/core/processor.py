@@ -209,6 +209,17 @@ class BatchRenameProcessor:
         """Check if file should be processed based on filters."""
         if not filters:
             return True
+        
+        # All filters must pass (AND logic)
+        for filter_func in filters:
+            try:
+                if not filter_func(context):
+                    return False
+            except Exception:
+                # If filter fails, exclude file
+                return False
+        
+        return True
     
     def _validate_converter_fields(self, input_fields: set, output_data: Dict[str, Any], converter_name: str):
         """Validate that converter preserved field structure properly."""
@@ -253,30 +264,6 @@ class BatchRenameProcessor:
         
         # Fallback: use original filename
         return original_path.name
-        
-        # All filters must pass (AND logic)
-        for filter_func in filters:
-            try:
-                if not filter_func(context):
-                    return False
-            except Exception:
-                # If filter fails, exclude file
-                return False
-        
-        return True
-    
-    def _generate_new_filename(self, data: Dict[str, Any], original_path: Path) -> str:
-        """Generate new filename from processed data."""
-        # If template was used and returned formatted_name, use it
-        if 'formatted_name' in data:
-            new_name = str(data['formatted_name'])
-            # Preserve extension if not included
-            if not new_name.endswith(original_path.suffix) and original_path.suffix:
-                new_name += original_path.suffix
-            return new_name
-        
-        # Fallback: use original filename
-        return original_path.name
     
     def _check_collisions(self, rename_plan: List[Dict]) -> int:
         """Check for naming collisions in rename plan."""
@@ -302,7 +289,7 @@ class BatchRenameProcessor:
                 new_path = old_path.parent / item['new_name']
                 
                 # Check if target already exists
-                if new_path.exists() and new_path != old_path:
+                if new_path.exists():
                     result.error_details.append({
                         'file': str(old_path),
                         'error': f"Target file already exists: {new_path}"
@@ -310,8 +297,8 @@ class BatchRenameProcessor:
                     result.errors += 1
                     continue
                 
-                # Perform rename
-                old_path.rename(new_path)
+                # Perform the rename
+                shutil.move(str(old_path), str(new_path))
                 renamed_count += 1
                 
             except Exception as e:

@@ -17,6 +17,19 @@ class ValidationResult:
     parameters: List[inspect.Parameter]
 
 
+def _looks_like_context_param(param: inspect.Parameter) -> bool:
+    """Check if parameter appears to be ProcessingContext."""
+    # Check type annotation
+    if param.annotation != param.empty:
+        annotation_str = str(param.annotation)
+        if 'ProcessingContext' in annotation_str:
+            return True
+    
+    # Check parameter name
+    context_names = ['context', 'ctx', 'processing_context']
+    return param.name.lower() in context_names
+
+
 def validate_extractor_function(function: Callable) -> ValidationResult:
     """
     Validate extractor function signature.
@@ -295,19 +308,6 @@ def validate_allinone_function(function: Callable) -> ValidationResult:
         )
 
 
-def _looks_like_context_param(param: inspect.Parameter) -> bool:
-    """Check if parameter appears to be ProcessingContext."""
-    # Check type annotation
-    if param.annotation != param.empty:
-        annotation_str = str(param.annotation)
-        if 'ProcessingContext' in annotation_str:
-            return True
-    
-    # Check parameter name
-    context_names = ['context', 'ctx', 'processing_context']
-    return param.name.lower() in context_names
-
-
 # Function type mappings for easy access
 FUNCTION_VALIDATORS = {
     'extractor': validate_extractor_function,
@@ -323,7 +323,7 @@ def get_validator(function_type: str) -> Callable:
     Get appropriate validator for function type.
     
     Args:
-        function_type: One of 'extractor', 'converter', 'template', 'filter', 'allinone'
+        function_type: Type of function ('extractor', 'converter', 'template', 'filter', 'allinone')
         
     Returns:
         Validator function
@@ -332,6 +332,6 @@ def get_validator(function_type: str) -> Callable:
         ValueError: If function_type is not recognized
     """
     if function_type not in FUNCTION_VALIDATORS:
-        raise ValueError(f"Unknown function type: {function_type}. Must be one of: {list(FUNCTION_VALIDATORS.keys())}")
+        raise ValueError(f"Unknown function type: {function_type}")
     
     return FUNCTION_VALIDATORS[function_type]

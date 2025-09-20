@@ -53,17 +53,25 @@ class RenameConfig:
     
     def _validate(self):
         """Validate configuration consistency."""
+        # Validate input folder
+        if not self.input_folder:
+            raise ValueError("input_folder is required")
+        
+        # Convert to Path if string
+        if isinstance(self.input_folder, str):
+            self.input_folder = Path(self.input_folder)
+        
         # Must have either extractor or extract_and_convert
         if not self.extractor and not self.extract_and_convert:
-            raise ValueError("Must specify either --extractor or --extract-and-convert")
+            raise ValueError("Must specify either extractor or extract_and_convert")
         
         # Can't have both extractor and extract_and_convert
         if self.extractor and self.extract_and_convert:
-            raise ValueError("Cannot specify both --extractor and --extract-and-convert")
+            raise ValueError("Cannot specify both extractor and extract_and_convert")
         
         # If using separate extractor, need at least one converter OR template
         if self.extractor and not self.converters and not self.template:
-            raise ValueError("When using --extractor, must provide at least one --converter or --template")
+            raise ValueError("When using extractor, must provide at least one converter or template")
         
         # Template validation updated for custom .py support
         if self.template:
@@ -95,37 +103,3 @@ class RenameResult:
     processing_time: float = 0.0
     preview_data: List[Dict] = field(default_factory=list)  # For showing rename preview
     error_details: List[Dict] = field(default_factory=list)  # For detailed error information
-
-
-@dataclass
-class ProcessingContext:
-    """
-    Context object containing all data for processing functions.
-    
-    This encapsulates file information and extracted data for use by
-    extractors, converters, and filters.
-    """
-    filename: str
-    file_path: Path
-    metadata: Dict[str, Any]
-    extracted_data: Dict[str, Any] = None
-    
-    @property
-    def base_name(self) -> str:
-        """Return filename without extension."""
-        return self.file_path.stem
-    
-    @property
-    def extension(self) -> str:
-        """Return file extension including the dot."""
-        return self.file_path.suffix
-    
-    def has_extracted_data(self) -> bool:
-        """Check if extraction has been performed and has data."""
-        return self.extracted_data is not None and len(self.extracted_data) > 0
-    
-    def get_extracted_field(self, field_name: str, default: Any = None) -> Any:
-        """Get a specific field from extracted data."""
-        if not self.has_extracted_data():
-            return default
-        return self.extracted_data.get(field_name, default)

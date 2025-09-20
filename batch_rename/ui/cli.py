@@ -1,25 +1,46 @@
 """
-CLI Interface for Batch Rename Tool with Logging Integration
+CLI Interface for Batch Rename Tool
 
-Handles command line argument parsing and user interaction with comprehensive logging.
+Handles command line argument parsing and user interaction with graceful dependency handling.
 """
 
 import argparse
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple, List, Dict, Any
 
-from ..core.processor import BatchRenameProcessor
-from ..core.config import RenameConfig
-from ..core.logging_processor import LoggingBatchRenameProcessor, create_logging_processor
-from ..core.templates import is_template_function
-from ..core.converters import is_converter_function
-from ..core.validators import get_validator
-from ..core.function_loader import load_custom_function
-from shared_utils.logger import get_logger
+# Try to import core modules with graceful fallbacks
+try:
+    from ..core.processor import BatchRenameProcessor
+    from ..core.config import RenameConfig
+    CORE_AVAILABLE = True
+except ImportError:
+    BatchRenameProcessor = None
+    RenameConfig = None
+    CORE_AVAILABLE = False
+
+# Try to import logging with fallback
+try:
+    from ..core.logging_processor import create_logging_processor
+    LOGGING_AVAILABLE = True
+except ImportError:
+    create_logging_processor = None
+    LOGGING_AVAILABLE = False
+
+# Try to import validators with fallback
+try:
+    from ..core.validators import get_validator
+    from ..core.function_loader import load_custom_function
+    from ..core.templates import is_template_function
+    VALIDATION_AVAILABLE = True
+except ImportError:
+    get_validator = None
+    load_custom_function = None
+    is_template_function = None
+    VALIDATION_AVAILABLE = False
 
 
-def parse_function_call(call_string: str) -> tuple:
+def parse_function_call(call_string: str) -> Tuple[Optional[str], List[str], Dict[str, str], bool]:
     """
     Parse function call syntax: "function,arg1,arg2,key=value"
     
@@ -61,7 +82,7 @@ def parse_function_call(call_string: str) -> tuple:
 
 
 def create_parser() -> argparse.ArgumentParser:
-    """Create the command line argument parser with logging options."""
+    """Create the command line argument parser."""
     parser = argparse.ArgumentParser(
         description="Professional batch file renaming with extractors and converters",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -81,16 +102,10 @@ Examples:
     --template stringsmith,"{{;dept;}}{{_;type;}}{{_;date;}}" \\
     --preview
 
-  # StringSmith template for graceful missing field handling
-  python batch_rename.py --input-folder ./files \\
-    --extractor regex,"(?P<dept>\\w+)_(?P<type>\\w+)" \\
-    --template stringsmith,"{{;dept;}}{{_;type;}}{{_report;}}" \\
-    --execute
-
   # All-in-one function (no converters or templates needed)
   python batch_rename.py --input-folder ./files \\
     --extract-and-convert my_logic.py \\
-    --execute --quiet --log-file batch.log
+    --execute
         """
     )
     
@@ -145,12 +160,6 @@ Examples:
         action='store_true',
         default=True,
         help='Show changes without executing (default: true)'
-    )
-    
-    parser.add_argument(
-        '--verbose',
-        action='store_true',
-        help='Show detailed preview of all file changes'
     )
     
     parser.add_argument(
@@ -220,8 +229,8 @@ def validate_args(args) -> Optional[str]:
     if not args.input_folder.is_dir():
         return f"Input path is not a directory: {args.input_folder}"
     
-    # Template constraints validation
-    if args.template:
+    # Template constraints validation (only if validation is available)
+    if args.template and VALIDATION_AVAILABLE:
         template_name, _, _, _ = parse_function_call(args.template)
         if not is_template_function(template_name) and not Path(template_name).suffix == '.py':
             return f"Invalid template type '{template_name}'. Only 'template', 'stringsmith', or custom .py files are allowed."
@@ -234,241 +243,48 @@ def validate_args(args) -> Optional[str]:
     if args.extract_and_convert and (args.converter or args.template):
         return "Cannot use --converter or --template with --extract-and-convert"
     
-    # Check custom function files exist and validate them
-    if args.extractor and Path(args.extractor.split(',')[0]).suffix == '.py':
-        try:
-            extractor_path = args.extractor.split(',')[0]
-            function_name = args.extractor.split(',')[1] if ',' in args.extractor else None
-            if not function_name:
-                return f"Custom extractor requires function name: {extractor_path},function_name"
-            
-            # Load and validate function
-            func = load_custom_function(extractor_path, function_name)
-            validator = get_validator('extractor')
-            result = validator(func)
-            if not result.valid:
-                return f"Extractor function validation failed: {result.message}"
-                
-        except Exception as e:
-            return f"Extractor validation error: {e}"
-    
-    if args.converter:
-        for converter_call in args.converter:
-            parts = converter_call.split(',')
-            if len(parts) > 0 and Path(parts[0]).suffix == '.py':
-                try:
-                    converter_path = parts[0]
-                    function_name = parts[1] if len(parts) > 1 else None
-                    if not function_name:
-                        return f"Custom converter requires function name: {converter_path},function_name"
-                    
-                    # Load and validate function
-                    func = load_custom_function(converter_path, function_name)
-                    validator = get_validator('converter')
-                    result = validator(func)
-                    if not result.valid:
-                        return f"Converter function validation failed: {result.message}"
-                        
-                except Exception as e:
-                    return f"Converter validation error: {e}"
-    
-    if args.template:
-        parts = args.template.split(',')
-        if len(parts) > 0 and Path(parts[0]).suffix == '.py':
+    # Custom function validation (only if validation is available)
+    if VALIDATION_AVAILABLE:
+        # Validate custom extractor functions
+        if args.extractor and Path(args.extractor.split(',')[0]).suffix == '.py':
             try:
-                template_path = parts[0]
-                function_name = parts[1] if len(parts) > 1 else None
+                extractor_path = args.extractor.split(',')[0]
+                function_name = args.extractor.split(',')[1] if ',' in args.extractor else None
                 if not function_name:
-                    return f"Custom template requires function name: {template_path},function_name"
+                    return f"Custom extractor requires function name: {extractor_path},function_name"
                 
                 # Load and validate function
-                func = load_custom_function(template_path, function_name)
-                validator = get_validator('template')
+                func = load_custom_function(extractor_path, function_name)
+                validator = get_validator('extractor')
                 result = validator(func)
                 if not result.valid:
-                    return f"Template function validation failed: {result.message}"
+                    return f"Extractor function validation failed: {result.message}"
                     
             except Exception as e:
-                return f"Template validation error: {e}"
-    
-    
-    if args.extract_and_convert and Path(args.extract_and_convert).suffix == '.py':
-        # For extract_and_convert, we need the function name from the first positional arg
-        try:
-            # This is trickier - the function name isn't in the path, it's in args
-            # For now, just check file exists
-            if not Path(args.extract_and_convert).exists():
-                return f"Extract-and-convert file not found: {args.extract_and_convert}"
-        except Exception as e:
-            return f"Extract-and-convert validation error: {e}"
-    
-    # Validate log file path
-    if args.log_file:
-        log_path = Path(args.log_file)
-        if not log_path.parent.exists():
-            return f"Log file directory does not exist: {log_path.parent}"
+                return f"Extractor validation error: {e}"
+        
+        # Validate custom converter functions
+        if args.converter:
+            for converter_call in args.converter:
+                parts = converter_call.split(',')
+                if len(parts) > 0 and Path(parts[0]).suffix == '.py':
+                    try:
+                        converter_path = parts[0]
+                        function_name = parts[1] if len(parts) > 1 else None
+                        if not function_name:
+                            return f"Custom converter requires function name: {converter_path},function_name"
+                        
+                        # Load and validate function
+                        func = load_custom_function(converter_path, function_name)
+                        validator = get_validator('converter')
+                        result = validator(func)
+                        if not result.valid:
+                            return f"Converter function validation failed: {result.message}"
+                            
+                    except Exception as e:
+                        return f"Converter validation error: {e}"
     
     return None
-
-
-def setup_logging_and_processor(args):
-    """Setup logging configuration and create logging processor."""
-    
-    # Handle legacy verbose flag
-    log_level = args.log_level
-    if args.verbose and log_level == 'INFO':
-        log_level = 'DEBUG'
-    
-    # Create logging processor with configuration
-    processor = create_logging_processor(
-        log_level=log_level,
-        log_file=args.log_file,
-        enable_colors=not args.no_colors,
-    )
-    
-    return processor
-
-
-def print_operation_header(args):
-    """Print operation header information if not in quiet mode."""
-    if args.quiet:
-        return
-        
-    operation_type = "PREVIEW" if (args.preview and not args.execute) else "EXECUTE"
-    
-    print(f"\n=== BATCH RENAME {operation_type} ===")
-    print(f"Input folder: {args.input_folder}")
-    
-    if args.extractor:
-        print(f"Extractor: {args.extractor}")
-    elif args.extract_and_convert:
-        print(f"Extract & Convert: {args.extract_and_convert}")
-    
-    if args.converter:
-        converter_summary = " -> ".join(args.converter)
-        print(f"Converters: {converter_summary}")
-    
-    if args.template:
-        print(f"Template: {args.template}")
-    
-    if args.filter:
-        filter_summary = []
-        for filt in args.filter:
-            if filt.startswith('!'):
-                filter_summary.append(f"NOT {filt[1:]}")
-            else:
-                filter_summary.append(filt)
-        print(f"Filters: {' AND '.join(filter_summary)}")
-    
-    print(f"Recursive: {args.recursive}")
-    print()
-
-
-def print_operation_results(args, result):
-    """Print operation results unless in quiet mode."""
-    if args.quiet:
-        return
-    
-    # Print summary
-    print(f"\nFiles analyzed: {result.files_analyzed}")
-    print(f"Files to rename: {result.files_to_rename}")
-    
-    if result.files_filtered_out > 0:
-        print(f"Files filtered out: {result.files_filtered_out}")
-    
-    if result.collisions > 0:
-        print(f"Collisions detected: {result.collisions}")
-    
-    if args.execute:
-        print(f"Files renamed: {result.files_renamed}")
-        if result.errors > 0:
-            print(f"Errors: {result.errors}")
-    
-    # Print preview data for preview mode
-    if not args.execute and result.preview_data:
-        print_preview_sample(result.preview_data, enable_colors=not args.no_colors, verbose=args.verbose)
-
-
-def print_preview_sample(preview_data, enable_colors=None, verbose=False):
-    """Print sample of preview changes with collision highlighting and interactive confirmation."""
-    
-    # Auto-detect if we should use colors
-    if enable_colors is None:
-        enable_colors = sys.stdout.isatty()  # True if terminal, False if piped
-    
-    # Filter to only show actual changes
-    changes = [item for item in preview_data if item['old_name'] != item['new_name']]
-    
-    if not changes:
-        print("\nNo filename changes would be made.")
-        return
-    
-    # Find collisions - new names that appear multiple times
-    new_names = [change['new_name'] for change in changes]
-    collision_names = {name for name in new_names if new_names.count(name) > 1}
-    
-    # ANSI color codes (only if colors enabled)
-    if enable_colors:
-        RED = '\033[91m'
-        RESET = '\033[0m'
-    else:
-        RED = ''
-        RESET = ''
-    
-    def format_change(change):
-        """Format a change with red highlighting for collisions."""
-        old_name = change['old_name']
-        new_name = change['new_name']
-        
-        if new_name in collision_names:
-            if enable_colors:
-                return f"  {old_name} → {RED}{new_name}{RESET}"
-            else:
-                return f"  {old_name} → {new_name} [COLLISION]"
-        else:
-            return f"  {old_name} → {new_name}"
-    
-    # Show initial sample
-    print(f"\nSample changes (showing first {min(5, len(changes))} of {len(changes)}):")
-    
-    for change in changes[:5]:
-        print(format_change(change))
-    
-    if len(changes) > 5:
-        print(f"  ... and {len(changes) - 5} more changes")
-        
-        # Interactive confirmation for large operations
-        if len(changes) > 10 and not verbose:
-            try:
-                response = input(f"\nFound {len(changes)} files to rename. Display all changes? (y/N): ")
-                if response.lower() in ['y', 'yes']:
-                    print(f"\nDetailed preview ({len(changes)} changes):")
-                    print("-" * 60)
-                    for entry in changes:
-                        print(format_change(entry))
-                    print("-" * 60)
-                    
-                    if collision_names:
-                        if enable_colors:
-                            print(f"\n{RED}Files in red have naming conflicts{RESET}")
-                        else:
-                            print("\nFiles marked [COLLISION] have naming conflicts")
-            except KeyboardInterrupt:
-                print("\nPreview cancelled.")
-                return
-        elif verbose:
-            # Show all changes if verbose mode
-            print(f"\nDetailed preview ({len(changes)} changes):")
-            print("-" * 60)
-            for entry in changes:
-                print(format_change(entry))
-            print("-" * 60)
-            
-            if collision_names:
-                if enable_colors:
-                    print(f"\n{RED}Files in red have naming conflicts{RESET}")
-                else:
-                    print("\nFiles marked [COLLISION] have naming conflicts")
 
 
 def main():
@@ -480,41 +296,40 @@ def main():
     error = validate_args(args)
     if error:
         print(f"Error: {error}", file=sys.stderr)
-        sys.exit(1)
+        return 1
+    
+    # Check if core functionality is available
+    if not CORE_AVAILABLE:
+        print("Error: Core batch rename functionality not available", file=sys.stderr)
+        return 1
     
     try:
-        # Setup logging and create processor
-        processor = setup_logging_and_processor(args)
+        # Set up logging if available
+        if LOGGING_AVAILABLE:
+            processor = create_logging_processor(
+                log_level=args.log_level,
+                log_file=args.log_file,
+                enable_colors=not args.no_colors
+            )
+        else:
+            processor = BatchRenameProcessor()
         
-        # Get CLI logger
-        cli_logger = get_logger('batch_rename.cli')
-        
-        # Print operation header
-        print_operation_header(args)
-        
-        # Parse extractor
-        extractor_name = None
-        extractor_args = {}
+        # Parse extractor configuration
         if args.extractor:
-            extractor_name, pos_args, kwargs, inverted = parse_function_call(args.extractor)
-            if inverted:
-                print("Error: Extractors cannot be inverted with !", file=sys.stderr)
-                sys.exit(1)
+            extractor_name, pos_args, kwargs, _ = parse_function_call(args.extractor)
             extractor_args = {'positional': pos_args, 'keyword': kwargs}
+        else:
+            extractor_name = None
+            extractor_args = {}
         
-        # Parse converters (excluding template functions)
+        # Parse converter configurations
         converters = []
         if args.converter:
             for converter_call in args.converter:
                 conv_name, pos_args, kwargs, inverted = parse_function_call(converter_call)
                 if inverted:
                     print("Error: Converters cannot be inverted with !", file=sys.stderr)
-                    sys.exit(1)
-                
-                # Prevent template functions from being used as converters
-                if is_template_function(conv_name):
-                    print(f"Error: '{conv_name}' is a template function. Use --template, not --converter", file=sys.stderr)
-                    sys.exit(1)
+                    return 1
                 
                 converters.append({
                     'name': conv_name,
@@ -522,13 +337,13 @@ def main():
                     'keyword': kwargs
                 })
         
-        # Parse template (separate from converters)
+        # Parse template configuration
         template = None
         if args.template:
             template_name, pos_args, kwargs, inverted = parse_function_call(args.template)
             if inverted:
                 print("Error: Templates cannot be inverted with !", file=sys.stderr)
-                sys.exit(1)
+                return 1
             
             template = {
                 'name': template_name,
@@ -536,7 +351,7 @@ def main():
                 'keyword': kwargs
             }
         
-        # Parse filters
+        # Parse filter configurations
         filters = []
         if args.filter:
             for filter_call in args.filter:
@@ -563,42 +378,48 @@ def main():
             on_internal_collision=args.on_internal_collision
         )
         
-        # Execute with logging
-        cli_logger.info("CLI operation started", 
-                       operation_type="preview" if config.preview_mode else "execute",
-                       input_folder=str(args.input_folder))
-        
+        # Execute processing
         result = processor.process(config)
         
         # Print results
-        print_operation_results(args, result)
+        operation_type = "PREVIEW" if config.preview_mode else "EXECUTE"
+        print(f"\n=== BATCH RENAME {operation_type} RESULTS ===")
+        print(f"Files analyzed: {result.files_analyzed}")
         
-        # Log completion
-        cli_logger.info("CLI operation completed",
-                       files_analyzed=result.files_analyzed,
-                       files_renamed=result.files_renamed,
-                       errors=result.errors)
+        if config.preview_mode:
+            print(f"Files to rename: {result.files_to_rename}")
+            if result.files_to_rename > 0:
+                print("\nPreview of changes:")
+                for item in result.preview_data[:10]:  # Show first 10
+                    print(f"  {item['old_name']} → {item['new_name']}")
+                if len(result.preview_data) > 10:
+                    print(f"  ... and {len(result.preview_data) - 10} more")
+                print(f"\nTo execute these changes, add --execute to your command.")
+        else:
+            print(f"Files renamed: {result.files_renamed}")
         
-        # Determine exit code
         if result.errors > 0:
-            cli_logger.warning("Operation completed with errors", error_count=result.errors)
-            sys.exit(1)
+            print(f"\nErrors: {result.errors}")
+            for error in result.error_details[:5]:  # Show first 5 errors
+                print(f"  {error['file']}: {error['error']}")
+            if len(result.error_details) > 5:
+                print(f"  ... and {len(result.error_details) - 5} more errors")
         
-        if not args.quiet and config.preview_mode and result.files_to_rename > 0:
-            print("\nUse --execute to perform the renames")
-    
+        if result.collisions > 0:
+            print(f"\nWarning: {result.collisions} naming conflicts detected!")
+        
+        return 0 if result.errors == 0 else 1
+        
     except KeyboardInterrupt:
-        cli_logger.warning("Operation cancelled by user")
         if not args.quiet:
             print("\nOperation cancelled by user.")
-        sys.exit(1)
-    
+        return 130
+            
     except Exception as e:
-        cli_logger.error("Unexpected error occurred", error=str(e), error_type=type(e).__name__)
         if not args.quiet:
-            print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
+            print(f"Error: {str(e)}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

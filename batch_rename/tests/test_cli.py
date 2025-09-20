@@ -9,56 +9,23 @@ import sys
 from unittest.mock import Mock, patch
 from pathlib import Path
 
-# The conftest.py already adds the project root to sys.path, so we can import directly
-try:
-    from ui.cli import parse_function_call
-    CLI_PARSE_AVAILABLE = True
-except ImportError:
-    CLI_PARSE_AVAILABLE = False
+# Add project root to path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
-# For functions that have relative imports, we'll mock the dependencies
-class MockProcessor:
-    pass
-
-class MockConfig:
-    pass
-
-class MockLogger:
-    @staticmethod
-    def get_logger(name):
-        return Mock()
-
-# Mock the problematic imports before importing CLI functions
-sys.modules['shared_utils.logger'] = MockLogger
-sys.modules['core.logging_processor'] = Mock()
-
-try:
-    # Now try to import other CLI functions with mocked dependencies
-    with patch.dict('sys.modules', {
-        'shared_utils.logger': MockLogger,
-        'core.logging_processor': Mock(),
-        'core.templates': Mock(),
-        'core.converters': Mock(),
-        'core.validators': Mock(),
-        'core.function_loader': Mock(),
-    }):
-        from ui.cli import create_parser, validate_args
-        CLI_FULL_AVAILABLE = True
-except ImportError:
-    CLI_FULL_AVAILABLE = False
+# Import the CLI module directly
+from ui.cli import parse_function_call, create_parser, validate_args
 
 
 class TestFunctionCallParsing:
     """Test parsing of function call syntax."""
     
-    @pytest.mark.skipif(not CLI_PARSE_AVAILABLE, reason="CLI parse_function_call not available")
     def test_parse_simple_function_call(self):
         """Test parsing simple function call."""
         result = parse_function_call('split,_,dept,type')
         
         assert result == ('split', ['_', 'dept', 'type'], {}, False)
     
-    @pytest.mark.skipif(not CLI_PARSE_AVAILABLE, reason="CLI parse_function_call not available")
     def test_parse_function_call_with_kwargs(self):
         """Test parsing function call with keyword arguments."""
         result = parse_function_call('pad_numbers,field,width=3,fill=0')
@@ -69,7 +36,6 @@ class TestFunctionCallParsing:
         assert kwargs == {'width': '3', 'fill': '0'}
         assert inverted is False
     
-    @pytest.mark.skipif(not CLI_PARSE_AVAILABLE, reason="CLI parse_function_call not available")
     def test_parse_function_call_mixed_args(self):
         """Test parsing function call with mixed positional and keyword args."""
         result = parse_function_call('format,{dept}_{type},case=upper')
@@ -80,7 +46,6 @@ class TestFunctionCallParsing:
         assert kwargs == {'case': 'upper'}
         assert inverted is False
     
-    @pytest.mark.skipif(not CLI_PARSE_AVAILABLE, reason="CLI parse_function_call not available")
     def test_parse_function_call_with_inversion(self):
         """Test parsing function call with inversion prefix."""
         result = parse_function_call('!extension,pdf,docx')
@@ -91,14 +56,18 @@ class TestFunctionCallParsing:
         assert kwargs == {}
         assert inverted is True
     
-    @pytest.mark.skipif(not CLI_PARSE_AVAILABLE, reason="CLI parse_function_call not available")
     def test_parse_function_call_empty(self):
         """Test parsing empty function call."""
         result = parse_function_call('')
         
         assert result == (None, [], {}, False)
     
-    @pytest.mark.skipif(not CLI_PARSE_AVAILABLE, reason="CLI parse_function_call not available")
+    def test_parse_function_call_none(self):
+        """Test parsing None input."""
+        result = parse_function_call(None)
+        
+        assert result == (None, [], {}, False)
+    
     def test_parse_function_call_only_name(self):
         """Test parsing function call with only name."""
         result = parse_function_call('metadata')
@@ -109,7 +78,6 @@ class TestFunctionCallParsing:
         assert kwargs == {}
         assert inverted is False
     
-    @pytest.mark.skipif(not CLI_PARSE_AVAILABLE, reason="CLI parse_function_call not available")
     def test_parse_function_call_with_spaces(self):
         """Test parsing function call with spaces around commas."""
         result = parse_function_call('split, _, dept, type')
@@ -121,91 +89,9 @@ class TestFunctionCallParsing:
         assert inverted is False
 
 
-class TestArgumentParser:
-    """Test argument parser creation and basic functionality."""
-    
-    @pytest.mark.skipif(not CLI_FULL_AVAILABLE, reason="CLI imports not fully available")
-    def test_create_parser(self):
-        """Test that parser can be created without errors."""
-        with patch.dict('sys.modules', {
-            'shared_utils.logger': MockLogger,
-            'core.logging_processor': Mock(),
-            'core.templates': Mock(),
-            'core.converters': Mock(),
-            'core.validators': Mock(),
-            'core.function_loader': Mock(),
-        }):
-            parser = create_parser()
-            assert parser is not None
-            assert hasattr(parser, 'parse_args')
-    
-    @pytest.mark.skipif(not CLI_FULL_AVAILABLE, reason="CLI imports not fully available")
-    def test_parser_basic_structure(self):
-        """Test basic parser structure."""
-        with patch.dict('sys.modules', {
-            'shared_utils.logger': MockLogger,
-            'core.logging_processor': Mock(),
-            'core.templates': Mock(),
-            'core.converters': Mock(),
-            'core.validators': Mock(),
-            'core.function_loader': Mock(),
-        }):
-            parser = create_parser()
-            
-            # Test that the parser has the expected arguments
-            # This tests the structure without trying to parse actual arguments
-            actions = {action.dest for action in parser._actions}
-            
-            # These should be present based on your CLI structure
-            expected_args = {'help', 'input_folder', 'extractor'}
-            assert expected_args.issubset(actions)
-
-
-class TestArgumentValidation:
-    """Test argument validation functionality."""
-    
-    @pytest.mark.skipif(not CLI_FULL_AVAILABLE, reason="CLI imports not fully available")
-    def test_validate_args_valid_folder(self, temp_dir):
-        """Test validation with valid input folder."""
-        with patch.dict('sys.modules', {
-            'shared_utils.logger': MockLogger,
-            'core.logging_processor': Mock(),
-            'core.templates': Mock(),
-            'core.converters': Mock(),
-            'core.validators': Mock(),
-            'core.function_loader': Mock(),
-        }):
-            mock_args = Mock()
-            mock_args.input_folder = temp_dir
-            mock_args.template = None
-            
-            error = validate_args(mock_args)
-            assert error is None
-    
-    @pytest.mark.skipif(not CLI_FULL_AVAILABLE, reason="CLI imports not fully available")
-    def test_validate_args_nonexistent_folder(self):
-        """Test validation with non-existent folder."""
-        with patch.dict('sys.modules', {
-            'shared_utils.logger': MockLogger,
-            'core.logging_processor': Mock(),
-            'core.templates': Mock(),
-            'core.converters': Mock(),
-            'core.validators': Mock(),
-            'core.function_loader': Mock(),
-        }):
-            mock_args = Mock()
-            mock_args.input_folder = Path("/definitely/nonexistent/folder")
-            mock_args.template = None
-            
-            error = validate_args(mock_args)
-            assert error is not None
-            assert "does not exist" in error
-
-
 class TestFunctionCallParsingEdgeCases:
     """Test edge cases in function call parsing."""
     
-    @pytest.mark.skipif(not CLI_PARSE_AVAILABLE, reason="CLI parse_function_call not available")
     def test_function_call_parsing_edge_cases(self):
         """Test edge cases in function call parsing."""
         # Test with equals in value
@@ -231,13 +117,6 @@ class TestFunctionCallParsingEdgeCases:
 class TestCLIErrorHandling:
     """Test CLI error handling scenarios."""
     
-    @pytest.mark.skipif(not CLI_PARSE_AVAILABLE, reason="CLI parse_function_call not available")  
-    def test_parse_function_call_none_input(self):
-        """Test parse_function_call with None input."""
-        result = parse_function_call(None)
-        assert result == (None, [], {}, False)
-    
-    @pytest.mark.skipif(not CLI_PARSE_AVAILABLE, reason="CLI parse_function_call not available")
     def test_parse_function_call_malformed_kwargs(self):
         """Test parse_function_call with malformed keyword arguments."""
         # Multiple equals signs - should take first split
@@ -258,24 +137,75 @@ class TestCLIErrorHandling:
         assert kwargs == {'key': ''}
 
 
-# Test that demonstrates the CLI structure without import issues
-class TestCLIStructure:
-    """Test CLI structure and behavior without deep imports."""
+class TestArgumentParser:
+    """Test argument parser creation and basic functionality."""
     
-    def test_function_call_format_specification(self):
-        """Test that function call format meets specification."""
-        # This documents the expected function call format for your CLI
-        expected_formats = [
-            'split,_,dept,type,date',
-            'pad_numbers,field,width=3',
-            'format,{dept}_{type}',
-            '!extension,pdf,docx',
-            'regex,"(?P<dept>\\w+)_(?P<num>\\d+)"'
-        ]
+    def test_create_parser(self):
+        """Test that parser can be created without errors."""
+        parser = create_parser()
+        assert parser is not None
+        assert hasattr(parser, 'parse_args')
+    
+    def test_parser_basic_structure(self):
+        """Test basic parser structure."""
+        parser = create_parser()
         
-        # These are the formats your CLI should support
-        for format_str in expected_formats:
-            assert isinstance(format_str, str)
-            assert ',' in format_str  # Should contain commas as separators
-            parts = format_str.split(',')
-            assert len(parts) >= 1  # Should have at least function name
+        # Test that the parser has the expected arguments
+        actions = {action.dest for action in parser._actions}
+        
+        # These should be present based on the CLI structure
+        expected_args = {'help', 'input_folder', 'extractor', 'extract_and_convert'}
+        assert expected_args.issubset(actions)
+
+
+class TestArgumentValidation:
+    """Test argument validation functionality."""
+    
+    @pytest.fixture
+    def temp_dir(self):
+        """Create temporary directory for testing."""
+        import tempfile
+        import shutil
+        temp_dir = tempfile.mkdtemp()
+        temp_path = Path(temp_dir)
+        yield temp_path
+        shutil.rmtree(temp_dir)
+    
+    def test_validate_args_valid_folder(self, temp_dir):
+        """Test validation with valid input folder."""
+        mock_args = Mock()
+        mock_args.input_folder = temp_dir
+        mock_args.template = None
+        mock_args.extractor = "split"
+        mock_args.converter = ["case"]
+        mock_args.extract_and_convert = None
+        
+        error = validate_args(mock_args)
+        assert error is None
+    
+    def test_validate_args_nonexistent_folder(self):
+        """Test validation with non-existent folder."""
+        mock_args = Mock()
+        mock_args.input_folder = Path("/definitely/nonexistent/folder")
+        mock_args.template = None
+        
+        error = validate_args(mock_args)
+        assert error is not None
+        assert "does not exist" in error
+    
+    def test_validate_args_extractor_without_converter(self):
+        """Test validation fails when extractor has no converter or template."""
+        mock_args = Mock()
+        mock_args.input_folder = Path.cwd()  # Use current directory as it exists
+        mock_args.template = None
+        mock_args.extractor = "split"
+        mock_args.converter = None
+        mock_args.extract_and_convert = None
+        
+        error = validate_args(mock_args)
+        assert error is not None
+        assert "must provide at least one" in error
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

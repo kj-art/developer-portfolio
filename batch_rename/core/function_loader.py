@@ -64,18 +64,20 @@ def validate_extractor_function(func: Callable) -> bool:
     Validate that a function has the correct signature for an extractor.
     
     Expected signature:
-    def extract_data(filename: str, file_path: Path, metadata: dict) -> dict
+    def extract_data(context: ProcessingContext, *args, **kwargs) -> dict
     """
     try:
         import inspect
         sig = inspect.signature(func)
         params = list(sig.parameters.keys())
         
-        # Check parameter count and names
-        expected_params = ['filename', 'file_path', 'metadata']
-        if len(params) >= len(expected_params):
-            # Allow additional parameters for flexibility
-            return True
+        # Check that function has at least one parameter (ProcessingContext)
+        if len(params) >= 1:
+            # Check if first parameter name suggests ProcessingContext
+            first_param = params[0]
+            # Accept common parameter names for ProcessingContext
+            valid_names = ['context', 'ctx', 'processing_context', 'filename', 'file_path']
+            return any(name in first_param.lower() for name in valid_names) or len(params) >= 3
         else:
             return False
     except Exception:
@@ -88,16 +90,15 @@ def validate_converter_function(func: Callable) -> bool:
     Validate that a function has the correct signature for a converter.
     
     Expected signature:
-    def convert_data(extracted_data: dict, filename: str, file_path: Path, metadata: dict) -> dict
+    def convert_data(context: ProcessingContext, *args, **kwargs) -> dict
     """
     try:
         import inspect
         sig = inspect.signature(func)
         params = list(sig.parameters.keys())
         
-        # Check parameter count
-        expected_params = ['extracted_data', 'filename', 'file_path', 'metadata']
-        if len(params) >= len(expected_params):
+        # Check that function has at least one parameter (ProcessingContext)
+        if len(params) >= 1:
             return True
         else:
             return False
@@ -110,16 +111,15 @@ def validate_combined_function(func: Callable) -> bool:
     Validate that a function has the correct signature for extract_and_convert.
     
     Expected signature:
-    def extract_and_convert(filename: str, file_path: Path, metadata: dict) -> dict
+    def extract_and_convert(context: ProcessingContext, *args, **kwargs) -> dict
     """
     try:
         import inspect
         sig = inspect.signature(func)
         params = list(sig.parameters.keys())
         
-        # Same as extractor signature
-        expected_params = ['filename', 'file_path', 'metadata']
-        if len(params) >= len(expected_params):
+        # Check that function has at least one parameter (ProcessingContext)
+        if len(params) >= 1:
             return True
         else:
             return False
