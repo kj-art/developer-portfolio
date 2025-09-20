@@ -13,7 +13,7 @@ from .processing_context import ProcessingContext
 from .built_ins.extractors import get_extractor
 from .built_ins.converters import get_converter
 from .built_ins.templates import get_template
-from .filters import get_filter
+from .built_ins.filters import get_filter
 from .built_ins.all_in_ones import get_builtin_all_in_one, is_builtin_all_in_one
 from .function_loader import load_custom_function
 

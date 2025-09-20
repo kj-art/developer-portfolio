@@ -6,9 +6,8 @@ Tests all converter functionality including field preservation and error handlin
 
 import pytest
 from pathlib import Path
-from unittest.mock import Mock
 
-from core.converters import (
+from core.built_ins.converters import (
     pad_numbers_converter, date_format_converter, case_converter,
     get_converter, is_converter_function, BUILTIN_CONVERTERS
 )

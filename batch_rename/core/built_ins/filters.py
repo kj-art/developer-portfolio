@@ -6,13 +6,11 @@ All filters take a ProcessingContext and return boolean values.
 """
 
 import fnmatch
-import re
 from pathlib import Path
 from typing import Dict, Any, List, Callable
-import datetime
 
-from .processing_context import ProcessingContext
-from .function_loader import load_custom_function
+from ..processing_context import ProcessingContext
+from ..function_loader import load_custom_function
 
 
 def pattern_filter(context: ProcessingContext, positional_args: List[str], **kwargs) -> bool:

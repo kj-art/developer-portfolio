@@ -6,9 +6,8 @@ Tests all filter functionality including inversion and edge cases.
 
 import pytest
 from pathlib import Path
-from unittest.mock import Mock
 
-from core.filters import (
+from batch_rename.core.built_ins.filters import (
     pattern_filter, file_type_filter, file_size_filter, name_length_filter, date_modified_filter,
     get_filter, BUILTIN_FILTERS
 )

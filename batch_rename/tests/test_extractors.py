@@ -6,9 +6,8 @@ Tests all extractor functionality including edge cases and error handling.
 
 import pytest
 from pathlib import Path
-from unittest.mock import Mock
 
-from core.extractors import (
+from core.built_ins.extractors import (
     split_extractor, regex_extractor, position_extractor, metadata_extractor,
     get_extractor, BUILTIN_EXTRACTORS
 )
