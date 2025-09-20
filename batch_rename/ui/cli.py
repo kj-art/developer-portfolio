@@ -7,7 +7,7 @@ Handles command line argument parsing and user interaction with graceful depende
 import argparse
 import sys
 from pathlib import Path
-from typing import Optional, Tuple, List, Dict, Any
+from typing import Optional, Tuple, List, Dict
 
 # Try to import core modules with graceful fallbacks
 try:
@@ -31,7 +31,7 @@ except ImportError:
 try:
     from ..core.validators import get_validator
     from ..core.function_loader import load_custom_function
-    from ..core.templates import is_template_function
+    from ..core.built_ins.templates import is_template_function
     VALIDATION_AVAILABLE = True
 except ImportError:
     get_validator = None
@@ -81,6 +81,57 @@ def parse_function_call(call_string: str) -> Tuple[Optional[str], List[str], Dic
     return function_name, positional_args, keyword_args, inverted
 
 
+def should_use_colors(color_setting):
+    """Determine if colors should be used based on setting and environment."""
+    if color_setting == 'always':
+        return True
+    elif color_setting == 'never':
+        return False
+    else:  # auto
+        # Detect if output is a terminal
+        return hasattr(sys.stdout, 'isatty') and sys.stdout.isatty()
+
+
+def highlight_collisions(preview_data, use_colors):
+    """Add red highlighting to collision conflicts in preview data."""
+    if not use_colors:
+        return preview_data
+    
+    # Find collisions by checking for duplicate new names
+    new_names = {}
+    for item in preview_data:
+        new_name = item['new_name']
+        if new_name in new_names:
+            new_names[new_name].append(item)
+        else:
+            new_names[new_name] = [item]
+    
+    # Mark collisions with red highlighting
+    collision_names = {name for name, items in new_names.items() if len(items) > 1}
+    
+    highlighted_data = []
+    for item in preview_data:
+        if item['new_name'] in collision_names:
+            # Add red ANSI color codes for collisions
+            highlighted_item = item.copy()
+            highlighted_item['new_name'] = f"\033[31m{item['new_name']}\033[0m"
+            highlighted_data.append(highlighted_item)
+        else:
+            highlighted_data.append(item)
+    
+    return highlighted_data
+
+
+def resolve_log_level(args):
+    """Resolve final log level from arguments with proper precedence."""
+    if args.quiet:
+        return 'WARNING'
+    elif args.verbose:
+        return 'DEBUG'
+    else:
+        return args.log_level
+
+
 def create_parser() -> argparse.ArgumentParser:
     """Create the command line argument parser."""
     parser = argparse.ArgumentParser(
@@ -104,6 +155,11 @@ Examples:
 
   # All-in-one function (no converters or templates needed)
   python batch_rename.py --input-folder ./files \\
+    --extract-and-convert "replace,report,summary,2024,2025" \\
+    --execute
+  
+  # Custom all-in-one function from .py file
+  python batch_rename.py --input-folder ./files \\
     --extract-and-convert my_logic.py \\
     --execute
         """
@@ -125,7 +181,7 @@ Examples:
     )
     extraction_group.add_argument(
         '--extract-and-convert',
-        help='Path to function that handles both extraction and conversion'
+        help='All-in-one function: "replace,old,new" or path to .py file with rename_all function'
     )
     
     # Conversion options (can have multiple)
@@ -201,15 +257,22 @@ Examples:
     )
     
     logging_group.add_argument(
-        '--no-colors',
-        action='store_true',
-        help='Disable colored console output'
+        '--color',
+        choices=['auto', 'always', 'never'],
+        default='auto',
+        help='Control colored output: auto (detect terminal), always (force colors), never (no colors)'
     )
     
     logging_group.add_argument(
         '--quiet',
         action='store_true',
         help='Suppress non-essential output (errors only)'
+    )
+    
+    logging_group.add_argument(
+        '--verbose',
+        action='store_true',
+        help='Enable detailed progress output (sets log level to DEBUG)'
     )
     
     return parser
@@ -235,54 +298,16 @@ def validate_args(args) -> Optional[str]:
         if not is_template_function(template_name) and not Path(template_name).suffix == '.py':
             return f"Invalid template type '{template_name}'. Only 'template', 'stringsmith', or custom .py files are allowed."
     
-    # Extractor + converter/template requirement
+    # Validate converters are provided when using extractor (not extract-and-convert)
     if args.extractor and not args.converter and not args.template:
-        return "When using --extractor, must provide at least one --converter or --template"
+        return "When using --extractor, you must provide at least one --converter or --template"
     
-    # Extract-and-convert should be standalone
-    if args.extract_and_convert and (args.converter or args.template):
-        return "Cannot use --converter or --template with --extract-and-convert"
+    # Validate extract-and-convert doesn't have converters
+    if args.extract_and_convert and args.converter:
+        return "Cannot use --converter with --extract-and-convert (all-in-one functions handle conversion internally)"
     
-    # Custom function validation (only if validation is available)
-    if VALIDATION_AVAILABLE:
-        # Validate custom extractor functions
-        if args.extractor and Path(args.extractor.split(',')[0]).suffix == '.py':
-            try:
-                extractor_path = args.extractor.split(',')[0]
-                function_name = args.extractor.split(',')[1] if ',' in args.extractor else None
-                if not function_name:
-                    return f"Custom extractor requires function name: {extractor_path},function_name"
-                
-                # Load and validate function
-                func = load_custom_function(extractor_path, function_name)
-                validator = get_validator('extractor')
-                result = validator(func)
-                if not result.valid:
-                    return f"Extractor function validation failed: {result.message}"
-                    
-            except Exception as e:
-                return f"Extractor validation error: {e}"
-        
-        # Validate custom converter functions
-        if args.converter:
-            for converter_call in args.converter:
-                parts = converter_call.split(',')
-                if len(parts) > 0 and Path(parts[0]).suffix == '.py':
-                    try:
-                        converter_path = parts[0]
-                        function_name = parts[1] if len(parts) > 1 else None
-                        if not function_name:
-                            return f"Custom converter requires function name: {converter_path},function_name"
-                        
-                        # Load and validate function
-                        func = load_custom_function(converter_path, function_name)
-                        validator = get_validator('converter')
-                        result = validator(func)
-                        if not result.valid:
-                            return f"Converter function validation failed: {result.message}"
-                            
-                    except Exception as e:
-                        return f"Converter validation error: {e}"
+    if args.extract_and_convert and args.template:
+        return "Cannot use --template with --extract-and-convert (all-in-one functions handle formatting internally)"
     
     return None
 
@@ -304,12 +329,16 @@ def main():
         return 1
     
     try:
+        # Determine color usage
+        use_colors = should_use_colors(args.color)
+        
         # Set up logging if available
         if LOGGING_AVAILABLE:
+            log_level = resolve_log_level(args)
             processor = create_logging_processor(
-                log_level=args.log_level,
+                log_level=log_level,
                 log_file=args.log_file,
-                enable_colors=not args.no_colors
+                enable_colors=use_colors
             )
         else:
             processor = BatchRenameProcessor()
@@ -390,10 +419,35 @@ def main():
             print(f"Files to rename: {result.files_to_rename}")
             if result.files_to_rename > 0:
                 print("\nPreview of changes:")
-                for item in result.preview_data[:10]:  # Show first 10
-                    print(f"  {item['old_name']} → {item['new_name']}")
-                if len(result.preview_data) > 10:
-                    print(f"  ... and {len(result.preview_data) - 10} more")
+                
+                # Highlight collisions if colors are enabled
+                preview_data = highlight_collisions(result.preview_data, use_colors)
+                
+                # Display changes in pages of 10
+                page_size = 10
+                total_changes = len(preview_data)
+                
+                for page_start in range(0, total_changes, page_size):
+                    page_end = min(page_start + page_size, total_changes)
+                    
+                    # Show current page
+                    for item in preview_data[page_start:page_end]:
+                        print(f"  {item['old_name']} → {item['new_name']}")
+                    
+                    # Check if there are more pages
+                    remaining = total_changes - page_end
+                    if remaining > 0:
+                        print(f"\nShowing {page_end}/{total_changes} changes. {remaining} more remaining.")
+                        try:
+                            continue_display = input("Continue displaying? (y/n): ").lower().strip()
+                            if continue_display != 'y':
+                                print(f"Skipping remaining {remaining} changes...")
+                                break
+                            print()  # Add blank line before next page
+                        except (KeyboardInterrupt, EOFError):
+                            print(f"\nSkipping remaining {remaining} changes...")
+                            break
+                
                 print(f"\nTo execute these changes, add --execute to your command.")
         else:
             print(f"Files renamed: {result.files_renamed}")
@@ -406,7 +460,10 @@ def main():
                 print(f"  ... and {len(result.error_details) - 5} more errors")
         
         if result.collisions > 0:
-            print(f"\nWarning: {result.collisions} naming conflicts detected!")
+            if use_colors:
+                print(f"\n\033[31mWarning: {result.collisions} naming conflicts detected!\033[0m")
+            else:
+                print(f"\nWarning: {result.collisions} naming conflicts detected!")
         
         return 0 if result.errors == 0 else 1
         

@@ -8,8 +8,8 @@ Templates are applied AFTER all converters and are responsible for final filenam
 from pathlib import Path
 from typing import Dict, Any, Callable, List
 
-from .processing_context import ProcessingContext
-from .function_loader import load_custom_function
+from ..processing_context import ProcessingContext
+from ..function_loader import load_custom_function
 
 
 def template_formatter(context: ProcessingContext, positional_args: List[str], **kwargs) -> str:

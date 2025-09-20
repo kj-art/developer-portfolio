@@ -9,8 +9,8 @@ from pathlib import Path
 from typing import Dict, Any, Callable, List
 import datetime
 
-from .processing_context import ProcessingContext
-from .function_loader import load_custom_function
+from ..processing_context import ProcessingContext
+from ..function_loader import load_custom_function
 
 
 def split_extractor(context: ProcessingContext, positional_args: List[str], **kwargs) -> Dict[str, Any]:

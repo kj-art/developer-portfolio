@@ -4,18 +4,18 @@ Core batch rename processor with ProcessingContext integration.
 Handles the main processing pipeline: extraction, conversion, filtering, and template formatting.
 """
 
-import os
 import shutil
 from pathlib import Path
 from typing import List, Dict, Any
-from dataclasses import dataclass
 
 from .config import RenameConfig, RenameResult
 from .processing_context import ProcessingContext
-from .extractors import get_extractor
-from .converters import get_converter
-from .templates import get_template
+from .built_ins.extractors import get_extractor
+from .built_ins.converters import get_converter
+from .built_ins.templates import get_template
 from .filters import get_filter
+from .built_ins.all_in_ones import get_builtin_all_in_one, is_builtin_all_in_one
+from .function_loader import load_custom_function
 
 
 class BatchRenameProcessor:
@@ -58,254 +58,280 @@ class BatchRenameProcessor:
             if len(files) == 0:
                 return result
             
-            # Set up processing functions
-            extractor = get_extractor(config.extractor, config.extractor_args)
-            converters = [get_converter(conv['name'], conv) for conv in config.converters]
-            filters = [get_filter(filt['name'], filt) for filt in config.filters]
-            
-            # Set up template formatter (separate from converters)
-            template_formatter = None
-            if config.template:
-                template_formatter = get_template(config.template['name'], config.template)
-            
-            # Process each file
-            rename_plan = []
-            for file_path in files:
-                try:
-                    # Get file metadata
-                    metadata = self._get_file_metadata(file_path)
-                    
-                    # Create processing context
-                    context = ProcessingContext(
-                        filename=file_path.name,
-                        file_path=file_path,
-                        metadata=metadata
-                    )
-                    
-                    # Apply filters first
-                    if not self._should_process_file(context, filters):
-                        continue
-                    
-                    # Extract data
-                    extracted_data = extractor(context)
-                    
-                    # Update context with extracted data for converters
-                    context.extracted_data = extracted_data
-                    
-                    # Apply converters (but not templates)
-                    converted_data = extracted_data.copy()
-                    for i, converter in enumerate(converters):
-                        try:
-                            input_fields = set(converted_data.keys())
-                            
-                            # Update context for this converter
-                            context.extracted_data = converted_data
-                            converter_result = converter(context)
-                            
-                            # Validate field consistency
-                            self._validate_converter_fields(
-                                input_fields, converter_result, f"converter #{i+1}"
-                            )
-                            
-                            # Update data for next converter
-                            converted_data = converter_result
-                            
-                        except Exception as e:
-                            raise ValueError(f"Converter #{i+1} failed: {e}")
-                    
-                    # Apply template formatter AFTER all converters (if specified)
-                    if template_formatter:
-                        # Update context with final converter data
-                        context.extracted_data = converted_data
-                        formatted_filename = template_formatter(context)  # Returns string directly
-                        
-                        # Generate new filename from template result
-                        new_name = self._generate_new_filename_from_template(formatted_filename, file_path)
-                    else:
-                        # No template - generate filename from converter data
-                        new_name = self._generate_new_filename_from_data(converted_data, file_path)
-                    
-                    if new_name != file_path.name:
-                        rename_plan.append({
-                            'old_path': file_path,
-                            'new_name': new_name,
-                            'old_name': file_path.name,
-                            'context': context,
-                            'converted_data': converted_data
-                        })
-                    
-                except Exception as e:
-                    result.errors += 1
-                    result.error_details.append({
-                        'file': str(file_path),
-                        'error': str(e)
-                    })
-            
-            # Check for naming conflicts
-            result.collisions = self._check_collisions(rename_plan)
-            result.files_to_rename = len(rename_plan)
-            
-            # Prepare preview data
-            result.preview_data = [
-                {
-                    'old_name': item['old_name'],
-                    'new_name': item['new_name']
-                }
-                for item in rename_plan
-            ]
-            
-            # Execute renames if not in preview mode
-            if not config.preview_mode:
-                result.files_renamed = self._execute_renames(rename_plan, result)
-            
-            return result
-            
+            # Check if using all-in-one function
+            if config.extract_and_convert:
+                return self._process_with_all_in_one(config, files, result)
+            else:
+                return self._process_with_pipeline(config, files, result)
+                
         except Exception as e:
+            result.errors = result.files_analyzed
             result.error_details.append({
-                'file': 'GENERAL',
-                'error': f"Processing failed: {str(e)}"
+                'file': 'SYSTEM',
+                'error': str(e)
             })
-            result.errors += 1
             return result
     
+    def _process_with_all_in_one(self, config: RenameConfig, files: List[Path], result: RenameResult) -> RenameResult:
+        """Process files using all-in-one function (extract_and_convert)."""
+        
+        # Set up all-in-one function
+        all_in_one_func = self._get_all_in_one_function(config.extract_and_convert)
+        
+        # Set up filters
+        filters = [get_filter(filt['name'], filt) for filt in config.filters]
+        
+        # Process each file
+        rename_plan = []
+        for file_path in files:
+            try:
+                # Get file metadata
+                metadata = self._get_file_metadata(file_path)
+                
+                # Create processing context
+                context = ProcessingContext(
+                    filename=file_path.name,
+                    file_path=file_path,
+                    metadata=metadata
+                )
+                
+                # Apply filters first
+                if not self._should_process_file(context, filters):
+                    continue
+                
+                # Apply all-in-one function
+                new_base_name = all_in_one_func(context)
+                
+                # Generate new filename (preserve extension)
+                new_name = self._generate_new_filename(new_base_name, file_path)
+                
+                # Add to rename plan
+                rename_plan.append({
+                    'old_path': file_path,
+                    'old_name': file_path.name,
+                    'new_name': new_name,
+                    'new_path': file_path.parent / new_name
+                })
+                
+            except Exception as e:
+                result.errors += 1
+                result.error_details.append({
+                    'file': file_path.name,
+                    'error': str(e)
+                })
+        
+        # Process rename plan
+        return self._execute_rename_plan(config, rename_plan, result)
+    
+    def _process_with_pipeline(self, config: RenameConfig, files: List[Path], result: RenameResult) -> RenameResult:
+        """Process files using the extraction -> conversion -> template pipeline."""
+        
+        # Set up processing functions
+        extractor = get_extractor(config.extractor, config.extractor_args)
+        converters = [get_converter(conv['name'], conv) for conv in config.converters]
+        filters = [get_filter(filt['name'], filt) for filt in config.filters]
+        
+        # Set up template formatter (separate from converters)
+        template_formatter = None
+        if config.template:
+            template_formatter = get_template(config.template['name'], config.template)
+        
+        # Process each file
+        rename_plan = []
+        for file_path in files:
+            try:
+                # Get file metadata
+                metadata = self._get_file_metadata(file_path)
+                
+                # Create processing context
+                context = ProcessingContext(
+                    filename=file_path.name,
+                    file_path=file_path,
+                    metadata=metadata
+                )
+                
+                # Apply filters first
+                if not self._should_process_file(context, filters):
+                    continue
+                
+                # Extract data
+                extracted_data = extractor(context)
+                
+                # Update context with extracted data for converters
+                context.extracted_data = extracted_data
+                
+                # Apply converters (but not templates)
+                converted_data = extracted_data.copy()
+                for i, converter in enumerate(converters):
+                    try:
+                        input_fields = set(converted_data.keys())
+                        
+                        # Update context for this converter
+                        context.extracted_data = converted_data
+                        converter_result = converter(context)
+                        
+                        # Validate field consistency
+                        self._validate_converter_fields(
+                            input_fields, converter_result, f"converter #{i+1}"
+                        )
+                        
+                        # Update data for next converter
+                        converted_data = converter_result
+                        
+                    except Exception as e:
+                        raise ValueError(f"Converter #{i+1} failed: {e}")
+                
+                # Apply template formatter AFTER all converters (if specified)
+                if template_formatter:
+                    # Update context with final converter data
+                    context.extracted_data = converted_data
+                    formatted_filename = template_formatter(context)  # Returns string directly
+                    
+                    # Generate new filename from template result
+                    new_name = self._generate_new_filename(formatted_filename, file_path)
+                else:
+                    # No template - use converted data directly (should not happen with current validation)
+                    # This branch exists for safety but shouldn't be reached
+                    new_name = file_path.name
+                
+                # Add to rename plan
+                rename_plan.append({
+                    'old_path': file_path,
+                    'old_name': file_path.name,
+                    'new_name': new_name,
+                    'new_path': file_path.parent / new_name
+                })
+                
+            except Exception as e:
+                result.errors += 1
+                result.error_details.append({
+                    'file': file_path.name,
+                    'error': str(e)
+                })
+        
+        # Process rename plan
+        return self._execute_rename_plan(config, rename_plan, result)
+    
+    def _get_all_in_one_function(self, extract_and_convert_spec: str):
+        """Get the all-in-one function (built-in or custom)."""
+        
+        # Check if it's a built-in function call (e.g., "replace,old,new")
+        if ',' in extract_and_convert_spec and not extract_and_convert_spec.endswith('.py'):
+            parts = extract_and_convert_spec.split(',')
+            function_name = parts[0]
+            
+            if is_builtin_all_in_one(function_name):
+                # Built-in all-in-one function
+                function_args = {
+                    'positional': parts[1:],
+                    'keyword': {}
+                }
+                return get_builtin_all_in_one(function_name, function_args)
+            else:
+                raise ValueError(f"Unknown built-in all-in-one function: {function_name}")
+        
+        elif extract_and_convert_spec.endswith('.py'):
+            # Custom .py file - assume function is named "rename_all"
+            custom_func = load_custom_function(extract_and_convert_spec, "rename_all")
+            
+            def custom_all_in_one(context: ProcessingContext) -> str:
+                # Call with legacy signature for compatibility
+                return custom_func(context.filename, context.file_path, context.metadata)
+            
+            return custom_all_in_one
+        else:
+            raise ValueError(f"Invalid extract_and_convert specification: {extract_and_convert_spec}")
+    
+    def _generate_new_filename(self, new_base_name: str, original_path: Path) -> str:
+        """Generate new filename preserving extension."""
+        if new_base_name.endswith(original_path.suffix):
+            return new_base_name
+        else:
+            return new_base_name + original_path.suffix
+    
+    def _execute_rename_plan(self, config: RenameConfig, rename_plan: List[Dict], result: RenameResult) -> RenameResult:
+        """Execute the rename plan and update results."""
+        
+        # Filter to only include actual changes
+        actual_changes = [
+            item for item in rename_plan 
+            if item['old_name'] != item['new_name']
+        ]
+        
+        result.files_to_rename = len(actual_changes)
+        
+        # Check for collisions among the changed files
+        new_names = [item['new_name'] for item in actual_changes]
+        collisions = len(new_names) - len(set(new_names))
+        result.collisions = collisions
+        
+        # Set preview data to only show actual changes
+        result.preview_data = [
+            {'old_name': item['old_name'], 'new_name': item['new_name']}
+            for item in actual_changes
+        ]
+        
+        # If preview mode, don't actually rename
+        if config.preview_mode:
+            return result
+        
+        # Execute renames (only for files that actually changed)
+        for item in actual_changes:
+            try:
+                shutil.move(str(item['old_path']), str(item['new_path']))
+                result.files_renamed += 1
+            except Exception as e:
+                result.errors += 1
+                result.error_details.append({
+                    'file': item['old_name'],
+                    'error': f"Rename failed: {e}"
+                })
+        
+        return result
+    
     def _get_file_list(self, config: RenameConfig) -> List[Path]:
-        """Get list of files to process based on config."""
+        """Get list of files to process."""
         files = []
         
         if config.recursive:
-            # Recursive file discovery
-            for root, dirs, filenames in os.walk(config.input_folder):
-                for filename in filenames:
-                    file_path = Path(root) / filename
-                    if file_path.is_file():
-                        files.append(file_path)
+            pattern = "**/*"
         else:
-            # Non-recursive file discovery
-            for item in config.input_folder.iterdir():
-                if item.is_file():
-                    files.append(item)
+            pattern = "*"
         
-        return sorted(files)
+        for file_path in config.input_folder.glob(pattern):
+            if file_path.is_file():
+                files.append(file_path)
+        
+        return files
     
     def _get_file_metadata(self, file_path: Path) -> Dict[str, Any]:
-        """Get file metadata for processing context."""
-        try:
-            stat = file_path.stat()
-            return {
-                'size': stat.st_size,
-                'created': stat.st_ctime,
-                'modified': stat.st_mtime,
-                'extension': file_path.suffix
-            }
-        except OSError:
-            return {
-                'size': 0,
-                'created': 0,
-                'modified': 0,
-                'extension': file_path.suffix
-            }
+        """Get metadata for a file."""
+        stat = file_path.stat()
+        return {
+            'size': stat.st_size,
+            'created_timestamp': stat.st_ctime,
+            'modified_timestamp': stat.st_mtime
+        }
     
     def _should_process_file(self, context: ProcessingContext, filters: List) -> bool:
         """Check if file should be processed based on filters."""
-        if not filters:
-            return True
-        
-        # All filters must pass (AND logic)
         for filter_func in filters:
-            try:
-                if not filter_func(context):
-                    return False
-            except Exception:
-                # If filter fails, exclude file
+            if not filter_func(context):
                 return False
-        
         return True
     
     def _validate_converter_fields(self, input_fields: set, output_data: Dict[str, Any], converter_name: str):
-        """Validate that converter preserved field structure properly."""
-        if not isinstance(output_data, dict):
-            raise ValueError(f"{converter_name} must return a dictionary, got {type(output_data).__name__}")
-        
+        """Validate that converter preserves field structure."""
         output_fields = set(output_data.keys())
         
-        # Check for missing fields (fields that were removed)
-        missing_fields = input_fields - output_fields
-        if missing_fields:
-            available_fields = list(output_fields)
-            raise ValueError(
-                f"{converter_name} removed fields: {missing_fields}. "
-                f"Available fields after conversion: {available_fields}. "
-                f"Hint: Converters should preserve all fields using 'result = context.extracted_data.copy()'"
-            )
-        
-        # Allow new fields but warn if it looks suspicious
-        new_fields = output_fields - input_fields
-        if len(new_fields) > 0:
-            # This might be OK (derived fields) but could indicate problems
-            # For now, just log it - don't error
-            pass
-    
-    def _generate_new_filename_from_template(self, formatted_filename: str, original_path: Path) -> str:
-        """Generate new filename from template result (string)."""
-        # Template returns just the filename without extension
-        # Add the original extension if not already present
-        if not formatted_filename.endswith(original_path.suffix) and original_path.suffix:
-            return formatted_filename + original_path.suffix
-        return formatted_filename
-    
-    def _generate_new_filename_from_data(self, data: Dict[str, Any], original_path: Path) -> str:
-        """Generate new filename from converter data (fallback when no template)."""
-        # Look for formatted_name in data (legacy converter support)
-        if 'formatted_name' in data:
-            new_name = str(data['formatted_name'])
-            if not new_name.endswith(original_path.suffix) and original_path.suffix:
-                new_name += original_path.suffix
-            return new_name
-        
-        # Fallback: use original filename
-        return original_path.name
-    
-    def _check_collisions(self, rename_plan: List[Dict]) -> int:
-        """Check for naming collisions in rename plan."""
-        collisions = 0
-        new_names = {}
-        
-        for item in rename_plan:
-            new_name = item['new_name']
-            if new_name in new_names:
-                collisions += 1
-            else:
-                new_names[new_name] = item
-        
-        return collisions
-    
-    def _execute_renames(self, rename_plan: List[Dict], result: RenameResult) -> int:
-        """Execute the actual file renames."""
-        renamed_count = 0
-        
-        for item in rename_plan:
-            try:
-                old_path = item['old_path']
-                new_path = old_path.parent / item['new_name']
-                
-                # Check if target already exists
-                if new_path.exists():
-                    result.error_details.append({
-                        'file': str(old_path),
-                        'error': f"Target file already exists: {new_path}"
-                    })
-                    result.errors += 1
-                    continue
-                
-                # Perform the rename
-                shutil.move(str(old_path), str(new_path))
-                renamed_count += 1
-                
-            except Exception as e:
-                result.error_details.append({
-                    'file': str(item['old_path']),
-                    'error': f"Rename failed: {str(e)}"
-                })
-                result.errors += 1
-        
-        return renamed_count
+        if input_fields != output_fields:
+            missing = input_fields - output_fields
+            extra = output_fields - input_fields
+            
+            errors = []
+            if missing:
+                errors.append(f"removed fields: {list(missing)}")
+            if extra:
+                errors.append(f"added fields: {list(extra)}")
+            
+            raise ValueError(f"{converter_name} changed field structure - {', '.join(errors)}")
