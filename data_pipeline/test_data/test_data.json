@@ -1,0 +1,17 @@
+[
+    {
+        "name": "José Canseco",
+        "age": 25,
+        "shoesize": 11
+    },
+    {
+        "name": "Björk",
+        "age": 30,
+        "shoesize": 10
+    },
+    {
+        "name": "Bob",
+        "age": 22,
+        "shoesize": 10
+    }
+]

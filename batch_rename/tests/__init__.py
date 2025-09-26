@@ -1,0 +1,1 @@
+# Tests package for batch rename project

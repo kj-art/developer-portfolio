@@ -1,0 +1,10 @@
+Project Alpha - Phase 1 Documentation
+
+Project: Alpha Initiative  
+Phase: Phase 1 - Discovery
+Date: January 15, 2024
+Version: 1.2
+
+This document contains Phase 1 requirements and analysis.
+
+Generated for batch rename tool testing.

@@ -1,0 +1,10 @@
+GlobalTech Finance Audit Report - Q3 2024
+
+Client: GlobalTech
+Department: Finance
+Document Type: Audit Report
+Period: Q3 2024
+
+Sample financial audit report demonstrating quarter handling.
+
+Generated for batch rename tool testing.

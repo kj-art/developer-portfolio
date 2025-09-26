@@ -1,0 +1,10 @@
+Startup ABC Marketing Brief - Preliminary
+
+Client: Startup ABC
+Department: Marketing
+Document Type: Brief
+Status: Preliminary
+
+Sample marketing brief demonstrating startup client classification.
+
+Generated for batch rename tool testing.

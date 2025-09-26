@@ -1,0 +1,51 @@
+# Corporate Document Standardization Configuration
+# Transforms messy business documents into consistent naming
+
+name: "Corporate Document Standardization"
+description: "Standardize HR, IT, Finance, and Marketing document naming conventions"
+
+settings:
+  input_folder: "./documents"
+  recursive: true
+  preview_mode: true
+
+pipeline:
+  # Filter out backup files and non-documents
+  filters:
+    - name: "file-type"
+      args: ["pdf", "docx", "doc", "xlsx", "pptx"]
+    - name: "!pattern"  # Exclude patterns (! means invert/exclude)
+      args: ["*backup*", "*~*", "*temp*", "*.tmp"]
+    #- name: "file-size"
+    #  args: ["1KB", "100MB"]  # Between 1KB and 100MB
+  
+  # Extract department, document type, and version from filename
+  extractor:
+    name: "split"
+    args: ["_", "dept", "doc_type", "version"]
+  
+  # Normalize extracted data
+  converters:
+    - name: "case"
+      args: ["dept", "upper"]
+    - name: "case"
+      args: ["doc_type", "title"]
+    - name: "pad_numbers"
+      args: ["version", "2"]
+      kwargs:
+        prefix: "v"
+  
+  # Build standardized filename
+  template:
+    name: "stringsmith"
+    args: ["{{dept}}-{{doc_type}}-{{version}}"]
+
+# Handle naming conflicts
+collision_handling:
+  on_existing_collision: "append_number"  # file.pdf, file_1.pdf, file_2.pdf
+  on_internal_collision: "error"          # Fail if multiple files would get same name
+
+# Example transformations this config produces:
+# HR_employee_handbook_2024.pdf → HR-Employee-Handbook-v2024.pdf
+# Marketing_branding_guidelines_draft.docx → MARKETING-Branding-Guidelines-Draft-v01.docx  
+# IT_security_policy_v2.pdf → IT-Security-Policy-v02.pdf

@@ -1,0 +1,31 @@
+# Batch Rename Tool Requirements
+# 
+# Core dependencies for the batch file rename tool
+
+# No external dependencies required for basic functionality
+# Python 3.7+ standard library provides all needed modules:
+# - pathlib (file operations)
+# - argparse (CLI parsing) 
+# - re (regex operations)
+# - fnmatch (glob patterns)
+# - importlib (dynamic imports)
+# - datetime (date parsing)
+
+# Optional dependencies for enhanced features:
+
+# For StringSmith template integration (for graceful missing field handling):
+# Assumes StringSmith is available in ../shared_utils/stringsmith/
+# If StringSmith is not available, falls back to basic template converter
+# Note: StringSmith provides conditional sections that disappear when data is missing
+#       Example: {{;dept;}}{{_;type;}}{{_;date;}} becomes "HR_report" instead of "HR_report_None"
+
+# For rich CLI output (future enhancement):  
+# rich>=10.0.0
+#
+# For progress bars (future enhancement):
+# tqdm>=4.60.0
+
+# Installation Instructions:
+# 1. Basic usage: No installation needed, uses Python standard library
+# 2. With StringSmith: Ensure StringSmith is available in ../shared_utils/stringsmith/
+# 3. Advanced features: pip install rich tqdm (when implemented)

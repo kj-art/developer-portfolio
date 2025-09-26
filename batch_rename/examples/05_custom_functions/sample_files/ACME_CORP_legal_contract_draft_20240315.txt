@@ -1,0 +1,11 @@
+ACME CORP Legal Contract - Draft
+
+Client: ACME Corporation
+Department: Legal
+Document Type: Contract
+Status: Draft
+Date: March 15, 2024
+
+Sample legal contract document for custom function testing.
+
+Generated for batch rename tool testing.

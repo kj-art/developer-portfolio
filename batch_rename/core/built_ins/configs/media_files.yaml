@@ -1,0 +1,48 @@
+# Media File Organization Configuration
+# Organizes photos and videos with date normalization
+
+name: "Media File Organization"
+description: "Organize photos and videos with consistent date formatting and metadata"
+
+settings:
+  input_folder: "./media"
+  recursive: true
+  preview_mode: true
+
+pipeline:
+  # Only process media files
+  filters:
+    - name: "file-type"
+      args: ["jpg", "jpeg", "png", "mp4", "mov", "avi"]
+    - name: "file-size"
+      args: ["10KB", "1GB"]  # Skip tiny files and huge files
+
+  # Extract date, time, and event info from filenames
+  extractor:
+    name: "regex"
+    args: ["(?P<date>\\d{8})_(?P<time>\\d{6})_(?P<event>\\w+)", "date", "time", "event"]
+    kwargs:
+      fallback_extractor: "split"
+      fallback_args: ["_", "date", "event"]
+
+  # Normalize date format and clean event names
+  converters:
+    - name: "date_format"
+      args: ["date", "%Y%m%d", "%Y-%m-%d"]
+    - name: "case"
+      args: ["event", "title"]
+    - name: "replace_text"
+      args: ["event", "_", " "]
+
+  # Create organized filename with date and event
+  template:
+    name: "stringsmith"
+    args: ["{{date}}_{{event|default:'Media'}}"]
+
+collision_handling:
+  on_existing_collision: "append_number"
+  on_internal_collision: "append_number"
+
+# Example transformations:
+# 20240315_143022_birthday.jpg → 2024-03-15_Birthday.jpg
+# 20240316_vacation_beach.mp4 → 2024-03-16_Vacation Beach.mp4

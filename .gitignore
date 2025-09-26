@@ -1,0 +1,9 @@
+data_pipeline.log
+data_pipeline.log.json
+formatting_test_output.txt
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+shared_utils/.pytest_cache/
+test_files/

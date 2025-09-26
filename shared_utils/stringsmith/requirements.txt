@@ -1,0 +1,10 @@
+# StringSmith Runtime Dependencies
+# 
+# Core functionality requires no external dependencies for maximum compatibility.
+# Optional dependencies can be installed via extras:
+#   pip install stringsmith[colors]  # For rich color support
+#   pip install stringsmith[dev]     # For development tools
+
+# Optional: Rich library for extended color support
+# Uncomment if you want to install by default:
+# rich>=10.0.0

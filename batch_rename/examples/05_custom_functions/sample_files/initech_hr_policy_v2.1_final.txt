@@ -1,0 +1,11 @@
+Initech HR Policy - Version 2.1 Final
+
+Client: Initech
+Department: Human Resources  
+Document Type: Policy
+Version: 2.1
+Status: Final
+
+Sample HR policy document demonstrating version handling.
+
+Generated for batch rename tool testing.

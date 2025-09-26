@@ -1,0 +1,17 @@
+{
+  "name": {
+    "type": "string",
+    "aliases": [
+      "full_name"
+    ]
+  },
+  "age": {
+    "type": "int64"
+  },
+  "city": {
+    "type": "string",
+    "aliases": [
+      "location"
+    ]
+  }
+}

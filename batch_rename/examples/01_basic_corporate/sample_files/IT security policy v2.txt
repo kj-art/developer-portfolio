@@ -1,0 +1,13 @@
+IT Security Policy - Version 2
+
+Information security standards and procedures.
+
+Contents:
+- Password requirements
+- Access control procedures  
+- Data protection guidelines
+- Incident response protocols
+
+Version: 2.0 - Updated security standards.
+
+Generated for batch rename tool testing.

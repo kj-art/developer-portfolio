@@ -1,0 +1,13 @@
+Legal Contract Template - Final
+
+Standard contract template for business agreements.
+
+Contents:
+- Terms and conditions
+- Payment terms
+- Liability clauses
+- Termination procedures
+
+Status: Final version approved for use.
+
+Generated for batch rename tool testing.
