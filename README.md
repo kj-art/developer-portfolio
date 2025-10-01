@@ -14,7 +14,7 @@ This repository showcases production-ready automation tools and libraries design
 
 ## 🚀 Featured Projects
 
-### [StringSmith Template Formatter](./shared_utils/stringsmith/) ✅ **Production Ready**
+### [StringSmith Template Formatter](./shared_utils/stringsmith/)
 Professional Python library for conditional template formatting with rich styling and dynamic content control.
 
 **Key Features:**
@@ -33,7 +33,7 @@ formatter.format(name="admin", message="Server maintenance")  # "User: admin Ser
 formatter.format(message="System alert", urgent=True)         # "🚨 URGENT: System alert"
 ```
 
-### [Multi-File Data Processing Pipeline](./data_pipeline/) 🚧 **In Development**
+### [Multi-File Data Processing Pipeline](./data_pipeline/)
 Enterprise-grade data processing system with streaming optimization and schema detection.
 
 **Key Features:**
@@ -45,36 +45,25 @@ Enterprise-grade data processing system with streaming optimization and schema d
 
 **Business Value:** Solves the universal problem of merging messy data from multiple sources into clean, standardized datasets. Critical for data migration, reporting consolidation, and ETL workflows.
 
-## 🔄 Planned Projects
+### [Batch Rename Tool](./batch_rename/)
+Flexible file renaming automation with modular processing pipeline and custom function support.
 
-### API Workflow Orchestrator
-**Goal:** Connect disparate business tools through automated API workflows  
-**Use Case:** Trello → Google Sheets → Slack notifications, with error handling and retry logic  
-**Skills:** REST APIs, OAuth, webhooks, multi-step workflow orchestration
+**Key Features:**
+- **Modular Pipeline:** Extract, convert, template, and filter operations with custom functions
+- **Preview Mode:** See changes before applying them
+- **Collision Handling:** Configurable strategies for duplicate filenames
+- **CLI & GUI:** Both command-line and graphical interfaces
+- **Custom Functions:** Load and execute user-defined Python functions for specialized workflows
 
-### Automated Report Generator  
-**Goal:** End-to-end business reporting automation  
-**Use Case:** Database queries → business logic → formatted PDFs → scheduled email delivery  
-**Skills:** Database connectivity, document generation, SMTP automation, template-driven reports
-
-### Cross-Platform Script Converter
-**Goal:** Migration assistance between automation environments  
-**Use Case:** Excel VBA → Google Apps Script, with syntax translation and optimization  
-**Skills:** Code parsing, AST manipulation, platform-specific API usage
-
-### Bulk File Rename & Metadata Tool
-**Goal:** Digital asset management automation  
-**Use Case:** Apply naming conventions, embed metadata, organize into structured folders with preview/undo  
-**Skills:** File system operations, regex pattern matching, metadata manipulation
+**Business Value:** Essential for digital asset management, batch processing workflows, and maintaining consistent file naming conventions across teams.
 
 ## 🛠️ Technical Stack
 
-**Languages:** Python 3.7+, JavaScript, Google Apps Script  
-**Data Processing:** pandas, openpyxl, JSON handling, streaming algorithms  
-**APIs & Integration:** REST APIs, OAuth, webhooks, database connectivity  
-**CLI/GUI:** argparse, tkinter, professional user interface design  
+**Languages:** Python 3.7+  
+**Data Processing:** pandas, openpyxl, streaming algorithms, schema detection  
+**CLI/GUI:** argparse, PyQt6, professional user interface design  
 **Testing & Quality:** pytest, comprehensive test coverage, error handling  
-**Deployment:** PyInstaller executables, cross-platform compatibility
+**Architecture:** Dependency injection, strategy pattern, modular design
 
 ## 🏗️ Architecture Philosophy
 
@@ -120,7 +109,7 @@ This background translates directly to business automation: understanding how te
 
 **Current Focus:** Building comprehensive automation toolkit demonstrating enterprise-ready solutions for common business challenges.
 
-**Next Targets:** Advanced API integration, cloud platform automation (AWS/Azure/GCP), CI/CD pipeline tools, security automation.
+**Technical Growth:** Expanding expertise in modern frameworks, cloud platforms, and API integration while maintaining focus on practical, production-ready solutions.
 
 **Learning Approach:** Production-quality implementations with real-world testing, comprehensive documentation, and professional deployment patterns.
 
